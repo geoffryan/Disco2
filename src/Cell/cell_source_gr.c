@@ -446,7 +446,17 @@ void cell_cool_integrateT_exact(double *prim, double *dcons, double dt,
     //                * T0*T0*T0 * dt * eos_r_scale/eos_c, -1.0/3.0) * T0 / (eos_mp*eos_c*eos_c);
     //
     double T0 = prim[PPP]/prim[RHO];
-    double T1 = pow(1.0 + 3*(GAM-1)*qdot/(prim[RHO]*u0*T0)*dt, -1.0/3.0) * T0;
+    double T1;
+    if(sim_CoolingType(theSim) == COOL_BB_ES)
+        T1 = pow(1.0 + 3*(GAM-1)*qdot/(prim[RHO]*u0*T0)*dt, -1.0/3.0) * T0;
+    else if (sim_CoolingType(theSim) == COOL_ISOTHERM)
+    {
+        T1 = sim_CoolPar1(theSim);
+        if(T1 > T0)
+            T1 = T0;
+    }
+    else
+        T1 = 0.0;
     //printf("%.12lg %.12lg %.12lg\n", prim[PPP]/prim[RHO], T0, T1);
 
     int NUMQ = sim_NUM_Q(theSim);
