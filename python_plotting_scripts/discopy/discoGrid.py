@@ -63,27 +63,69 @@ class Grid:
         else:
             print("Given checkpoint has different grid structure, can not load.")
 
-    def saveCheckpoint(self, filename, numProc=1):
-        # Saves grid to checkpoint file, ASSUMES 2D
-        # TODO: 3D
+    def saveCheckpoint(self, filename, numProc=1, loadBalance="default"):
+        # Saves grid to checkpoint file, emulating Disco's behaviour for
+        # distribution amongst several processes.  loadBalance should be
+        # "quadratic" for use with Yike's self-gravity version.
+
+        numProcR = 1
+        numProcZ = 1
+
+        if self.nz_tot > 1:
+            # This emulates MPI_dims_create.
+            for i in xrange(int(math.sqrt(numProc)), 0, -1):
+                if numProc % i == 0:
+                    numProcZ = i
+                
+        numProcR = numProc / numProcZ
 
         N = 0
         nr = self.nr_tot - self.ng_rmin - self.ng_rmax
-        nr_loc = nr / numProc
+        nz = self.nz_tot - self.ng_zmin - self.ng_zmax
+        if self.nz_tot == 1:
+            nz = 1
+
+        N0 = np.zeros(numProcR+1, dtype=np.int64)
+
+        if loadBalance == "quadratic":
+            N0[0] = 0
+            N0[-1] = nr
+            singleSlice = (nr*(nr+1)/2) / numProcR
+            k = 0
+            for i in xrange(nr+1):
+                tot = (k+1) * singleSlice
+                if i*(i+1)/2 > tot:
+                    N0[k+1] = i
+                    k += 1
+
+        else:
+            N0 = np.arange(0,numProcR+1) * (nr/numProcR)
+
+        nz_loc = nz / numProcZ
 
         for rank in xrange(numProc):
 
+            rankR = rank / numProcZ
+            rankZ = rank % numProcZ
+
             ng1 = self.ng
             ng2 = self.ng
-            if rank == 0:
+            if rankR == 0:
                 ng1 = self.ng_rmin
-            if rank == numProc-1:
+            if rankR == numProcR-1:
                 ng2 = self.ng_rmax
             
-            i1 = self.ng_rmin + (rank  )*nr_loc - ng1
-            i2 = self.ng_rmin + (rank+1)*nr_loc + ng2
+            i1 = self.ng_rmin + N0[rankR]   - ng1
+            i2 = self.ng_rmin + N0[rankR+1] + ng2
 
-            N += self.np[:,i1:i2].sum()
+            if self.nz_tot == 1:
+                k1 = 0
+                k2 = 1
+            else:
+                k1 = self.ng_zmin + (rankZ  )*nz_loc - self.ng
+                k2 = self.ng_zmin + (rankZ+1)*nz_loc + self.ng
+
+            N += self.np[k1:k2,i1:i2].sum()
 
         f = h5.File(filename, "w")
         dat = f.create_dataset('Data', (N,3+self.nq), dtype=np.float64)
@@ -94,17 +136,28 @@ class Grid:
 
         ind = 0
         for rank in xrange(numProc):
+            
+            rankR = rank / numProcZ
+            rankZ = rank % numProcZ
+
             ng1 = self.ng
             ng2 = self.ng
-            if rank == 0:
+            if rankR == 0:
                 ng1 = self.ng_rmin
-            if rank == numProc-1:
+            if rankR == numProcR-1:
                 ng2 = self.ng_rmax
             
-            i1 = self.ng_rmin + (rank  )*nr_loc - ng1
-            i2 = self.ng_rmin + (rank+1)*nr_loc + ng2
-            
-            dN = self.np[:,i1:i2].sum()
+            i1 = self.ng_rmin + N0[rankR]   - ng1
+            i2 = self.ng_rmin + N0[rankR+1] + ng2
+
+            if self.nz_tot == 1:
+                k1 = 0
+                k2 = 1
+            else:
+                k1 = self.ng_zmin + (rankZ  )*nz_loc - self.ng
+                k2 = self.ng_zmin + (rankZ+1)*nz_loc + self.ng
+
+            dN = self.np[k1:k2,i1:i2].sum()
 
             piph = np.zeros(dN)
             r = np.zeros(dN)
@@ -112,7 +165,7 @@ class Grid:
             prim = np.zeros((dN,self.nq))
 
             ind1 = 0
-            for k in xrange(self.nz_tot):
+            for k in xrange(k1,k2):
                 z0 = 0.5 * (self.zFaces[k+1] + self.zFaces[k])
                 for i in xrange(i1,i2):
                     nphi = self.np[k,i]
