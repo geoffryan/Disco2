@@ -3,10 +3,14 @@ from itertools import imap, izip
 import h5py as h5
 import numpy as np
 
-def readCheckpoint(filename):
+def readCheckpoint(filename, nq=0):
+    """
+    Return the data from a checkpoint file.  Remove duplicate entries.
+    """
 
     f = h5.File(filename, "r")
     Data = f['Data'][...]
+    gravMass = f['GravMass'][...]
     t = f['T'][0]
     f.close()
 
@@ -28,10 +32,13 @@ def readCheckpoint(filename):
     vr = np.array(Data[:,5])
     vp = np.array(Data[:,6])
     vz = np.array(Data[:,7])
-    try:
-        q = np.array(Data[:,8])
-    except:
-        q = np.zeros(r.shape)
+    q = []
+    for i in xrange(nq-5):
+        try:
+            q.append(np.array(Data[:,8+i]))
+        except:
+            q.append(np.zeros(r.shape))
+    q = tuple(q)
 
     #calculate cell volumes
     z_vals = np.unique(z)
@@ -68,5 +75,5 @@ def readCheckpoint(filename):
         phi[inds] = piph[inds] - 0.5*dp
         dV[inds] *= r[inds] * dphi[inds]
 
-    return t, r, phi, z, rho, P, vr, vp, vz, dV, q, piph
+    return t, r, phi, z, rho, P, vr, vp, vz, dV, q, piph, gravMass
 

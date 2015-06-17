@@ -28,6 +28,7 @@ class Grid:
     prim = None
     grad = None
     nq = 0
+    gravMass = None
 
     _pars = None
 
@@ -48,9 +49,10 @@ class Grid:
         self._setFacePosRZ()
         self._setNP()
         self._setFacePosP()
+        self.nq = 5 + pars['NUM_N']
 
     def loadCheckpoint(self, filename):
-        dat = rc.readCheckpoint(filename)
+        dat = rc.readCheckpoint(filename, self.nq)
         r = dat[1]
         z = dat[3]
         piph = dat[11]
@@ -86,10 +88,9 @@ class Grid:
         f = h5.File(filename, "w")
         dat = f.create_dataset('Data', (N,3+self.nq), dtype=np.float64)
         f.create_dataset('T', (1,), dtype=np.float64)
-        f.create_dataset('GravMass', (2,4), dtype=np.float64)
+        f.create_dataset('GravMass', data=self.gravMass, dtype=np.float64)
 
         f['T'][0] = self.T
-        f['GravMass'][:,:] = np.zeros((2,4))
 
         ind = 0
         for rank in xrange(numProc):
@@ -188,6 +189,8 @@ class Grid:
                     j += self.np[k,i]
                 self.prim.append(slice)
 
+        self.gravMass = dataGroup["grav_mass"][...]
+
         f.close()
 
     def saveArchive(self, filename):
@@ -240,6 +243,10 @@ class Grid:
                         primDSet[2+q, j:j+nphi] = self.prim[k][i][:,q]
 
                     j += self.np[k,i]
+
+        if self.gravMass is not None:
+            dataGroup.create_dataset("grav_mass", data=self.gravMass, 
+                                        dtype=np.float64)
 
         f.close()
 
@@ -389,19 +396,21 @@ class Grid:
         if self.prim is None:
             self.prim = []
 
-        self.nq = 6
-
         T = dat[0]
         R = dat[1]
         Z = dat[3]
         Piph = dat[11]
-        prim = np.array([dat[4], dat[5], dat[6], dat[7], dat[8], dat[10]])
-        prim = prim.T
+        gravMass = dat[12]
+        prim = [dat[4], dat[5], dat[6], dat[7], dat[8]]
+        for i in xrange(self.nq-5):
+            prim.append(dat[10][i])
+        prim = np.array(prim).T
 
         Rvals = np.unique(R)
         Zvals = np.unique(Z)
 
         self.T = T
+        self.gravMass = gravMass
 
         for k, z in enumerate(Zvals):
             

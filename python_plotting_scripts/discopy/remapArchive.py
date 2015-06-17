@@ -19,7 +19,8 @@ def _remapGrid2D(g0, g1):
         g0.plm()
 
     prim = []
-    nq = g0.nq
+    nq = g1.nq
+    nq0 = min(g0.nq, g1.nq)
 
     # Initialize all prims to 0
     for i in xrange(g1.nr_tot):
@@ -80,11 +81,11 @@ def _remapGrid2D(g0, g1):
                 if dphi < 0:
                     print("AAAAAAHHHHHHH!")
 
-                q = prim0[j0,:] + (r-r0)*grad0[j0,:,0] \
-                                + (phi-phi0)*grad0[j0,:,1]
+                q = prim0[j0,:nq0] + (r-r0)*grad0[j0,:nq0,0] \
+                                   + (phi-phi0)*grad0[j0,:nq0,1]
                 dA = r * dr * dphi
 
-                prim[i1][j1,:] += q*dA
+                prim[i1][j1,:nq0] += q*dA
 
                 if phi0R < phi1R:
                     j0 += 1
@@ -123,8 +124,8 @@ def _remapGrid2D(g0, g1):
 
     # Done!
     g1.prim = [prim]
-    g1.nq = nq
     g1.T = g0.T
+    g1.gravMass = g0.gravMass.copy()
 
 def _remapGrid3D(g0, g1):
     # Instantiate g1's prim with values linearly interpolated from g0, assuming
@@ -134,7 +135,8 @@ def _remapGrid3D(g0, g1):
         g0.plm()
 
     prim = []
-    nq = g0.nq
+    nq = g1.nq
+    nq0 = min(g0.nq, g1.nq)
 
     # Initialize all prims to 0
     for k in xrange(g1.nz_tot):
@@ -217,12 +219,12 @@ def _remapGrid3D(g0, g1):
                         if dphi < 0:
                             print("AAAAAAHHHHHHH!")
 
-                        q = prim0[j0,:] + (r-r0)*grad0[j0,:,0] \
-                                        + (phi-phi0)*grad0[j0,:,1] \
-                                        + (z-z0)*grad0[j0,:,2]
+                        q = prim0[j0,:nq0] + (r-r0)*grad0[j0,:nq0,0] \
+                                           + (phi-phi0)*grad0[j0,:nq0,1] \
+                                           + (z-z0)*grad0[j0,:nq0,2]
                         dV = r * dr * dphi * dz
 
-                        prim[k1][i1][j1,:] += q*dV
+                        prim[k1][i1][j1,:nq0] += q*dV
 
                         if phi0R < phi1R:
                             j0 += 1
@@ -274,8 +276,8 @@ def _remapGrid3D(g0, g1):
 
     # Done!
     g1.prim = prim
-    g1.nq = nq
     g1.T = g0.T
+    g1.gravMass = g0.gravMass.copy()
 
 
 if __name__ == "__main__":
