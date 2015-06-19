@@ -3,8 +3,11 @@ import numpy as np
 import discoGrid as dg
 import readParfile as rp
 
-def remapGrid(g0, g1):
+def remapGrid(g0, g1, gradOrder=0):
     # Maps g0's data onto g1, taking into account differing grid structures.
+
+    if g0.gradOrder != gradOrder or g0.grad is None:
+        g0.calcGrad(gradOrder)
 
     if g0.nz_tot != 1 or g1.nz_tot != 1:
         _remapGrid3D(g0, g1)
@@ -14,9 +17,6 @@ def remapGrid(g0, g1):
 def _remapGrid2D(g0, g1):
     # Instantiate g1's prim with values linearly interpolated from g0, assuming
     # both grids only have a single 'z' zone.
-
-    if g0.grad is None:
-        g0.plm()
 
     prim = []
     nq = g1.nq
@@ -130,9 +130,6 @@ def _remapGrid2D(g0, g1):
 def _remapGrid3D(g0, g1):
     # Instantiate g1's prim with values linearly interpolated from g0, assuming
     # both grids only have a single 'z' zone.
-
-    if g0.grad is None:
-        g0.plm()
 
     prim = []
     nq = g1.nq

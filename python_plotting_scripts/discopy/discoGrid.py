@@ -27,6 +27,7 @@ class Grid:
     T = 0
     prim = None
     grad = None
+    gradOrder = -1
     nq = 0
     gravMass = None
 
@@ -76,6 +77,7 @@ class Grid:
             for i in xrange(int(math.sqrt(numProc)), 0, -1):
                 if numProc % i == 0:
                     numProcZ = i
+                    break
                 
         numProcR = numProc / numProcZ
 
@@ -303,8 +305,11 @@ class Grid:
 
         f.close()
 
-    def plm(self):
-        self._calcGrad()
+    def calcGrad(self, gradOrder=0):
+        if gradOrder == 1:
+            self._calcGradPLM()
+        else:
+            self._calcGradPCM()
 
     def _setNRZ(self):
         # Same logic as in sim_alloc_arr() in sim_alloc_arr.c
@@ -479,7 +484,21 @@ class Grid:
             
             self.prim.append(slice)
 
-    def _calcGrad(self):
+    def _calcGradPCM(self):
+        
+        # Initialize grad array to zero.  
+        grad = []
+        for k in xrange(self.nz_tot):
+            slice = []
+            for i in xrange(self.nr_tot):
+                nphi = self.np[k,i]
+                slice.append(np.zeros((nphi,self.nq,3), dtype=np.float64))
+            grad.append(slice)
+
+        self.grad = grad
+        self.gradOrder = 0
+
+    def _calcGradPLM(self):
         
         # Initialize grad array to zero.  
         grad = []
@@ -665,6 +684,7 @@ class Grid:
                     grad[k][i][j,:,2] /= dA
 
         self.grad = grad
+        self.gradOrder = 1
 
 
 def fixPhi(phiL1, phiL2, phiR1, phiR2):
