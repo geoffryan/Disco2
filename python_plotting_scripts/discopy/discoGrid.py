@@ -3,7 +3,7 @@ import math
 import numpy as np
 import scipy.optimize as opt
 import h5py as h5
-import readChkpt as rc
+import readCheckpoint as rc
 import readParfile as rp
 
 class Grid:
@@ -27,7 +27,9 @@ class Grid:
     T = 0
     prim = None
     grad = None
+    gradOrder = -1
     nq = 0
+    gravMass = None
 
     _pars = None
 
@@ -40,7 +42,7 @@ class Grid:
             self.loadPars(pars)
 
             if chkpt is not None:
-                self.loadChkpt(chkpt)
+                self.loadCheckpoint(chkpt)
 
     def loadPars(self, pars):
         self._pars = pars
@@ -48,62 +50,116 @@ class Grid:
         self._setFacePosRZ()
         self._setNP()
         self._setFacePosP()
+        self.nq = 5 + pars['NUM_N']
 
-    def loadChkpt(self, filename):
-        dat = rc.readChkpt(filename)
+    def loadCheckpoint(self, filename):
+        dat = rc.readCheckpoint(filename, self.nq)
         r = dat[1]
         z = dat[3]
         piph = dat[11]
 
         if self._checkSame(r, z, piph):
             print("Looks like the same grid! Copying...")
-            self._loadChkptIdentical(dat)
+            self._loadCheckpointIdentical(dat)
         else:
             print("Given checkpoint has different grid structure, can not load.")
 
-    def saveChkpt(self, filename, numProc=1):
-        # Saves grid to checkpoint file, ASSUMES 2D
-        # TODO: 3D
+    def saveCheckpoint(self, filename, numProc=1, loadBalance="default"):
+        # Saves grid to checkpoint file, emulating Disco's behaviour for
+        # distribution amongst several processes.  loadBalance should be
+        # "quadratic" for use with Yike's self-gravity version.
+
+        numProcR = 1
+        numProcZ = 1
+
+        if self.nz_tot > 1:
+            # This emulates MPI_dims_create.
+            for i in xrange(int(math.sqrt(numProc)), 0, -1):
+                if numProc % i == 0:
+                    numProcZ = i
+                    break
+                
+        numProcR = numProc / numProcZ
 
         N = 0
         nr = self.nr_tot - self.ng_rmin - self.ng_rmax
-        nr_loc = nr / numProc
+        nz = self.nz_tot - self.ng_zmin - self.ng_zmax
+        if self.nz_tot == 1:
+            nz = 1
+
+        N0 = np.zeros(numProcR+1, dtype=np.int64)
+
+        if loadBalance == "quadratic":
+            N0[0] = 0
+            N0[-1] = nr
+            singleSlice = (nr*(nr+1)/2) / numProcR
+            k = 0
+            for i in xrange(nr+1):
+                tot = (k+1) * singleSlice
+                if i*(i+1)/2 > tot:
+                    N0[k+1] = i
+                    k += 1
+
+        else:
+            N0 = np.arange(0,numProcR+1) * (nr/numProcR)
+
+        nz_loc = nz / numProcZ
 
         for rank in xrange(numProc):
 
+            rankR = rank / numProcZ
+            rankZ = rank % numProcZ
+
             ng1 = self.ng
             ng2 = self.ng
-            if rank == 0:
+            if rankR == 0:
                 ng1 = self.ng_rmin
-            if rank == numProc-1:
+            if rankR == numProcR-1:
                 ng2 = self.ng_rmax
             
-            i1 = self.ng_rmin + (rank  )*nr_loc - ng1
-            i2 = self.ng_rmin + (rank+1)*nr_loc + ng2
+            i1 = self.ng_rmin + N0[rankR]   - ng1
+            i2 = self.ng_rmin + N0[rankR+1] + ng2
 
-            N += self.np[:,i1:i2].sum()
+            if self.nz_tot == 1:
+                k1 = 0
+                k2 = 1
+            else:
+                k1 = self.ng_zmin + (rankZ  )*nz_loc - self.ng
+                k2 = self.ng_zmin + (rankZ+1)*nz_loc + self.ng
+
+            N += self.np[k1:k2,i1:i2].sum()
 
         f = h5.File(filename, "w")
         dat = f.create_dataset('Data', (N,3+self.nq), dtype=np.float64)
         f.create_dataset('T', (1,), dtype=np.float64)
-        f.create_dataset('GravMass', (2,4), dtype=np.float64)
+        f.create_dataset('GravMass', data=self.gravMass, dtype=np.float64)
 
         f['T'][0] = self.T
-        f['GravMass'][:,:] = np.zeros((2,4))
 
         ind = 0
         for rank in xrange(numProc):
+            
+            rankR = rank / numProcZ
+            rankZ = rank % numProcZ
+
             ng1 = self.ng
             ng2 = self.ng
-            if rank == 0:
+            if rankR == 0:
                 ng1 = self.ng_rmin
-            if rank == numProc-1:
+            if rankR == numProcR-1:
                 ng2 = self.ng_rmax
             
-            i1 = self.ng_rmin + (rank  )*nr_loc - ng1
-            i2 = self.ng_rmin + (rank+1)*nr_loc + ng2
-            
-            dN = self.np[:,i1:i2].sum()
+            i1 = self.ng_rmin + N0[rankR]   - ng1
+            i2 = self.ng_rmin + N0[rankR+1] + ng2
+
+            if self.nz_tot == 1:
+                k1 = 0
+                k2 = 1
+            else:
+                k1 = self.ng_zmin + (rankZ  )*nz_loc - self.ng
+                k2 = self.ng_zmin + (rankZ+1)*nz_loc + self.ng
+
+            dN = self.np[k1:k2,i1:i2].sum()
 
             piph = np.zeros(dN)
             r = np.zeros(dN)
@@ -111,7 +167,7 @@ class Grid:
             prim = np.zeros((dN,self.nq))
 
             ind1 = 0
-            for k in xrange(self.nz_tot):
+            for k in xrange(k1,k2):
                 z0 = 0.5 * (self.zFaces[k+1] + self.zFaces[k])
                 for i in xrange(i1,i2):
                     nphi = self.np[k,i]
@@ -188,6 +244,8 @@ class Grid:
                     j += self.np[k,i]
                 self.prim.append(slice)
 
+        self.gravMass = dataGroup["grav_mass"][...]
+
         f.close()
 
     def saveArchive(self, filename):
@@ -229,7 +287,8 @@ class Grid:
         if self.nq > 0:
             j = 0
             primDSet = dataGroup.create_dataset("prim", 
-                                    (2+self.nq, self.np.sum()), dtype=np.float64)
+                                    (2+self.nq, self.np.sum()), 
+                                    dtype=np.float64)
             for k in xrange(self.nz_tot):
                 for i in xrange(self.nr_tot):
                     nphi = self.np[k,i]
@@ -240,10 +299,17 @@ class Grid:
 
                     j += self.np[k,i]
 
+        if self.gravMass is not None:
+            dataGroup.create_dataset("grav_mass", data=self.gravMass, 
+                                        dtype=np.float64)
+
         f.close()
 
-    def plm(self):
-        self._calcGrad()
+    def calcGrad(self, gradOrder=0):
+        if gradOrder == 1:
+            self._calcGradPLM()
+        else:
+            self._calcGradPCM()
 
     def _setNRZ(self):
         # Same logic as in sim_alloc_arr() in sim_alloc_arr.c
@@ -377,30 +443,32 @@ class Grid:
                 if r < self.rFaces[i] or r > self.rFaces[i+1]:
                     return False
 
-                rind = (R==r)
+                rind = (Rz==r)
                 if len(Piphz[rind]) != self.np[k][i]:
                     return False
 
         return True
 
-    def _loadChkptIdentical(self, dat):
+    def _loadCheckpointIdentical(self, dat):
 
         if self.prim is None:
             self.prim = []
-
-        self.nq = 6
 
         T = dat[0]
         R = dat[1]
         Z = dat[3]
         Piph = dat[11]
-        prim = np.array([dat[4], dat[5], dat[6], dat[7], dat[8], dat[10]])
-        prim = prim.T
+        gravMass = dat[12]
+        prim = [dat[4], dat[5], dat[6], dat[7], dat[8]]
+        for i in xrange(self.nq-5):
+            prim.append(dat[10][i])
+        prim = np.array(prim).T
 
         Rvals = np.unique(R)
         Zvals = np.unique(Z)
 
         self.T = T
+        self.gravMass = gravMass
 
         for k, z in enumerate(Zvals):
             
@@ -409,14 +477,28 @@ class Grid:
             
             for i, r in enumerate(Rvals):
                 rind = r==R
-                self.pFaces[k][i] = Piph[zind][rind]
+                self.pFaces[k][i] = Piph[zind*rind]
 
-                annulus = prim[zind][rind]
+                annulus = prim[zind*rind]
                 slice.append(annulus)
             
             self.prim.append(slice)
 
-    def _calcGrad(self):
+    def _calcGradPCM(self):
+        
+        # Initialize grad array to zero.  
+        grad = []
+        for k in xrange(self.nz_tot):
+            slice = []
+            for i in xrange(self.nr_tot):
+                nphi = self.np[k,i]
+                slice.append(np.zeros((nphi,self.nq,3), dtype=np.float64))
+            grad.append(slice)
+
+        self.grad = grad
+        self.gradOrder = 0
+
+    def _calcGradPLM(self):
         
         # Initialize grad array to zero.  
         grad = []
@@ -459,7 +541,7 @@ class Grid:
             for i,r in enumerate(self.rFaces):
                 if i == 0 or i == self.nr_tot:
                     continue
-                print("   interface {0:d}".format(i))
+                #print("   interface {0:d}".format(i))
                 dr = 0.5 * (self.rFaces[i+1] - self.rFaces[i-1])
                 r = self.rFaces[i]
 
@@ -527,6 +609,7 @@ class Grid:
                     grad[k][i][j,:,0] /= dA
 
         # Z - Direction
+        print("Calculating z derivatives...")
         for i in xrange(self.nr_tot):
 
             dr = self.rFaces[i+1] - self.rFaces[i]
@@ -601,6 +684,7 @@ class Grid:
                     grad[k][i][j,:,2] /= dA
 
         self.grad = grad
+        self.gradOrder = 1
 
 
 def fixPhi(phiL1, phiL2, phiR1, phiR2):
@@ -653,10 +737,10 @@ if __name__ == "__main__":
             
             pars = rp.readParfile(sys.argv[1])
             g = Grid(pars)
-            g.loadChkpt(sys.argv[2])
+            g.loadCheckpoint(sys.argv[2])
 
     g.saveArchive("archive.h5")
-    g.saveChkpt("checkpoint_test.h5")
+    g.saveCheckpoint("checkpoint_test.h5")
 
 
 

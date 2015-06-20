@@ -43,7 +43,7 @@ def plotGrid(g, ax, k=0, N=1000):
 def plotGridData(g, ax, k=0, q=0, cmap=cm.spring):
     
     patches = []
-    vals = np.zeros(g.np[k].sum(), dtype=np.float64)
+    vals = np.zeros(g.np[k,:].sum(), dtype=np.float64)
 
     d2r = 180/math.pi
 
@@ -66,6 +66,32 @@ def plotGridData(g, ax, k=0, q=0, cmap=cm.spring):
     p.set_array(vals)
     ax.add_collection(p)
     plt.colorbar(p)
+
+def plotGridRZ(g, ax, phi=0.0, q=0, cmap=cm.afmhot):
+   
+    #TODO: Finish this!
+
+    patches = []
+    vals = np.zeros(g.nz_tot * g.nr_tot)
+
+    v = 0
+
+    for k in xrange(g.nz_tot):
+        z1 = g.zFaces[k]
+        z2 = g.zFaces[k+1]
+        dz = z2-z1
+        
+        for i in xrange(g.nr_tot):
+            r1 = g.rFaces[i]
+            r2 = g.rFaces[i+1]
+            dr = r2-r1
+
+            p = pat.Rectangle(r1, z1, dr, dz)
+            patches.append(p)
+
+            piph = g.pFaces[k][i]
+            j0 = np.argmin(piph)
+
 
 def sizePlot(g, ax, rmax=None):
 
