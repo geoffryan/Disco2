@@ -451,8 +451,7 @@ class Grid:
 
     def _loadCheckpointIdentical(self, dat):
 
-        if self.prim is None:
-            self.prim = []
+        self.prim = []
 
         T = dat[0]
         R = dat[1]
