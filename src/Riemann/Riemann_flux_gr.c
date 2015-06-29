@@ -89,6 +89,8 @@ void riemann_set_vel_gr(struct Riemann *theRiemann, struct Sim *theSim, double r
     v[2] = theRiemann->primR[UZZ];
     w = a / sqrt(-metric_g_dd(g,0,0)-2.0*metric_dot3_u(g,b,v)-metric_square3_u(g,v));
     sig = cf22/(w*w*(1.0-cf22));
+
+    //TODO: typo????????
     dv = sqrt(sig*(1.0+sig)*a*a*gam - sig*(vnL+bn)*(vnL+bn));
 
     Sl2 = (vnR - sig*bn - dv) / (1.0+sig);

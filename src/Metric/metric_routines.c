@@ -373,6 +373,130 @@ double metric_frame_dU_du_acc(struct Metric *g, int mu, int nu, struct Sim *theS
     return 0.0;
 }
 
+double metric_frame_U_u_fit(struct Metric *g, int mu, struct Sim *theSim)
+{
+    double UR, UP, U0;
+    double M = sim_GravM(theSim);
+    double r = g->x[1];
+
+    U0 = 0.0;
+    UR = 0.0;
+    UP = 0.0;
+
+    if(mu == 0 || mu == 1)
+    {
+        double p1, p2, r1, r2, a;
+        r1 = 2.012;
+        r2 = 3.663;
+        p1 = -1.864;
+        p2 = -7.896;
+        a = -0.632;
+        UR = -pow( pow(r/(r1*M),p1*a) + pow(r/(r2*M),p2*a), 1.0/a);
+    }
+    if(mu == 0 || mu == 2)
+    {
+        double p1, p2, r1, r2, a;
+        r1 = 1.837;
+        r2 = 1.0;
+        p1 = -2.029;
+        p2 = -1.5;
+        a = 3.635;
+        UP = pow( pow(r/(r1*M),p1*a) + pow(r/(r2*M),p2*a), 1.0/a) / M;
+    }
+    if(mu == 0)
+    {
+        double g00 = -1.0 + 2*M/r;
+        double g0r = 2*M/r;
+        double grr = 1.0 + 2*M/r;
+        double gpp = r*r;
+        U0 = (-g0r*UR - sqrt(g0r*g0r*UR*UR - g00*(1.0+grr*UR*UR+gpp*UP*UP)))
+                / g00;
+    }
+
+    if(mu == 0)
+        return U0;
+    else if (mu == 1)
+        return UR;
+    else if (mu == 2)
+        return UP;
+
+    return 0.0;
+}
+double metric_frame_dU_du_fit(struct Metric *g, int mu, int nu, 
+                                struct Sim *theSim)
+{
+    double UR, UP, U0, dUR, dUP, dU0;
+    double M = sim_GravM(theSim);
+    double r = g->x[1];
+    
+    U0 = 0.0;
+    UR = 0.0;
+    UP = 0.0;
+    dU0 = 0.0;
+    dUR = 0.0;
+    dUP = 0.0;
+
+    if(mu != 1)
+        return 0.0;
+
+    if(nu == 0 || nu == 1)
+    {
+        double p1, p2, r1, r2, a, x1, x2;
+        r1 = 2.012;
+        r2 = 3.663;
+        p1 = -1.864;
+        p2 = -7.896;
+        a = -0.632;
+        x1 = pow(r/(r1*M), p1*a);
+        x2 = pow(r/(r2*M), p2*a);
+        UR = -pow( x1 + x2, 1.0/a);
+        dUR = UR * (p1*x1+p2*x2) / (r * (x1+x2));
+    }
+    if(nu == 0 || nu == 2)
+    {
+        double p1, p2, r1, r2, a, x1, x2;
+        r1 = 1.837;
+        r2 = 1.0;
+        p1 = -2.029;
+        p2 = -1.5;
+        a = 3.635;
+        x1 = pow(r/(r1*M), p1*a);
+        x2 = pow(r/(r2*M), p2*a);
+        UP = pow( x1 + x2, 1.0/a) / M;
+        dUP = UP * (p1*x1+p2*x2) / (r * (x1+x2));
+    }
+    if(nu == 0)
+    {
+        double g00 = -1.0 + 2*M/r;
+        double g0r = 2*M/r;
+        double grr = 1.0 + 2*M/r;
+        double gpp = r*r;
+        double dB = -2*M/(r*r);
+
+        double Na, desc, N, dNa, ddesc, dN;
+        Na = -g0r*UR;
+        desc = g0r*g0r*UR*UR - g00*(1.0+grr*UR*UR+gpp*UP*UP);
+        N = Na - sqrt(desc);
+
+        dNa = -dB*UR - g0r*dUR;
+        ddesc = 2*(g0r*dB*UR*UR+g0r*g0r*UR*dUR) - dB*(1.0+grr*UR*UR+gpp*UP*UP)
+                - g00*(dB*UR*UR + 2*grr*UR*dUR + dB*UP*UP + 2*gpp*UP*dUP);
+        dN = dNa - 0.5*ddesc/sqrt(desc);
+
+        U0 = N / g00;
+        dU0 = (dN*g00 - N*dB) / (g00*g00);
+    }
+
+    if(nu == 0)
+        return dU0;
+    else if (nu == 1)
+        return dUR;
+    else if (nu == 2)
+        return dUP;
+
+    return 0.0;
+}
+
 int metric_fixV(struct Metric *g, double *v, double maxW)
 {
     //If velocity is superluminal, reduce to Lorentz factor 5, keeping

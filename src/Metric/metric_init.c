@@ -67,6 +67,12 @@ void metric_init_background(struct Sim *theSim)
         metric_frame_U_u = &metric_frame_U_u_acc;
         metric_frame_dU_du = &metric_frame_dU_du_acc;
     }
+    else if(sim_Frame(theSim) == FR_FIT)
+    {
+        printf("Fitted!\n");
+        metric_frame_U_u = &metric_frame_U_u_fit;
+        metric_frame_dU_du = &metric_frame_dU_du_fit;
+    }
 
 }
 
