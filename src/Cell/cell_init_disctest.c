@@ -210,6 +210,55 @@ void cell_init_disctest_spread(struct Cell *c, double r, double phi, double z, s
     }
 }
 
+void cell_init_disctest_geodesic(struct Cell *c, double r, double phi, double z, struct Sim *theSim)
+{
+    double rho, vr, vp, P;
+    double sig0, T0;
+    double M  = sim_GravM(theSim);
+
+    sig0 = sim_InitPar1(theSim);
+    T0 = sim_InitPar2(theSim);
+
+    rho = sig0;
+    P = rho*T0;
+
+    if(r < 6*M)
+    {
+        double x = 6*M/r-1.0;
+        double ur = -sqrt(x*x*x)/3.0;
+        double up = 2.0*sqrt(3.0)*M / (r*r);
+        double u0 = 2.0 * (sqrt(2.0)*r - M*sqrt(x*x*x)) / (3.0*(r-2.0*M));
+        vr = ur/u0;
+        vp = up/u0;
+    }
+    else
+    {
+        double ur = 0.0;
+        double up = sqrt(M/(r*r*(r-3.0*M)));
+        double u0 = sqrt(r/(r-3.0*M));
+        vr = ur/u0;
+        vp = up/u0;
+    }
+
+    c->prim[RHO] = rho;
+    c->prim[PPP] = P;
+    c->prim[URR] = vr;
+    c->prim[UPP] = vp;
+    c->prim[UZZ] = 0.0;
+
+    if(sim_NUM_C(theSim)<sim_NUM_Q(theSim)) 
+    {
+        int i;
+        for(i=sim_NUM_C(theSim); i<sim_NUM_Q(theSim); i++)
+        {
+            if(r*cos(phi) < 0)
+                c->prim[i] = 0.0;
+            else
+                c->prim[i] = 1.0;
+        }
+    }
+}
+
 void cell_init_disctest_calc(struct Cell *c, double r, double phi, double z, struct Sim *theSim)
 {
     int test_num = sim_InitPar0(theSim);
@@ -222,6 +271,8 @@ void cell_init_disctest_calc(struct Cell *c, double r, double phi, double z, str
         cell_init_disctest_alphakepler(c, r, phi, z, theSim);
     else if(test_num == 3)
         cell_init_disctest_spread(c, r, phi, z, theSim);
+    else if(test_num == 4)
+        cell_init_disctest_geodesic(c, r, phi, z, theSim);
     else
         printf("ERROR: cell_init_disctest given bad option.\n");
 }
