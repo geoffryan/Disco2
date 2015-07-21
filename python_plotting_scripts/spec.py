@@ -34,10 +34,10 @@ def calcSpec(g, nu):
             dphi[dphi > 2*np.pi] -= 2*np.pi
 
             R[ind:ind+numP] = r
-            prim[ind:int+numP,:] = g.prim[k][i][:,:5]
+            prim[ind:ind+numP,:] = g.prim[k][i][:,:5]
             dA[ind:ind+numP] = r*dr*dphi
 
-            int += numP
+            ind += numP
 
     Sig = prim[:,0]
     Pi = prim[:,1]
