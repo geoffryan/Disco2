@@ -9,8 +9,13 @@ c = 2.99792458e10
 mp = 1.672621777e-24
 h = 6.62606957e-27
 ka_bbes = 0.2
+rg_solar = 1.4766250385e5
 
-nu = np.logspace(14,20,num=7,base=10.0)
+rho_scale = 1.0
+r_scale = rg_solar
+
+nu = np.logspace(12,20.3,num=500,base=10.0)
+#nu = np.logspace(17,20,num=7,base=10.0)
 
 def calcSpec(g, nu):
 
@@ -28,8 +33,8 @@ def calcSpec(g, nu):
 
             numP = g.np[k,i]
             dphi = np.zeros(numP)
-            dphi[1:] = g.piph[1:] - g.piph[:-1]
-            dphi[0] = g.piph[0] - g.piph[-1]
+            dphi[1:] = g.pFaces[k][i][1:] - g.pFaces[k][i][:-1]
+            dphi[0] = g.pFaces[k][i][0] - g.pFaces[k][i][-1]
             dphi[dphi < 0] += 2*np.pi
             dphi[dphi > 2*np.pi] -= 2*np.pi
 
@@ -39,21 +44,22 @@ def calcSpec(g, nu):
 
             ind += numP
 
-    Sig = prim[:,0]
-    Pi = prim[:,1]
-    T = mp*c*c * Pi/Sig
+    Sig = prim[:,0] * rho_scale * r_scale # g/cm^2
+    Pi = prim[:,1] * rho_scale * c * c * r_scale # erg/cm^2
+    T = mp * Pi/Sig # erg
 
-    qdot = 8*sb * T*T*T*T / (3*ka_bbes*Sig)
+    qdot = 8*sb * T*T*T*T / (3*ka_bbes*Sig) # erg/(cm^2 s)
 
-    Teff = np.power(qdot/sb, -0.25)
+    Teff = np.power(qdot/sb, 0.25) # erg
 
-    Lnu = (2*h*nu[:,None]*nu[:,None]*nu[:,None] * dA[None,:] / 
-            (c*c*(np.exp(h*nu[:,None]/Teff[None,:]) - 1.0))).sum(axis=1)
+    LnuR = (2*h*(nu*nu*nu)[:,None] / 
+            (c*c*(np.exp(h*nu[:,None]/Teff[None,:]) - 1.0)))
 
-    return Lnu
+    Lnu = (LnuR * dA[None,:]).sum(axis=1)
 
+    #print h*nu[:,None]/Teff[None,:]
 
-
+    return R, Teff, LnuR
 
 
 if __name__ == "__main__":
@@ -75,10 +81,12 @@ if __name__ == "__main__":
         print("Calculating {0:s}...".format(f))
         g.loadCheckpoint(f)
         T[i] = g.T
-        Lnu[i,:] = calcSpec(g, nu)
+        R, Teff, LnuR, Lnu = calcSpec(g, nu)
+        Lnu[i,:] = Lnu
 
     figlc, axlc = plt.subplots()
-    axlc.plot(T, Lnu, labels=[str(n) for n in nu])
+    for i in xrange(nn):
+        axlc.plot(T, Lnu[:,i], label=str(nu[i]))
     axlc.set_yscale('log')
     axlc.set_xlabel(r'$t$ ($M_\odot$)')
     axlc.set_ylabel(r'$L_\nu$ ($erg$ / $s\cdot Hz$)')
@@ -94,8 +102,6 @@ if __name__ == "__main__":
         ax.set_xlabel(r'$\nu$ ($Hz$)')
         ax.set_ylabel(r'$L_\nu$ ($erg$ / $s\cdot Hz$)')
         ax.set_title(r'$T$ = {0:s}'.format(str(t)))
-        fig.savefig("spec_{0:d}.png".format(i))
+        fig.savefig("spec_{0:04d}.png".format(i))
         plt.close()
-
-
 

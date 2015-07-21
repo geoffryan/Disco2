@@ -373,6 +373,92 @@ double metric_frame_dU_du_acc(struct Metric *g, int mu, int nu, struct Sim *theS
     return 0.0;
 }
 
+double metric_frame_U_u_fit(struct Metric *g, int mu, struct Sim *theSim)
+{
+    double M = sim_GravM(theSim);
+    double r = g->x[1];
+    double Risco = 6*M;
+
+    if(mu == 0)
+    {
+        if(r > Risco)
+            return sqrt(r/(r-3*M));
+        else
+        {
+            double x = Risco/r - 1.0;
+            return 2.0*(sqrt(2.0)*r - M*sqrt(x*x*x)) / (3.0*(r-2.0*M));
+        }
+    }
+    if(mu == 1)
+    {
+        if(r > Risco)
+            return 0.0;
+        else
+        {
+            double x = Risco/r - 1.0;
+            return -sqrt(x*x*x) / 3.0;
+        }
+    }
+    if(mu == 2)
+    {
+        if(r > Risco)
+            return sqrt(M/(r*r*(r-3*M)));
+        else
+            return 2.0*sqrt(3.0)*M/(r*r);
+    }
+
+    return 0.0;
+}
+double metric_frame_dU_du_fit(struct Metric *g, int mu, int nu, 
+                                struct Sim *theSim)
+{
+    double M = sim_GravM(theSim);
+    double r = g->x[1];
+    double Risco = 6*M;
+
+    if(mu != 1)
+        return 0.0;
+
+    if(nu == 0)
+    {
+        if(r > Risco)
+        {
+            double x = 1.0 - 3.0*M/r;
+            return -1.5*M / (sqrt(x*x*x) * r*r);
+        }
+        else
+        {
+            double x = sqrt(Risco/r - 1.0);
+            double y = M/r;
+            return -2.0*M * (x*(18.0*y*y-15.0*y+1.0) + 2.0*sqrt(2.0))
+                    / (3.0*(r-2.0*M)*(r-2.0*M));
+        }
+    }
+    if(nu == 1)
+    {
+        if(r > Risco)
+            return 0.0;
+        else
+        {
+            double x = Risco/r - 1.0;
+            double dx = -Risco/(r*r);
+            return -0.5 * sqrt(x) * dx;
+        }
+    }
+    if(nu == 2)
+    {
+        if(r > Risco)
+        {
+            double x = r-3.0*M;
+            return -1.5 * (r-2.0*M) * sqrt(M/(x*x*x)) / (r*r);
+        }
+        else
+            return -4.0*sqrt(3.0) * M / (r*r*r);
+    }
+
+    return 0.0;
+}
+
 int metric_fixV(struct Metric *g, double *v, double maxW)
 {
     //If velocity is superluminal, reduce to Lorentz factor 5, keeping
