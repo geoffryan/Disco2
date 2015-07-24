@@ -7,7 +7,7 @@ import numpy as np
 import discopy as dp
 
 GAM = 5.0/3.0
-M = 1.0
+M = 0.95
 scale = 'log'
 
 def plot_r_profile_single(r, f, sca, ylabel, R=None, F=None):

@@ -405,7 +405,7 @@ void cell_boundary_linear_r_inner(struct Cell ***theCells,
     int NUM_Q = sim_NUM_Q(theSim);
 
     int n,q;
-    int i,j,k;
+    int j,k;
 
     // if the global inner radius is set negative, we don't apply an inner BC
     if(mpisetup_check_rin_bndry(theMPIsetup) && sim_NoInnerBC(theSim)!=1)
@@ -558,12 +558,110 @@ void cell_boundary_linear_r_outer( struct Cell *** theCells , struct Face * theF
   }
 }
 
+void cell_boundary_plunge_r_inner(struct Cell ***theCells, 
+                struct Face *theFaces, struct Sim *theSim, 
+                struct MPIsetup *theMPIsetup, struct TimeStep * theTimeStep )
+{
+    int i,j,k,mu;
+
+    // if the global inner radius is set negative, we don't apply an inner BC
+    if(mpisetup_check_rin_bndry(theMPIsetup) && sim_NoInnerBC(theSim)!=1)
+    {
+        double GAM = sim_GAMMALAW(theSim);
+        
+        //Calculate accretion rate & Isentropic constant
+        i = sim_Nghost_min(theSim,R_DIR);
+        double R = 0.5*(sim_FacePos(theSim,i,R_DIR)
+                        + sim_FacePos(theSim,i-1,R_DIR));
+
+        double mdot = 0.0;
+        double K = 0.0;
+
+        for(k = 0; k < sim_N(theSim, Z_DIR); k++)
+        {
+            double zm = sim_FacePos(theSim, k-1, Z_DIR);
+            double zp = sim_FacePos(theSim, k, Z_DIR);
+            double z = 0.5*(zm+zp);
+            double dz = zp-zm;
+
+            for(j = 0; j < sim_N_p(theSim,1); j++)
+            {
+                double dphi = theCells[k][i][j].dphi;
+                double phi = theCells[k][i][j].tiph - 0.5*dphi;
+
+                struct Metric *g = metric_create(time_global, R, phi, z,
+                                                        theSim);
+                double b[3], v[3], u0;
+                v[0] = theCells[k][i][j].prim[URR];
+                v[1] = theCells[k][i][j].prim[UPP];
+                v[2] = theCells[k][i][j].prim[UZZ];
+                for(mu=0; mu<3; mu++)
+                    b[mu] = metric_shift_u(g, mu);
+                u0 = 1.0 / sqrt(-metric_g_dd(g,0,0) - 2*metric_dot3_u(g,b,v)
+                                - metric_square3_u(g,v));
+                metric_destroy(g);
+
+                double rho = theCells[k][i][j].prim[RHO];
+                double P = theCells[k][i][j].prim[PPP];
+
+                mdot += -rho * u0*v[0] * R*dphi*dz;
+                K += P/pow(rho,GAM) * dphi*dz;
+            }
+        }
+        double dZ = sim_FacePos(theSim, sim_N(theSim,Z_DIR)-1, Z_DIR)
+                     - sim_FacePos(theSim, -1, Z_DIR);
+        mdot /= 2*M_PI*dZ;
+        K /= 2*M_PI*dZ;
+
+        //printf("%lg %lg\n", mdot, K);
+
+        //Update ghost zones with plunging solution
+        for(k = 0; k < sim_N(theSim, Z_DIR); k++)
+        {
+            double zm = sim_FacePos(theSim, k-1, Z_DIR);
+            double zp = sim_FacePos(theSim, k, Z_DIR);
+            double z = 0.5*(zm+zp);
+
+            for(i=0; i<sim_Nghost_min(theSim,R_DIR); i++)
+            {
+                double rm = sim_FacePos(theSim, i-1, R_DIR);
+                double rp = sim_FacePos(theSim, i, R_DIR);
+                double r = 0.5*(rm+rp);
+                
+                for(j = 0; j < sim_N_p(theSim,1); j++)
+                {
+                    double dphi = theCells[k][i][j].dphi;
+                    double phi = theCells[k][i][j].tiph - 0.5*dphi;
+
+                    struct Metric *g = metric_create(time_global, r, phi, z,
+                                                        theSim);
+                    double U[4];
+                    for(mu=0; mu<4; mu++)
+                        U[mu] = metric_frame_U_u(g, mu, theSim);
+                    metric_destroy(g);
+
+                    double rho = -mdot / (r*U[1]);
+                    double vr = U[1]/U[0];
+                    double vp = U[2]/U[0];
+                    double vz = U[3]/U[0];
+                    double P = K * pow(rho, GAM);
+
+                    theCells[k][i][j].prim[RHO] = rho;
+                    theCells[k][i][j].prim[PPP] = P;
+                    theCells[k][i][j].prim[URR] = vr;
+                    theCells[k][i][j].prim[UPP] = vp;
+                    theCells[k][i][j].prim[UZZ] = vz;
+                }
+            }
+        }
+    }
+}
 void cell_boundary_nozzle(struct Cell ***theCells, struct Sim *theSim, 
                 struct MPIsetup *theMPIsetup)
 {
     // A nozzle entering injecting gas from the boundary.
     
-    int i,j,k,q;
+    int i,j,k;
     if(mpisetup_check_rout_bndry(theMPIsetup))
     {
         double V = sim_BoundPar1(theSim);

@@ -197,6 +197,9 @@ void timestep_substep(struct TimeStep * theTimeStep, struct Cell *** theCells,
   else if (sim_BoundTypeRIn(theSim)==BOUND_LINEAR)
     cell_boundary_linear_r_inner( theCells, theFaces_r, theSim, theMPIsetup, 
                                     theTimeStep);
+  else if (sim_BoundTypeRIn(theSim)==BOUND_PLUNGE)
+    cell_boundary_plunge_r_inner( theCells, theFaces_r, theSim, theMPIsetup, 
+                                    theTimeStep);
   
   //R - Outer
   if (sim_BoundTypeROut(theSim)==BOUND_OUTFLOW)
