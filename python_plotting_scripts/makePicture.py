@@ -131,14 +131,15 @@ def getTz(g, rays):
 
 if __name__ == "__main__":
 
-    if len(sys.argv) < 4:
+    if len(sys.argv) < 5:
         print("makePicture.py: generates a ray-traced image of emmision from thegiven checkpoints.")
-        print("usage: python makePicture.py parfile rayfile <checkpoints ...>")
+        print("usage: python makePicture.py parfile rayfile <checkpoints ...> prefix")
         sys.exit()
 
     parfile = sys.argv[1]
     rayfile = sys.argv[2]
-    chkfile = sys.argv[3]
+    chkfile = sys.argv[3:-1]
+    prefix = sys.argv[:-1]
 
     pars = dp.readParfile(parfile)
     g = dp.Grid(pars)
@@ -158,6 +159,6 @@ if __name__ == "__main__":
         ax.set_xlabel(r"$X$ ($M_\odot$)")
         ax.set_ylabel(r"$Y$ ($M_\odot$)")
         plt.colorbar(im)
-        fig.savefig("disc_im_{0:d}.png".format(i))
+        fig.savefig("{0:s}_{1:d}.png".format(prefix,i))
         plt.close()
 
