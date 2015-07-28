@@ -143,7 +143,7 @@ if __name__ == "__main__":
 
     pars = dp.readParfile(parfile)
     g = dp.Grid(pars)
-    g.loadCheckpoint(chkfile)
+    g.loadCheckpoint(chkfile[0])
 
     rays = RayData(rayfile)
     
