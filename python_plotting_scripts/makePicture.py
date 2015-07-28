@@ -45,7 +45,7 @@ def makeImage(g, rays, nus):
     print("Generating Temperature and redshift maps")
     Tmap, zmap = getTz(g, rays)
 
-    zmap[:,:] = 1.0
+    #zmap[:,:] = 1.0
 
     print("Generating intensity map")
     Inus = specificIntensity(Tmap, zmap, nus)
@@ -87,6 +87,10 @@ def getTz(g, rays):
         R = rays.X[ind,1]
         Phi = rays.X[ind,3]
         ir = np.searchsorted(g.rFaces, R) - 1
+        if ir >= g.nr_tot or ir < 0:
+            Tmap[i,j] = -1.0
+            zmap[i,j] = -1.0
+            continue
         shift = np.argmin(g.pFaces[0][ir])
         piph = np.roll(g.pFaces[0][ir], -shift)
         ip = np.searchsorted(piph, Phi)
@@ -147,7 +151,7 @@ if __name__ == "__main__":
 
     rays = RayData(rayfile)
     
-    nus = [500.0, 1000.0, 2000.0, 4000.0, 8000.0]
+    nus = [100.0, 200.0, 500.0, 1000.0, 2000.0, 8000.0]
 
     imgs = makeImage(g, rays, nus)
 
@@ -155,7 +159,7 @@ if __name__ == "__main__":
         fig, ax = plt.subplots()
         im = ax.imshow(img, cmap=plt.cm.afmhot, extent=rays.extent, 
                     aspect='equal')
-        ax.set_title(r"$I_\nu$ ($\nu = $ {0:.3g} $eV$)".format(nus[i]))
+        ax.set_title(r"$I_\nu$ ($\nu = $ {0:.2f} $keV$)".format(nus[i]/1000.0))
         ax.set_xlabel(r"$X$ ($M_\odot$)")
         ax.set_ylabel(r"$Y$ ($M_\odot$)")
         plt.colorbar(im)
