@@ -14,6 +14,7 @@ rg_solar = 1.4766250385e5
 r_scale = rg_solar
 rho_scale = 1.0
 eV = 6.24150934e11
+kpc = 3.08567758149e21
 
 class RayData:
 
@@ -21,11 +22,14 @@ class RayData:
     U = None
     ixy = None
     extent = None
+    nx = -1
+    ny = -1
+    M = -1.0
 
-    def __init__(self, rayfile):
-        self.loadRayfile(rayfile)
+    def __init__(self, rayfile, M=1.0):
+        self.loadRayfile(rayfile, M)
 
-    def loadRayfile(self, rayfile):
+    def loadRayfile(self, rayfile, M):
         print("Loading Rays")
         dat = np.loadtxt(rayfile)
         xi = dat[:,2]
@@ -34,46 +38,25 @@ class RayData:
         self.U = dat[:,16:20]
         self.ixy = dat[:,0:2].astype(np.int64)
 
+        self.X[:,0:2] *= M
+        self.U[:,2:4] *= M
+
         ximax = xi.max()
         ximin = xi.min()
         yimax = yi.max()
         yimin = yi.min()
-        self.extent = (ximin, ximax, yimin, yimax)
+        self.extent = (M*ximin, M*ximax, M*yimin, M*yimax)
 
-def makeImage(g, rays, nus):
+        self.nx = self.ixy[:,0].max()+1
+        self.ny = self.ixy[:,1].max()+1
 
-    print("Generating Temperature and redshift maps")
-    Tmap, zmap = getTz(g, rays)
-
-    #zmap[:,:] = 1.0
-
-    print("Generating intensity map")
-    Inus = specificIntensity(Tmap, zmap, nus)
-
-    #Transform images into screen coordinates, origin at top left.
-    Inus = np.transpose(Inus, (0,2,1))[:,:,::-1]
-    
-    return Inus
-
-def specificIntensity(Tmap, zmap, nu):
-
-    #Effective Temp in eV
-    T = Tmap * zmap * eV
-
-    Inu = np.zeros((len(nu), Tmap.shape[0], Tmap.shape[1]))
-    for i,v in enumerate(nu):
-        Inu[i] = 2*v*v*v/(np.exp(v/T)-1.0)
-        Inu[i][Tmap==-1.0] = 0.0
-
-    return Inu
 
 def getTz(g, rays):
 
-    nx = rays.ixy[:,0].max()+1
-    ny = rays.ixy[:,1].max()+1
+    shape = (rays.nx, rays.ny)
 
-    Tmap = np.zeros((nx,ny))
-    zmap = np.zeros((nx,ny))
+    Tmap = np.zeros(shape)
+    zmap = np.zeros(shape)
 
     for ind,ij in enumerate(rays.ixy):
         i = ij[0]
@@ -132,37 +115,140 @@ def getTz(g, rays):
 
     return Tmap, zmap
 
+def specificIntensity(Tmap, zmap, nu):
+
+    #Effective Temp in eV
+    T = Tmap * zmap * eV
+
+    #Inu = np.zeros((len(nu), Tmap.shape[0], Tmap.shape[1]))
+    #for i,v in enumerate(nu):
+    #    Inu[i] = 2*v*v*v/(np.exp(v/T)-1.0)
+    #    Inu[i][Tmap==-1.0] = 0.0
+
+    nu = np.atleast_1d(nu)
+
+    if len(nu) > 1:
+        Inu = 2*(nu*nu*nu)[:,None,None] / (
+                np.exp(nu[:,None,None]/T[None,:,:])-1.0)
+        for i in xrange(len(nu)):
+            Inu[i][Tmap==-1.0] = 0.0
+    else:
+        Inu = 2*nu*nu*nu / (np.exp(nu/T) - 1.0)
+        Inu[Tmap == -1.0] = 0.0
+
+    return Inu
+
+def makeImage(g, rays, nus, redshift='yes'):
+
+    print("Generating Temperature and redshift maps")
+    Tmap, zmap = getTz(g, rays)
+
+    if redshift == 'no':
+        zmap[:,:] = 1.0
+
+    print("Generating intensity map")
+    Inus = specificIntensity(Tmap, zmap, nus)
+
+    #Transform images into screen coordinates, origin at top left.
+    Inus = np.transpose(Inus, (0,2,1))[:,:,::-1]
+    
+    return Inus
+
+def makeSpectrum(g, rays, nus, D=1.0, redshift='yes'):
+
+    print("Generating Temperature and redshift maps")
+    Tmap, zmap = getTz(g, rays)
+
+    if redshift == 'no':
+        zmap[:,:] = 1.0
+
+    Fnu = np.zeros(nus.shape)
+
+    print("Generating intensity maps")
+
+    dx = (rays.extent[1]-rays.extent[0]) / (rays.nx-1)
+    dy = (rays.extent[3]-rays.extent[2]) / (rays.ny-1)
+    dA = dx*dy
+
+    for i,nu in enumerate(nus):
+        Inu = specificIntensity(Tmap, zmap, nu)
+        Fnu[i] = (Inu * dA).sum() / (D*D*kpc*kpc)
+
+    return Fnu
+
 
 if __name__ == "__main__":
 
-    if len(sys.argv) < 5:
-        print("makePicture.py: generates a ray-traced image of emmision from thegiven checkpoints.")
-        print("usage: python makePicture.py parfile rayfile <checkpoints ...> prefix")
+    if len(sys.argv) < 6:
+        print("makePicture.py: generates a ray-traced image of emission from thegiven checkpoints.")
+        print("usage: python makePicture.py mode parfile rayfile <checkpoints ...> prefix")
         sys.exit()
 
-    parfile = sys.argv[1]
-    rayfile = sys.argv[2]
-    chkfile = sys.argv[3:-1]
+    mode = sys.argv[1]
+    parfile = sys.argv[2]
+    rayfile = sys.argv[3]
+    chkfiles = sys.argv[4:-1]
     prefix = sys.argv[-1]
 
     pars = dp.readParfile(parfile)
     g = dp.Grid(pars)
-    g.loadCheckpoint(chkfile[0])
+    rays = RayData(rayfile, g._pars["GravM"])
+   
+    if mode == "spectrum":
+        nus = np.logspace(2.0, 5.0, base=10.0, num=1000)
 
-    rays = RayData(rayfile)
-    
-    nus = [100.0, 200.0, 500.0, 1000.0, 2000.0, 8000.0]
+        for i,chkpt in enumerate(chkfiles):
+            g.loadCheckpoint(chkpt)
+            
+            Fnu = makeSpectrum(g, rays, nus, D=1.0, redshift='yes')
 
-    imgs = makeImage(g, rays, nus)
+            fig, ax = plt.subplots()
+            ax.plot(nus/1000.0, Fnu, 'k+')
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ax.set_xlabel(r"$\nu$ ($keV$)")
+            ax.set_ylabel(r"$F_\nu$ ($erg/cm^2 s Hz$)")
+            ax.set_title(chkpt)
+            fig.savefig("{0:s}_spectrum_{1:d}.png".format(prefix, i))
+            plt.close()
 
-    for i,img in enumerate(imgs):
-        fig, ax = plt.subplots()
-        im = ax.imshow(img, cmap=plt.cm.afmhot, extent=rays.extent, 
-                    aspect='equal')
-        ax.set_title(r"$I_\nu$ ($\nu = $ {0:.2f} $keV$)".format(nus[i]/1000.0))
-        ax.set_xlabel(r"$X$ ($M_\odot$)")
-        ax.set_ylabel(r"$Y$ ($M_\odot$)")
-        plt.colorbar(im)
-        fig.savefig("{0:s}_{1:d}.png".format(prefix,i))
-        plt.close()
+    elif mode == "lightcurve":
+        nus = np.logspace(2.0, 4.0, base=10.0, num=3)
+        Fnu = np.zeros((len(chkfiles), len(nus)))
+        T = np.zeros(len(chkfiles))
+
+        for i,chkpt in enumerate(chkfiles):
+            g.loadCheckpoint(chkpt)
+            T[i] = g.T
+            Fnu[i] = makeSpectrum(g, rays, nus, D=1.0, redshift='yes')
+
+        for i,nu in enumerate(nus):
+            fig, ax = plt.subplots()
+            ax.plot(T, Fnu[:,i])
+            ax.set_yscale("log")
+            ax.set_xlabel(r"$T$ ($G M_\odot / c^3$)")
+            ax.set_ylabel(r"$F_\nu$ ($erg/cm^2 s Hz$)")
+            ax.set_title(r"$\nu = $ {0:.2f} $keV$)".format(nu/1000.0))
+            fig.savefig("{0:s}_lightcurve_{1:d}.png".format(prefix, i))
+            plt.close()
+
+    else:
+        nus = np.array([100.0, 200.0, 500.0, 1000.0, 2000.0, 8000.0])
+
+        for i,chkpt in enumerate(chkfiles):
+            g.loadCheckpoint(chkpt)
+
+            imgs = makeImage(g, rays, nus, redshift='yes')
+
+            for j,img in enumerate(imgs):
+                fig, ax = plt.subplots()
+                im = ax.imshow(img, cmap=plt.cm.afmhot, extent=rays.extent, 
+                            aspect='equal')
+                ax.set_title(r"$I_\nu$ ($\nu = $ {0:.2f} $keV$)".format(
+                            nus[j]/1000.0))
+                ax.set_xlabel(r"$X$ ($M_\odot$)")
+                ax.set_ylabel(r"$Y$ ($M_\odot$)")
+                plt.colorbar(im)
+                fig.savefig("{0:s}_{1:03d}_{2:03d}.png".format(prefix,i,j))
+                plt.close()
 
