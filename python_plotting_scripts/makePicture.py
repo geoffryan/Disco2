@@ -139,7 +139,7 @@ if __name__ == "__main__":
     parfile = sys.argv[1]
     rayfile = sys.argv[2]
     chkfile = sys.argv[3:-1]
-    prefix = sys.argv[:-1]
+    prefix = sys.argv[-1]
 
     pars = dp.readParfile(parfile)
     g = dp.Grid(pars)
