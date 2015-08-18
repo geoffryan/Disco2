@@ -222,6 +222,17 @@ void cell_init_disctest_geodesic(struct Cell *c, double r, double phi, double z,
     rho = sig0;
     P = rho*T0;
 
+    struct Metric *g = metric_create(time_global, r, phi, z, theSim);
+
+    double u0 = metric_frame_U_u_geo(g, 0, theSim);
+    double ur = metric_frame_U_u_geo(g, 1, theSim);
+    double up = metric_frame_U_u_geo(g, 2, theSim);
+
+    metric_destroy(g);
+
+    vr = ur/u0;
+    vp = up/u0;
+/*
     if(r < 6*M)
     {
         double x = 6*M/r-1.0;
@@ -239,6 +250,7 @@ void cell_init_disctest_geodesic(struct Cell *c, double r, double phi, double z,
         vr = ur/u0;
         vp = up/u0;
     }
+*/
 
     c->prim[RHO] = rho;
     c->prim[PPP] = P;
