@@ -91,7 +91,7 @@ void riemann_set_vel_gr(struct Riemann *theRiemann, struct Sim *theSim, double r
     sig = cf22/(w*w*(1.0-cf22));
 
     //TODO: typo????????
-    dv = sqrt(sig*(1.0+sig)*a*a*gam - sig*(vnL+bn)*(vnL+bn));
+    dv = sqrt(sig*(1.0+sig)*a*a*gam - sig*(vnR+bn)*(vnR+bn));
 
     Sl2 = (vnR - sig*bn - dv) / (1.0+sig);
     Sr2 = (vnR - sig*bn + dv) / (1.0+sig);
@@ -110,6 +110,20 @@ void riemann_set_vel_gr(struct Riemann *theRiemann, struct Sim *theSim, double r
         Sr = Sr2;
     else
         Sr = Sr1;
+
+    //TODO: RUSANOV.  REMOVE THIS.
+    /*
+    if(fabs(Sl) > Sr)
+    {
+        Sl = -fabs(Sl);
+        Sr = fabs(Sl);
+    }
+    else
+    {
+        Sl = -fabs(Sr);
+        Sr = fabs(Sr);
+    }
+    */
 
     //Fluxes in orthonormal basis
     if(dir == PDIRECTION)
