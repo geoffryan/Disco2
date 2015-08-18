@@ -453,7 +453,7 @@ double metric_frame_U_u_geo(struct Metric *g, int mu, struct Sim *theSim)
             double C = metric_g_uu(g,0,0)*eps*eps
                         + 2*metric_g_uu(g,0,2)*eps*lll
                         + metric_g_uu(g,2,2)*lll*lll + 1.0;
-            double urd = (-hB - sqrt(hB*hB - A*C)) / A;
+            double urd = (-hB + sqrt(hB*hB - A*C)) / A;
 
             if(mu == 0)
                 return metric_g_uu(g,0,0)*eps + metric_g_uu(g,0,1)*urd
