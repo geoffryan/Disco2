@@ -70,8 +70,8 @@ void metric_init_background(struct Sim *theSim)
     else if(sim_Frame(theSim) == FR_GEO)
     {
         printf("Geodesic!\n");
-        metric_frame_U_u = &metric_frame_U_u_fit;
-        metric_frame_dU_du = &metric_frame_dU_du_fit;
+        metric_frame_U_u = &metric_frame_U_u_geo;
+        metric_frame_dU_du = &metric_frame_dU_du_geo;
     }
 
 }

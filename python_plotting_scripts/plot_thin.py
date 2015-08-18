@@ -50,8 +50,8 @@ def calcNT(g, r, rs, Mdot):
 
     U0 = 1.0/np.sqrt(C)
 
-    pi = Mdot / (6*np.pi*AL*math.sqrt(GAM)) * OMK
-    PI = Mdot / (6*np.pi*AL*math.sqrt(GAM)) * OMK * np.sqrt(C) * P / (D*D)
+    pi = Mdot / (3*np.pi*AL*math.sqrt(GAM)) * OMK
+    PI = Mdot / (3*np.pi*AL*math.sqrt(GAM)) * OMK * np.sqrt(C) * P / (D*D)
 
     Qdot = 3*Mdot/(4*np.pi) * OMK*OMK
     QDOT = 3*Mdot/(4*np.pi) * OMK*OMK * P / C
@@ -78,7 +78,7 @@ def plotNT(g):
     R = np.logspace(math.log10(Risco), math.log10(r.max()), base=10.0, num=200)
 
     RS = 6.0*M
-    MDOT = 34.0
+    MDOT = 17.5
 
     SSdat, NTdat = calcNT(g, R, RS, MDOT)
 

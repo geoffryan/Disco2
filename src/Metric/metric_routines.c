@@ -373,87 +373,227 @@ double metric_frame_dU_du_acc(struct Metric *g, int mu, int nu, struct Sim *theS
     return 0.0;
 }
 
-double metric_frame_U_u_fit(struct Metric *g, int mu, struct Sim *theSim)
+double metric_frame_U_u_geo(struct Metric *g, int mu, struct Sim *theSim)
 {
     double M = sim_GravM(theSim);
     double r = g->x[1];
-    double Risco = 6*M;
 
-    if(mu == 0)
+    if(sim_Metric(theSim) == SCHWARZSCHILD_KS)
     {
-        if(r > Risco)
-            return sqrt(r/(r-3*M));
-        else
+        double Risco = 6*M;
+        if(mu == 0)
         {
-            double x = Risco/r - 1.0;
-            return 2.0*(sqrt(2.0)*r - M*sqrt(x*x*x)) / (3.0*(r-2.0*M));
+            if(r > Risco)
+                return sqrt(r/(r-3*M));
+            else
+            {
+                double x = Risco/r - 1.0;
+                return 2.0*(sqrt(2.0)*r - M*sqrt(x*x*x)) / (3.0*(r-2.0*M));
+            }
+        }
+        if(mu == 1)
+        {
+            if(r > Risco)
+                return 0.0;
+            else
+            {
+                double x = Risco/r - 1.0;
+                return -sqrt(x*x*x) / 3.0;
+            }
+        }
+        if(mu == 2)
+        {
+            if(r > Risco)
+                return sqrt(M/(r*r*(r-3*M)));
+            else
+                return 2.0*sqrt(3.0)*M/(r*r);
         }
     }
-    if(mu == 1)
+    else if(sim_Metric(theSim) == KERR_KS)
     {
+        double a = sim_GravA(theSim);
+        double Z1 = 1.0 + pow((1.0-a*a)*(1.0+a), 1.0/3.0)
+                         + pow((1.0-a*a)*(1.0-a), 1.0/3.0);
+        double Z2 = sqrt(3.0*a*a + Z1*Z1);
+        double Risco;
+        if(a >= 0.0)
+            Risco = M*(3.0 + Z2 - sqrt((3.0-Z1)*(3.0+Z1+2.0*Z2)));
+        else
+            Risco = M*(3.0 + Z2 + sqrt((3.0-Z1)*(3.0+Z1+2.0*Z2)));
+
         if(r > Risco)
-            return 0.0;
+        {
+            double u0 = (r + a*M*sqrt(M/r)) / sqrt(r*r - 3*M*r
+                                                        + 2*a*sqrt(M*M*M*r));
+            if(mu == 0)
+                return u0;
+            else if(mu == 1)
+                return 0.0;
+            else if(mu == 2)
+            {
+                double omk = sqrt(M/(r*r*r));
+                return u0 * omk / (1.0 + a*M*omk);
+            }
+            else
+                return 0.0;
+        }
         else
         {
-            double x = Risco/r - 1.0;
-            return -sqrt(x*x*x) / 3.0;
+            double U0 = (Risco + a*M*sqrt(M/Risco)) / sqrt(Risco*Risco
+                                        - 3*M*Risco + 2*a*sqrt(M*M*M*Risco));
+            double OMK = sqrt(M/(Risco*Risco*Risco));
+            double UP = U0 * OMK / (1.0 + a*M*OMK);
+            double eps = (-1.0 + 2*M/Risco) * U0 + (-2.0*M*M*a/Risco) * UP;
+            double lll = (-2.0*M*M*a/Risco) * U0
+                            + (Risco*Risco + M*M*a*a + 2*M*M*M*a*a/Risco) * UP;
+
+            //We're in for a treat.
+            double A = metric_g_uu(g,1,1);
+            double hB = metric_g_uu(g,0,1)*eps + metric_g_uu(g,1,2)*lll;
+            double C = metric_g_uu(g,0,0)*eps*eps
+                        + 2*metric_g_uu(g,0,2)*eps*lll
+                        + metric_g_uu(g,2,2)*lll*lll + 1.0;
+            double urd = (-hB - sqrt(hB*hB - A*C)) / A;
+
+            if(mu == 0)
+                return metric_g_uu(g,0,0)*eps + metric_g_uu(g,0,1)*urd
+                        + metric_g_uu(g,0,2)*lll;
+            else if(mu == 1)
+                return metric_g_uu(g,1,0)*eps + metric_g_uu(g,1,1)*urd
+                        + metric_g_uu(g,1,2)*lll;
+            else if(mu == 2)
+                return metric_g_uu(g,2,0)*eps + metric_g_uu(g,2,1)*urd
+                        + metric_g_uu(g,2,2)*lll;
+            else
+                return 0.0;
         }
-    }
-    if(mu == 2)
-    {
-        if(r > Risco)
-            return sqrt(M/(r*r*(r-3*M)));
-        else
-            return 2.0*sqrt(3.0)*M/(r*r);
     }
 
     return 0.0;
 }
-double metric_frame_dU_du_fit(struct Metric *g, int mu, int nu, 
+
+double metric_frame_dU_du_geo(struct Metric *g, int mu, int nu, 
                                 struct Sim *theSim)
 {
     double M = sim_GravM(theSim);
     double r = g->x[1];
-    double Risco = 6*M;
 
-    if(mu != 1)
-        return 0.0;
+    if(sim_Metric(theSim) == SCHWARZSCHILD_KS)
+    {
+        double Risco = 6*M;
 
-    if(nu == 0)
-    {
-        if(r > Risco)
-        {
-            double x = 1.0 - 3.0*M/r;
-            return -1.5*M / (sqrt(x*x*x) * r*r);
-        }
-        else
-        {
-            double x = sqrt(Risco/r - 1.0);
-            double y = M/r;
-            return -2.0*M * (x*(18.0*y*y-15.0*y+1.0) + 2.0*sqrt(2.0))
-                    / (3.0*(r-2.0*M)*(r-2.0*M));
-        }
-    }
-    if(nu == 1)
-    {
-        if(r > Risco)
+        if(mu != 1)
             return 0.0;
-        else
+
+        if(nu == 0)
         {
-            double x = Risco/r - 1.0;
-            double dx = -Risco/(r*r);
-            return -0.5 * sqrt(x) * dx;
+            if(r > Risco)
+            {
+                double x = 1.0 - 3.0*M/r;
+                return -1.5*M / (sqrt(x*x*x) * r*r);
+            }
+            else
+            {
+                double x = sqrt(Risco/r - 1.0);
+                double y = M/r;
+                return -2.0*M * (x*(18.0*y*y-15.0*y+1.0) + 2.0*sqrt(2.0))
+                        / (3.0*(r-2.0*M)*(r-2.0*M));
+            }
+        }
+        if(nu == 1)
+        {
+            if(r > Risco)
+                return 0.0;
+            else
+            {
+                double x = Risco/r - 1.0;
+                double dx = -Risco/(r*r);
+                return -0.5 * sqrt(x) * dx;
+            }
+        }
+        if(nu == 2)
+        {
+            if(r > Risco)
+            {
+                double x = r-3.0*M;
+                return -1.5 * (r-2.0*M) * sqrt(M/(x*x*x)) / (r*r);
+            }
+            else
+                return -4.0*sqrt(3.0) * M / (r*r*r);
         }
     }
-    if(nu == 2)
+    else if(sim_Metric(theSim) == KERR_KS)
     {
+        if(mu != 1)
+            return 0.0;
+
+        double a = sim_GravA(theSim);
+        double Z1 = 1.0 + pow((1.0-a*a)*(1.0+a), 1.0/3.0)
+                         + pow((1.0-a*a)*(1.0-a), 1.0/3.0);
+        double Z2 = sqrt(3.0*a*a + Z1*Z1);
+        double Risco;
+        if(a >= 0.0)
+            Risco = M*(3.0 + Z2 - sqrt((3.0-Z1)*(3.0+Z1+2.0*Z2)));
+        else
+            Risco = M*(3.0 + Z2 + sqrt((3.0-Z1)*(3.0+Z1+2.0*Z2)));
+
         if(r > Risco)
         {
-            double x = r-3.0*M;
-            return -1.5 * (r-2.0*M) * sqrt(M/(x*x*x)) / (r*r);
+            double omk = sqrt(M/(r*r*r));
+            double u0 = (1.0 + a*M*omk) / sqrt(1.0 - 3.0*M/r + 2*a*M*omk);
+            double du0 = -1.5*M/(r*r) * pow(1.0 - 3.0*M/r + 2*a*M*omk, -1.5) * 
+                            (1.0 + a*omk*(r-3.0*M) + 2.0*a*a*M*M/(r*r)
+                                - a*a*M*M*M/(r*r*r));
+            if(nu == 0)
+                return du0;
+            else if(mu == 1)
+                return 0.0;
+            else if(mu == 2)
+            {
+                double domk = -1.5 * omk / r;
+                return du0 * omk / (1.0+a*M*omk) + u0 * domk / (1.0+a*M*omk)
+                         - u0 * omk * a*M*domk / ((1.0+a*M*omk)*(1.0+a*M*omk));
+            }
+            else
+                return 0.0;
         }
         else
-            return -4.0*sqrt(3.0) * M / (r*r*r);
+        {
+            double U0 = (Risco + a*M*sqrt(M/Risco)) / sqrt(Risco*Risco
+                                        - 3*M*Risco + 2*a*sqrt(M*M*M*Risco));
+            double OMK = sqrt(M/(Risco*Risco*Risco));
+            double UP = U0 * OMK / (1.0 + a*M*OMK);
+            double eps = (-1.0 + 2*M/Risco) * U0 + (-2.0*M*M*a/Risco) * UP;
+            double lll = (-2.0*M*M*a/Risco) * U0
+                            + (Risco*Risco + M*M*a*a + 2*M*M*M*a*a/Risco) * UP;
+
+            //We're in for a treat.
+            double A = metric_g_uu(g,1,1);
+            double hB = metric_g_uu(g,0,1)*eps + metric_g_uu(g,1,2)*lll;
+            double C = metric_g_uu(g,0,0)*eps*eps
+                        + 2*metric_g_uu(g,0,2)*eps*lll
+                        + metric_g_uu(g,2,2)*lll*lll + 1.0;
+            double dA = metric_dg_uu(g,1,1,1);
+            double dhB = metric_dg_uu(g,1,0,1)*eps + metric_dg_uu(g,1,1,2)*lll;
+            double dC = metric_dg_uu(g,1,0,0)*eps*eps
+                        + 2*metric_dg_uu(g,1,0,2)*eps*lll
+                        + metric_dg_uu(g,1,2,2)*lll*lll;
+            double urd = (-hB - sqrt(hB*hB - A*C)) / A;
+            double durd = -(dhB*A-hB*A)/(A*A) - (A*hB*dhB-hB*hB*dA+0.5*A*C*dA
+                            -0.5*A*A*dC) / (sqrt(hB*hB-A*C)*A*A);
+
+            if(mu == 0)
+                return metric_dg_uu(g,1,0,0)*eps + metric_dg_uu(g,1,0,2)*lll
+                    + metric_dg_uu(g,1,0,1)*urd + metric_g_uu(g,0,1)*durd;
+            else if(mu == 1)
+                return metric_dg_uu(g,1,1,0)*eps + metric_dg_uu(g,1,1,2)*lll
+                    + metric_dg_uu(g,1,1,1)*urd + metric_g_uu(g,1,1)*durd;
+            else if(mu == 2)
+                return metric_dg_uu(g,1,2,0)*eps + metric_dg_uu(g,1,2,2)*lll
+                    + metric_dg_uu(g,1,2,1)*urd + metric_g_uu(g,2,1)*durd;
+            else
+                return 0.0;
+        }
     }
 
     return 0.0;

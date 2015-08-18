@@ -2,6 +2,8 @@ import sys
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+import colormath.color_objects as cmco
+import colormath.color_conversions as cmcc
 import discopy as dp
 
 # All constants in c.g.s.
@@ -89,7 +91,7 @@ def getTz(g, rays):
         vp = prim[3]
 
         Tc = pi/sig * mp*c*c
-        qdot = 8*sb * Tc*Tc*Tc*Tc / (3*ka_bbes*sig * rho_scale*r_scale)
+        qdot = 4*sb * Tc*Tc*Tc*Tc / (3*ka_bbes*sig * rho_scale*r_scale)
         Tmap[i,j] = math.pow(qdot/sb, 0.25)
         
         #print ir, ip
@@ -116,6 +118,9 @@ def getTz(g, rays):
     return Tmap, zmap
 
 def specificIntensity(Tmap, zmap, nu):
+    # Calculates specific Intensity given source temperatues and redshifts
+    # for each image pixel.  Assumes temperature is in ergs, nu is in eV
+    # and returns I_\nu in cgs: erg/cm^2 s Hz ster.
 
     #Effective Temp in eV
     T = Tmap * zmap * eV
@@ -136,7 +141,7 @@ def specificIntensity(Tmap, zmap, nu):
         Inu = 2*nu*nu*nu / (np.exp(nu/T) - 1.0)
         Inu[Tmap == -1.0] = 0.0
 
-    return Inu
+    return Inu/(eV*eV*eV*h*h*c*c)
 
 def makeImage(g, rays, nus, redshift='yes'):
 
@@ -153,6 +158,36 @@ def makeImage(g, rays, nus, redshift='yes'):
     Inus = np.transpose(Inus, (0,2,1))[:,:,::-1]
     
     return Inus
+
+def makePicture(g, rays, numin, numax, redshift='yes'):
+
+    print("Generating Temperature and redshift maps")
+    Tmap, zmap = getTz(g, rays)
+
+    if redshift == 'no':
+        zmap[:,:] = 1.0
+
+    optical_lambda = np.linspace(340.0, 830.0, num=50) * 1.0e-7 # in cm
+    optical_nu = c/optical_lambda * h * eV # in eV
+
+    pic = np.zeros((rays.nx, rays.ny, 3))
+
+    print("Generating intensity map")
+    Inus = specificIntensity(Tmap, zmap, optical_nu)
+
+    for i in xrange(rays.nx):
+        for j in xrange(rays.ny):
+            print i,j
+            spd = Inus[:,i,j] * optical_nu*optical_nu / (c * h*h*eV*eV)
+            specColor = cmco.SpectralColor(*spd)
+            rgb = cmcc.convert_color(specColor, cmco.sRGBColor)
+            pic[i,j,:] = rgb.get_value_tuple()
+
+
+    #Transform images into screen coordinates, origin at top left.
+    pic = np.transpose(pic, (1,0,2))[:,::-1,:]
+    
+    return pic
 
 def makeSpectrum(g, rays, nus, D=1.0, redshift='yes'):
 
@@ -203,11 +238,11 @@ if __name__ == "__main__":
             Fnu = makeSpectrum(g, rays, nus, D=1.0, redshift='yes')
 
             fig, ax = plt.subplots()
-            ax.plot(nus/1000.0, Fnu, 'k+')
+            ax.plot(nus/1000.0, Fnu / (h*nus), 'k+')
             ax.set_xscale("log")
             ax.set_yscale("log")
             ax.set_xlabel(r"$\nu$ ($keV$)")
-            ax.set_ylabel(r"$F_\nu$ ($erg/cm^2 s Hz$)")
+            ax.set_ylabel(r"$F_\nu / h\nu$ ($cts/cm^2 s Hz$)")
             ax.set_title(chkpt)
             fig.savefig("{0:s}_spectrum_{1:d}.png".format(prefix, i))
             plt.close()
@@ -230,6 +265,24 @@ if __name__ == "__main__":
             ax.set_ylabel(r"$F_\nu$ ($erg/cm^2 s Hz$)")
             ax.set_title(r"$\nu = $ {0:.2f} $keV$)".format(nu/1000.0))
             fig.savefig("{0:s}_lightcurve_{1:d}.png".format(prefix, i))
+            plt.close()
+
+    elif mode == "picture":
+
+        numin = 0.0
+        numax = 1.0
+
+        for i,chkpt in enumerate(chkfiles):
+            g.loadCheckpoint(chkpt)
+
+            pic = makePicture(g, rays, numin, numax, redshift='yes')
+
+            fig, ax = plt.subplots()
+            im = ax.imshow(pic, extent=rays.extent, aspect='equal')
+            ax.set_title(chkpt)
+            ax.set_xlabel(r"$X$ ($M_\odot$)")
+            ax.set_ylabel(r"$Y$ ($M_\odot$)")
+            fig.savefig("{0:s}_picture_{1:03d}.png".format(prefix,i))
             plt.close()
 
     else:

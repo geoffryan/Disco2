@@ -86,7 +86,7 @@ double metric_dg_dd(struct Metric *g, int k, int i, int j)
     return g->dg_dd[10*a + i+4*j-j*(j+1)/2];
 }
 
-double metric_dg_uu_(struct Metric *g, int k, int i, int j)
+double metric_dg_uu(struct Metric *g, int k, int i, int j)
 {
     if(g->killing[k])
         return 0.0;
