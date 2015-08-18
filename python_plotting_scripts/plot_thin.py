@@ -69,31 +69,58 @@ def calcNT(g, r, rs, Mdot):
 
     return (sig, pi, vr, vp, Qdot), (SIG, PI, VR, VP, QDOT)
 
+def calcGEO(g, r, Mdot, K):
+
+    M = g._pars['GravM']
+    GAM = g._pars['Adiabatic_Index']
+    AL = g._pars['AlphaVisc']
+
+    ur = -np.power(6*M/r - 1.0, 1.5) / 3.0
+    up = 2*math.sqrt(3.0)*M/(r*r)
+    u0 = (-2*M/r*ur - np.sqrt(4*M*M/(r*r)*ur*ur - (-1+2.0*M/r) * (1.0+(1.0+2.0*M/r)*ur*ur + r*r*up*up))) / (-1+2*M/r)
+
+    vr = ur/u0
+    vp = up/u0
+
+    rho = -Mdot / (2*math.pi*r*ur)
+
+    P = K * np.power(rho, GAM)
+
+    return rho, P, vr, vp
+
 def plotNT(g):
 
     r, prim = gToArr(g)
 
     M = g._pars['GravM']
     Risco = 6.0*M
-    R = np.logspace(math.log10(Risco), math.log10(r.max()), base=10.0, num=200)
+    R = np.logspace(math.log10(Risco)+0.05, math.log10(r.max()), base=10.0, num=200)
+    R2 = np.logspace(math.log10(r.min()), math.log10(Risco)-0.05, base=10.0, num=200)
 
     RS = 6.0*M
-    MDOT = 17.5
+    MDOT = 182.3
+    K = 2.5e-5
 
     SSdat, NTdat = calcNT(g, R, RS, MDOT)
+    GEOdat = calcGEO(g, R2, MDOT, K)
 
-    fig, ax = plt.subplots(2,3, figsize=(12,9))
+    fig, ax = plt.subplots(2,3, figsize=(14,9))
 
     print r.shape
     print prim.shape
     print R.shape
     print SSdat[0].shape
 
+    blue = (31.0/255, 119.0/255, 180.0/255)
+    orange = (255.0/255, 127.0/255, 14.0/255)
+    green = (44.0/255, 160.0/255, 44.0/255)
+
     xlim = (1.0, 1.0e3)
 
     ax[0,0].plot(r, prim[:,0], 'k+')
-    ax[0,0].plot(R, SSdat[0], 'r')
-    ax[0,0].plot(R, NTdat[0], 'b')
+    ax[0,0].plot(R, SSdat[0], ls='-', lw=3.0, color=orange)
+    ax[0,0].plot(R2, GEOdat[0], ls='-', lw=3.0, color=green)
+    ax[0,0].plot(R, NTdat[0], ls='-', lw=3.0, color=blue)
     ax[0,0].set_xlabel(r"$r$")
     ax[0,0].set_ylabel(r"$\Sigma$")
     ax[0,0].set_xscale('log')
@@ -101,8 +128,9 @@ def plotNT(g):
     ax[0,0].set_xlim(xlim)
     
     ax[0,1].plot(r, prim[:,1], 'k+')
-    ax[0,1].plot(R, SSdat[1], 'r')
-    ax[0,1].plot(R, NTdat[1], 'b')
+    ax[0,1].plot(R, SSdat[1], ls='-', lw=3.0, color=orange)
+    ax[0,1].plot(R2, GEOdat[1], ls='-', lw=3.0, color=green)
+    ax[0,1].plot(R, NTdat[1], ls='-', lw=3.0, color=blue)
     ax[0,1].set_xlabel(r"$r$")
     ax[0,1].set_ylabel(r"$\Pi$")
     ax[0,1].set_xscale('log')
@@ -110,8 +138,9 @@ def plotNT(g):
     ax[0,1].set_xlim(xlim)
 
     ax[1,0].plot(r, -prim[:,2], 'k+')
-    ax[1,0].plot(R, -SSdat[2], 'r')
-    ax[1,0].plot(R, -NTdat[2], 'b')
+    ax[1,0].plot(R, -SSdat[2], ls='-', lw=3.0, color=orange)
+    ax[1,0].plot(R2, -GEOdat[2], ls='-', lw=3.0, color=green)
+    ax[1,0].plot(R, -NTdat[2], ls='-', lw=3.0, color=blue)
     ax[1,0].set_xlabel(r"$r$")
     ax[1,0].set_ylabel(r"$v^r$")
     ax[1,0].set_xscale('log')
@@ -119,8 +148,9 @@ def plotNT(g):
     ax[1,0].set_xlim(xlim)
 
     ax[1,1].plot(r, prim[:,3], 'k+')
-    ax[1,1].plot(R, SSdat[3], 'r')
-    ax[1,1].plot(R, NTdat[3], 'b')
+    ax[1,1].plot(R, SSdat[3], ls='-', lw=3.0, color=orange)
+    ax[1,1].plot(R2, GEOdat[3], ls='-', lw=3.0, color=green)
+    ax[1,1].plot(R, NTdat[3], ls='-', lw=3.0, color=blue)
     ax[1,1].set_xlabel(r"$r$")
     ax[1,1].set_ylabel(r"$v^\phi$")
     ax[1,1].set_xscale('log')
@@ -135,8 +165,8 @@ def plotNT(g):
     qdot = 8*sb * T*T*T*T / (3*ka_bbes*sig * c*c*c*rho_scale*r_scale)
 
     ax[0,2].plot(r, qdot, 'k+')
-    ax[0,2].plot(R, SSdat[4], 'r')
-    ax[0,2].plot(R, NTdat[4], 'b')
+    ax[0,2].plot(R, SSdat[4], ls='-', lw=3.0, color=orange)
+    ax[0,2].plot(R, NTdat[4], ls='-', lw=3.0, color=blue)
     ax[0,2].set_xlabel(r"$r$")
     ax[0,2].set_ylabel(r"$\dot{Q}$")
     ax[0,2].set_xscale('log')
@@ -147,8 +177,8 @@ def plotNT(g):
     mdot = -2*np.pi*r*sig*u0*vr
 
     ax[1,2].plot(r, mdot, 'k+')
-    ax[1,2].plot(R, MDOT*np.ones(R.shape), 'r')
-    ax[1,2].plot(R, MDOT*np.ones(R.shape), 'b')
+    ax[1,2].plot(R, MDOT*np.ones(R.shape), ls='-', lw=3.0, color=orange)
+    ax[1,2].plot(R, MDOT*np.ones(R.shape), ls='-', lw=3.0, color=blue)
     ax[1,2].set_xlabel(r"$r$")
     ax[1,2].set_ylabel(r"$\dot{M}$")
     ax[1,2].set_xscale('log')
@@ -156,6 +186,8 @@ def plotNT(g):
     ax[1,2].set_xlim(xlim)
 
     plt.tight_layout()
+
+    fig.savefig("thin.png")
 
 if __name__ == "__main__":
 

@@ -546,9 +546,9 @@ double metric_frame_dU_du_geo(struct Metric *g, int mu, int nu,
                                 - a*a*M*M*M/(r*r*r));
             if(nu == 0)
                 return du0;
-            else if(mu == 1)
+            else if(nu == 1)
                 return 0.0;
-            else if(mu == 2)
+            else if(nu == 2)
             {
                 double domk = -1.5 * omk / r;
                 return du0 * omk / (1.0+a*M*omk) + u0 * domk / (1.0+a*M*omk)
@@ -582,13 +582,13 @@ double metric_frame_dU_du_geo(struct Metric *g, int mu, int nu,
             double durd = -(dhB*A-hB*A)/(A*A) - (A*hB*dhB-hB*hB*dA+0.5*A*C*dA
                             -0.5*A*A*dC) / (sqrt(hB*hB-A*C)*A*A);
 
-            if(mu == 0)
+            if(nu == 0)
                 return metric_dg_uu(g,1,0,0)*eps + metric_dg_uu(g,1,0,2)*lll
                     + metric_dg_uu(g,1,0,1)*urd + metric_g_uu(g,0,1)*durd;
-            else if(mu == 1)
+            else if(nu == 1)
                 return metric_dg_uu(g,1,1,0)*eps + metric_dg_uu(g,1,1,2)*lll
                     + metric_dg_uu(g,1,1,1)*urd + metric_g_uu(g,1,1)*durd;
-            else if(mu == 2)
+            else if(nu == 2)
                 return metric_dg_uu(g,1,2,0)*eps + metric_dg_uu(g,1,2,2)*lll
                     + metric_dg_uu(g,1,2,1)*urd + metric_g_uu(g,2,1)*durd;
             else
