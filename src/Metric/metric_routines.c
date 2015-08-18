@@ -439,9 +439,8 @@ double metric_frame_U_u_geo(struct Metric *g, int mu, struct Sim *theSim)
         }
         else
         {
-            double U0 = (Risco + a*M*sqrt(M/Risco)) / sqrt(Risco*Risco
-                                        - 3*M*Risco + 2*a*sqrt(M*M*M*Risco));
             double OMK = sqrt(M/(Risco*Risco*Risco));
+            double U0 = (1.0 + a*M*OMK) / sqrt(1.0 - 3*M/Risco + 2*a*M*OMK);
             double UP = U0 * OMK / (1.0 + a*M*OMK);
             double eps = (-1.0 + 2*M/Risco) * U0 + (-2.0*M*M*a/Risco) * UP;
             double lll = (-2.0*M*M*a/Risco) * U0
@@ -559,9 +558,8 @@ double metric_frame_dU_du_geo(struct Metric *g, int mu, int nu,
         }
         else
         {
-            double U0 = (Risco + a*M*sqrt(M/Risco)) / sqrt(Risco*Risco
-                                        - 3*M*Risco + 2*a*sqrt(M*M*M*Risco));
             double OMK = sqrt(M/(Risco*Risco*Risco));
+            double U0 = (1.0 + a*M*OMK) / sqrt(1.0 - 3*M/Risco + 2*a*M*OMK);
             double UP = U0 * OMK / (1.0 + a*M*OMK);
             double eps = (-1.0 + 2*M/Risco) * U0 + (-2.0*M*M*a/Risco) * UP;
             double lll = (-2.0*M*M*a/Risco) * U0
@@ -579,7 +577,7 @@ double metric_frame_dU_du_geo(struct Metric *g, int mu, int nu,
                         + 2*metric_dg_uu(g,1,0,2)*eps*lll
                         + metric_dg_uu(g,1,2,2)*lll*lll;
             double urd = (-hB - sqrt(hB*hB - A*C)) / A;
-            double durd = -(dhB*A-hB*A)/(A*A) - (A*hB*dhB-hB*hB*dA+0.5*A*C*dA
+            double durd = -(dhB*A-hB*dA)/(A*A) - (A*hB*dhB-hB*hB*dA+0.5*A*C*dA
                             -0.5*A*A*dC) / (sqrt(hB*hB-A*C)*A*A);
 
             if(nu == 0)
