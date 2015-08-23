@@ -541,8 +541,8 @@ double metric_frame_dU_du_geo(struct Metric *g, int mu, int nu,
             double omk = sqrt(M/(r*r*r));
             double u0 = (1.0 + a*M*omk) / sqrt(1.0 - 3.0*M/r + 2*a*M*omk);
             double du0 = -1.5*M/(r*r) * pow(1.0 - 3.0*M/r + 2*a*M*omk, -1.5) * 
-                            (1.0 + a*omk*(r-3.0*M) + 2.0*a*a*M*M/(r*r)
-                                - a*a*M*M*M/(r*r*r));
+                            (1.0 - 2*a*M*omk + a*a*M*M/(r*r));
+
             if(nu == 0)
                 return du0;
             else if(nu == 1)

@@ -11,7 +11,7 @@ InitialDataType        17       // 0 Torus, 1 Bondi, 2 Vortex, 3 Uniform,
                                 // 24 Kick
 GravMassType            0       // 0 none, 1 single, 2 binary
 Background              2       // 0 Newtonian, 1 GR, 2 GRvisc, 3 GRDisc
-Metric                  2       // 0 Flat, 1 Schwarzschild-SC,
+Metric                  4       // 0 Flat, 1 Schwarzschild-SC,
                                 // 2 Schwarzschild-KS, 4 Kerr-KS, 5 FlatADM,
                                 // 6 Schwarzschild-KS-ADM, 
 Frame                   3       // 0 Euler, 1 Keplerian, 2 Accreting, 3 Fit
@@ -30,10 +30,10 @@ aspect         1.0
 
 NUM_C                   5
 NUM_N                   1
-Time_Max                6.0e4
-Num_Checkpoints	        3001
-Num_Diag_Dump           31
-Num_Diag_Measure        31
+Time_Max                1.0e-3
+Num_Checkpoints	        1001
+Num_Diag_Dump           11
+Num_Diag_Measure        11
 
 
 NoInnerBC               0
@@ -59,7 +59,7 @@ PLM			1.0
 Grav_2D			1
 G_EPS			0.0
 GravM           1.0
-GravA           0.0
+GravA           0.9
 AlphaVisc       0.1
 
 BoostType   0       // 0 None, 1 Rigid, 2 Binary

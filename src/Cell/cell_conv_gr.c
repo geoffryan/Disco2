@@ -45,6 +45,16 @@ void cell_prim2cons_gr( double * prim , double * cons , double *pos , double dV 
     for(i=0; i<4; i++)
         U[i] = metric_frame_U_u(g, i, theSim);
 
+    /*
+    double dU[4];
+    for(i=0; i<4; i++)
+        dU[i] = metric_frame_dU_du(g, 1, i, theSim);
+    FILE *ufile = fopen("U.txt", "a");
+    fprintf(ufile, "%lg %lg %lg %lg %lg %lg %lg %lg %lg\n", r, 
+            U[0], U[1], U[2], U[3], dU[0], dU[1], dU[2], dU[3]);
+    fclose(ufile);
+    */
+
     //Check if velocity superluminal.
     double V[3];
     for(i=0; i<3; i++)
