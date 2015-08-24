@@ -258,6 +258,12 @@ void cell_init_disctest_geodesic(struct Cell *c, double r, double phi, double z,
     c->prim[UPP] = vp;
     c->prim[UZZ] = 0.0;
 
+    if(sim_Background(theSim) == GRDISC)
+    {
+        c->prim[RHO] = rho * u0 * sqrt(M*rho/(r*r*r*P));
+        c->prim[TTT] = T0;
+    }
+
     if(sim_NUM_C(theSim)<sim_NUM_Q(theSim)) 
     {
         int i;
