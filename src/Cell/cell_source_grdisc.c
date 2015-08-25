@@ -382,8 +382,8 @@ double logT_prime(double logT, double p[], double r, double M, double u0,
         double h = rhoh / rho;
         double height = sqrt(P*r*r*r/(rhoh*M))/u0;
 
-        dedT_sig = dedT - 0.5*dedp*(dPdT-(rho*dedT+dPdT)/h)
-                         / (1 + 0.5*(dPdp-(1+eps+rho*dedp+dPdp)/h));
+        dedT_sig = dedT - 0.5*dedp * ((1.0+eps)*rho/P*dPdT - rho*dedT)/h
+                         / (1 + 0.5*((1+eps)*(-1+rho/P*dPdp) - rho*dedp)/h);
 
         double qdot = eos_cool(p, height, theSim);
         double logTprime = qdot / (rho * height * u0 * dedT_sig * T);
