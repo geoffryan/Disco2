@@ -4,6 +4,7 @@
 #include <math.h>
 #include "../Headers/Cell.h"
 #include "../Headers/Sim.h"
+#include "../Headers/EOS.h"
 #include "../Headers/Face.h"
 #include "../Headers/GravMass.h"
 #include "../Headers/Metric.h"
@@ -568,6 +569,7 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
     if(mpisetup_check_rin_bndry(theMPIsetup) && sim_NoInnerBC(theSim)!=1)
     {
         double GAM = sim_GAMMALAW(theSim);
+        double M = sim_GravM(theSim);
         int bg = sim_Background(theSim);
         
         //Calculate accretion rate & Isentropic constant
@@ -602,11 +604,14 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
                                 - metric_square3_u(g,v));
                 metric_destroy(g);
 
+                double Sigma, Pi;
+
                 if(bg == GRDISC)
                 {
+                    double rho = eos_rho(theCells[k][i][j].prim, theSim);
                     double P = eos_ppp(theCells[k][i][j].prim, theSim);
                     double eps = eos_eps(theCells[k][i][j].prim, theSim);
-                    double H = sqrt(r*r*r*P / (rho+rho*eps*P)) / u0;
+                    double H = sqrt(R*R*R*P / (M*(rho+rho*eps+P))) / u0;
 
                     /* So the thermodynamics of the GRDISC setup are pretty
                      * screwy. The EOS is written in terms of central
@@ -623,6 +628,9 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
                      * ANYWAYS, so gas pressure should be dominant.
                      */
 
+                    Sigma = rho*H;
+                    Pi = P*H;
+
                     mdot += -rho*H * u0*v[0] * R * dphi*dz;
                     S += P / pow(rho,GAM) * dphi*dz;
                 }
@@ -631,9 +639,12 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
                     double rho = theCells[k][i][j].prim[RHO];
                     double P = theCells[k][i][j].prim[PPP];
 
-                    mdot += -rho * u0*v[0] * R*dphi*dz;
-                    S += log(pow(P/rho,1.0/(GAM-1.0)) / rho) * dphi*dz;
+                    Sigma = rho;
+                    Pi = P;
                 }
+
+                mdot += -Sigma * u0*v[0] * R*dphi*dz;
+                S += log(pow(Pi/Sigma,1.0/(GAM-1.0)) / Sigma) * dphi*dz;
             }
         }
         double dZ = sim_FacePos(theSim, sim_N(theSim,Z_DIR)-1, Z_DIR)
@@ -668,20 +679,36 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
                         U[mu] = metric_frame_U_u(g, mu, theSim);
                     metric_destroy(g);
 
+                    double Sigma = -mdot / (r*U[1]);
+                    double Pi = pow(Sigma, GAM) * exp((GAM-1.0)*S);
+
                     if(bg == GRDISC)
                     {
-                        double sigma = -mdot / (r*U[1]);
                         double vr = U[1]/U[0];
                         double vp = U[2]/U[0];
                         double vz = U[3]/U[0];
+
+                        double Sigmah = Sigma+GAM/(GAM-1.0)*Pi;
+                        double H = sqrt(r*r*r*Pi/(M*Sigmah)) / U[0];
+
+                        double rho = Sigma/H;
+                        double P = Pi/H;
+                        double T = P / rho; //TODO: MAKE SURE THIS RESPECTS
+                                            //      EOS.
+                        
+                        theCells[k][i][j].prim[RHO] = rho;
+                        theCells[k][i][j].prim[TTT] = T;
+                        theCells[k][i][j].prim[URR] = vr;
+                        theCells[k][i][j].prim[UPP] = vp;
+                        theCells[k][i][j].prim[UZZ] = vz;
                     }
                     else
                     {
-                        double rho = -mdot / (r*U[1]);
+                        double rho = Sigma;
                         double vr = U[1]/U[0];
                         double vp = U[2]/U[0];
                         double vz = U[3]/U[0];
-                        double P = pow(rho, GAM) * exp((GAM-1.0)*S);
+                        double P = Pi;
 
                         theCells[k][i][j].prim[RHO] = rho;
                         theCells[k][i][j].prim[PPP] = P;
