@@ -568,6 +568,7 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
     if(mpisetup_check_rin_bndry(theMPIsetup) && sim_NoInnerBC(theSim)!=1)
     {
         double GAM = sim_GAMMALAW(theSim);
+        int bg = sim_Background(theSim);
         
         //Calculate accretion rate & Isentropic constant
         i = sim_Nghost_min(theSim,R_DIR);
@@ -575,7 +576,7 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
                         + sim_FacePos(theSim,i-1,R_DIR));
 
         double mdot = 0.0;
-        double K = 0.0;
+        double S = 0.0;
 
         for(k = 0; k < sim_N(theSim, Z_DIR); k++)
         {
@@ -601,17 +602,44 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
                                 - metric_square3_u(g,v));
                 metric_destroy(g);
 
-                double rho = theCells[k][i][j].prim[RHO];
-                double P = theCells[k][i][j].prim[PPP];
+                if(bg == GRDISC)
+                {
+                    double P = eos_ppp(theCells[k][i][j].prim, theSim);
+                    double eps = eos_eps(theCells[k][i][j].prim, theSim);
+                    double H = sqrt(r*r*r*P / (rho+rho*eps*P)) / u0;
 
-                mdot += -rho * u0*v[0] * R*dphi*dz;
-                K += P/pow(rho,GAM) * dphi*dz;
+                    /* So the thermodynamics of the GRDISC setup are pretty
+                     * screwy. The EOS is written in terms of central
+                     * central quantities, but the energy equation conserves
+                     * the column-integrated energy.  This means that 
+                     * the isentropic relation enforced by the adiabatic energy
+                     * equation is for COLUMN INTEGRATED entropy, NOT the
+                     * central entropy that would be easy to calculate.
+                     *
+                     * It's not easy/obvious at the moment how to write a good
+                     * isentropic relation for this system, so I'll assume 
+                     * a gas pressure dominated system because a) I know the
+                     * answer there and b) the gas cools inside the ISCO 
+                     * ANYWAYS, so gas pressure should be dominant.
+                     */
+
+                    mdot += -rho*H * u0*v[0] * R * dphi*dz;
+                    S += P / pow(rho,GAM) * dphi*dz;
+                }
+                else
+                {
+                    double rho = theCells[k][i][j].prim[RHO];
+                    double P = theCells[k][i][j].prim[PPP];
+
+                    mdot += -rho * u0*v[0] * R*dphi*dz;
+                    S += log(pow(P/rho,1.0/(GAM-1.0)) / rho) * dphi*dz;
+                }
             }
         }
         double dZ = sim_FacePos(theSim, sim_N(theSim,Z_DIR)-1, Z_DIR)
                      - sim_FacePos(theSim, -1, Z_DIR);
         mdot /= 2*M_PI*dZ;
-        K /= 2*M_PI*dZ;
+        S /= 2*M_PI*dZ;
 
         //printf("%lg %lg\n", mdot, K);
 
@@ -640,17 +668,27 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
                         U[mu] = metric_frame_U_u(g, mu, theSim);
                     metric_destroy(g);
 
-                    double rho = -mdot / (r*U[1]);
-                    double vr = U[1]/U[0];
-                    double vp = U[2]/U[0];
-                    double vz = U[3]/U[0];
-                    double P = K * pow(rho, GAM);
+                    if(bg == GRDISC)
+                    {
+                        double sigma = -mdot / (r*U[1]);
+                        double vr = U[1]/U[0];
+                        double vp = U[2]/U[0];
+                        double vz = U[3]/U[0];
+                    }
+                    else
+                    {
+                        double rho = -mdot / (r*U[1]);
+                        double vr = U[1]/U[0];
+                        double vp = U[2]/U[0];
+                        double vz = U[3]/U[0];
+                        double P = pow(rho, GAM) * exp((GAM-1.0)*S);
 
-                    theCells[k][i][j].prim[RHO] = rho;
-                    theCells[k][i][j].prim[PPP] = P;
-                    theCells[k][i][j].prim[URR] = vr;
-                    theCells[k][i][j].prim[UPP] = vp;
-                    theCells[k][i][j].prim[UZZ] = vz;
+                        theCells[k][i][j].prim[RHO] = rho;
+                        theCells[k][i][j].prim[PPP] = P;
+                        theCells[k][i][j].prim[URR] = vr;
+                        theCells[k][i][j].prim[UPP] = vp;
+                        theCells[k][i][j].prim[UZZ] = vz;
+                    }
                 }
             }
         }
