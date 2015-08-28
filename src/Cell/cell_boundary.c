@@ -630,9 +630,6 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
 
                     Sigma = rho*H;
                     Pi = P*H;
-
-                    mdot += -rho*H * u0*v[0] * R * dphi*dz;
-                    S += P / pow(rho,GAM) * dphi*dz;
                 }
                 else
                 {
