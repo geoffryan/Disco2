@@ -301,7 +301,12 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
     p[UZZ] = prim[UZZ];
     double logT = log(p[TTT]);
 
-    if(1)
+    if(sim_CoolingType(theSim) == COOL_NONE) {}
+    else if(sim_CoolingType(theSim) == COOL_ISOTHERM)
+    {
+        logT = log(sim_CoolPar1(theSim));
+    }
+    else if(sim_CoolingType(theSim) == COOL_BB_ES)
     {
         double GAM = sim_GAMMALAW(theSim);
         double rho = eos_rho(prim, theSim);
