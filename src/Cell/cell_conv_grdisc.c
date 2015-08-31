@@ -192,7 +192,7 @@ static int cons2prim_solve(double *cons, double *prim, double *pos, double dV,
     double S2, SU, A, B, C;
     double f1, f2, df1dr, df1dt, df2dr, df2dt, detj;
     int err = 0;
-    double tol = 1.0e-12;
+    double tol = 1.0e-10;
     int maxIter = 100;
 
     r = pos[R_DIR];
