@@ -461,6 +461,12 @@ void cell_cool_integrateT_gr_exact(double *prim, double *dcons, double dt,
         T1 = 0.0;
     //printf("%.12lg %.12lg %.12lg\n", prim[PPP]/prim[RHO], T0, T1);
 
+    /*
+    FILE *Tfile = fopen("cool.txt", "a");
+    fprintf(Tfile, "%.16lg %.16lg %.16lg\n", pos[R_DIR], T0, T1);
+    fclose(Tfile);
+    */
+
     int NUMQ = sim_NUM_Q(theSim);
     double p[NUMQ];
     p[RHO] = prim[RHO];

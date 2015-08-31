@@ -289,7 +289,7 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
 
     int i;
     int NUMQ = sim_NUM_Q(theSim);
-    double res = 1.0e-6;
+    double res = 1.0e-15;
 
     double r = pos[R_DIR];
 
@@ -301,6 +301,25 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
     p[UZZ] = prim[UZZ];
     double logT = log(p[TTT]);
 
+    if(1)
+    {
+        double GAM = sim_GAMMALAW(theSim);
+        double rho = eos_rho(prim, theSim);
+        double P = eos_ppp(prim, theSim);
+        double eps = eos_eps(prim, theSim);
+        double rhoh = rho + rho*eps + P;
+        double H = sqrt(r*r*r*P/(rhoh*M)) / u0;
+        double qdot = eos_cool(prim, H, theSim);
+
+        double T0 = prim[TTT];
+        double T1;
+
+        T1 = pow(1.0 + 3*(GAM-1)*qdot/(prim[RHO]*u0*H*T0)*dt, -1.0/3.0) * T0;
+
+        logT = log(T1);
+    }
+    else
+    {
     double t = 0;
 
     // Cool using adaptive Forward Euler or RK4.
@@ -331,10 +350,16 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
         t += step;
         i++;
     }
-    /*
+    
     if(i>100)
         printf("   Cell at (%.12lg, %.12lg, %.12lg) cooled in %d steps.\n",
                 pos[R_DIR], pos[P_DIR], pos[Z_DIR], i);
+    }
+
+    /*
+    FILE *Tfile = fopen("cool.txt", "a");
+    fprintf(Tfile, "%.16lg %.16lg %.16lg\n", pos[R_DIR], prim[TTT], exp(logT));
+    fclose(Tfile);
     */
 
     double T = exp(logT);

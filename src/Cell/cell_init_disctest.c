@@ -4,6 +4,7 @@
 #include <math.h>
 #include "../Headers/Cell.h"
 #include "../Headers/Sim.h"
+#include "../Headers/EOS.h"
 #include "../Headers/Face.h"
 #include "../Headers/GravMass.h"
 #include "../Headers/Metric.h"
@@ -215,6 +216,7 @@ void cell_init_disctest_geodesic(struct Cell *c, double r, double phi, double z,
     double rho, vr, vp, P;
     double sig0, T0;
     double M  = sim_GravM(theSim);
+    double GAM = sim_GAMMALAW(theSim);
 
     sig0 = sim_InitPar1(theSim);
     T0 = sim_InitPar2(theSim);
@@ -260,7 +262,10 @@ void cell_init_disctest_geodesic(struct Cell *c, double r, double phi, double z,
 
     if(sim_Background(theSim) == GRDISC)
     {
-        c->prim[RHO] = rho * u0 * sqrt(M*rho/(r*r*r*P));
+        double pi = P;
+        double sigmah = sig0 + GAM/(GAM-1.0)*pi;
+        double H = sqrt(r*r*r*pi/(M*sigmah)) / u0;
+        c->prim[RHO] = sig0 / H;
         c->prim[TTT] = T0;
     }
 

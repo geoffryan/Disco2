@@ -160,7 +160,7 @@ def plotNT(g):
     R2 = np.logspace(math.log10(r.min()), math.log10(Risco)-0.05, base=10.0, num=200)
 
     RS = Risco
-    MDOT = 347
+    MDOT = 174
     K = 2.5e-5
 
     SSdat, NTdat = calcNT(g, R, RS, MDOT)
