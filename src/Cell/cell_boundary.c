@@ -578,7 +578,7 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
                         + sim_FacePos(theSim,i-1,R_DIR));
 
         double mdot = 0.0;
-        double S = 0.0;
+        double Sdot = 0.0;
 
         for(k = 0; k < sim_N(theSim, Z_DIR); k++)
         {
@@ -640,14 +640,18 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
                     Pi = P;
                 }
 
+                double s = log(pow(Pi/Sigma,1.0/(GAM-1.0)) / Sigma);
+
                 mdot += -Sigma * u0*v[0] * R*dphi*dz;
-                S += log(pow(Pi/Sigma,1.0/(GAM-1.0)) / Sigma) * dphi*dz;
+                Sdot += -s * Sigma * u0*v[0] * R*dphi*dz;
             }
         }
         double dZ = sim_FacePos(theSim, sim_N(theSim,Z_DIR)-1, Z_DIR)
                      - sim_FacePos(theSim, -1, Z_DIR);
         mdot /= 2*M_PI*dZ;
-        S /= 2*M_PI*dZ;
+        Sdot /= 2*M_PI*dZ;
+
+        double s = Sdot / mdot;
 
         //printf("%lg %lg\n", mdot, K);
 
@@ -677,7 +681,7 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
                     metric_destroy(g);
 
                     double Sigma = -mdot / (r*U[1]);
-                    double Pi = pow(Sigma, GAM) * exp((GAM-1.0)*S);
+                    double Pi = pow(Sigma, GAM) * exp((GAM-1.0)*s);
 
                     if(bg == GRDISC)
                     {
