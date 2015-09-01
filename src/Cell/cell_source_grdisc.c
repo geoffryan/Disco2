@@ -309,7 +309,12 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
 
     double sigma = rho * H;
 
-    if(1)
+    if(sim_CoolingType(theSim) == COOL_NONE) {}
+    else if(sim_CoolingType(theSim) == COOL_ISOTHERM)
+    {
+        logT = log(sim_CoolPar1(theSim));
+    }
+    else if(sim_CoolingType(theSim) == COOL_BB_ES)
     {
         double GAM = sim_GAMMALAW(theSim);
         double qdot = eos_cool(prim, H, theSim);
