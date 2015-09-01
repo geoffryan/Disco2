@@ -15,6 +15,8 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
                                 double u0, double pos[], double M,
                                 struct Sim *theSim);
 double logT_prime(double logT, double p[], double r, double M, double u0,
+                    double sigma, struct Sim *theSim);
+int rho_solve(double p[], double sigma, double r, double M, double u0, 
                     struct Sim *theSim);
 
 //Add source terms to theCells.
@@ -300,15 +302,16 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
     p[UPP] = prim[UPP];
     p[UZZ] = prim[UZZ];
     double logT = log(p[TTT]);
+    double rho = eos_rho(p, theSim);
+    double eps = eos_eps(p, theSim);
+    double P   = eos_ppp(p, theSim);
+    double H = sqrt(r*r*r*P / (M*(rho+rho*eps+P))) / u0;
+
+    double sigma = rho * H;
 
     if(1)
     {
         double GAM = sim_GAMMALAW(theSim);
-        double rho = eos_rho(prim, theSim);
-        double P = eos_ppp(prim, theSim);
-        double eps = eos_eps(prim, theSim);
-        double rhoh = rho + rho*eps + P;
-        double H = sqrt(r*r*r*P/(rhoh*M)) / u0;
         double qdot = eos_cool(prim, H, theSim);
 
         double T0 = prim[TTT];
@@ -328,7 +331,7 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
     i = 0;
     while(t < dt)
     {
-        double logTprime = logT_prime(logT, p, r, M, u0, theSim);
+        double logTprime = logT_prime(logT, p, r, M, u0, sigma, theSim);
 
         double step = res / logTprime;
         step = step < dt-t ? step : dt-t;
@@ -339,11 +342,11 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
         //RK4
         
         double logT1 = logT - 0.5*step*logTprime;
-        double logTp2 = logT_prime(logT1, p, r, M, u0, theSim);
+        double logTp2 = logT_prime(logT1, p, r, M, u0, sigma, theSim);
         double logT2 = logT - 0.5*step*logTp2;
-        double logTp3 = logT_prime(logT2, p, r, M, u0, theSim);
+        double logTp3 = logT_prime(logT2, p, r, M, u0, sigma, theSim);
         double logT3 = logT - step*logTp3;
-        double logTp4 = logT_prime(logT3, p, r, M, u0, theSim);
+        double logTp4 = logT_prime(logT3, p, r, M, u0, sigma, theSim);
         logT += -step*(logTprime + 2*logTp2 + 2*logTp3 + logTp4)/6.0;
         
 
@@ -364,6 +367,7 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
 
     double T = exp(logT);
     p[TTT] = T;
+    int err = rho_solve(p, sigma, r, M, u0, theSim);
 
     if(T > prim[TTT])
         printf("WAT\n");
@@ -375,7 +379,9 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
     cell_prim2cons(prim, cons0, pos, 1.0, theSim);
     cell_prim2cons(p,    cons1, pos, 1.0, theSim);
 
-    dcons[RHO] = 0.0;
+    //printf("%.12lg\n", cons1[DDD]-cons0[DDD]);
+
+    dcons[DDD] = 0.0;
     dcons[SRR] = cons1[SRR]-cons0[SRR];
     dcons[LLL] = cons1[LLL]-cons0[LLL];
     dcons[SZZ] = cons1[SZZ]-cons0[SZZ];
@@ -391,11 +397,14 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
 }
 
 double logT_prime(double logT, double p[], double r, double M, double u0,
-                    struct Sim *theSim)
+                    double sigma, struct Sim *theSim)
 {
         double T = exp(logT);
         p[TTT] = T;
+        
         double rho, P, eps, dPdp, dPdT, dedp, dedT, dedT_sig;
+        int err = rho_solve(p, sigma, r, M, u0, theSim);
+
         rho = p[RHO];
         P = eos_ppp(p, theSim);
         eps = eos_eps(p, theSim);
@@ -403,7 +412,7 @@ double logT_prime(double logT, double p[], double r, double M, double u0,
         dPdT = eos_dpppdttt(p, theSim);
         dedp = eos_depsdrho(p, theSim);
         dedT = eos_depsdttt(p, theSim);
-        double rhoh = rho*(1+eps) + P;
+        double rhoh = rho + rho*eps + P;
         double h = rhoh / rho;
         double height = sqrt(P*r*r*r/(rhoh*M))/u0;
 
@@ -416,3 +425,55 @@ double logT_prime(double logT, double p[], double r, double M, double u0,
         return logTprime;
 }
 
+int rho_solve(double p[], double sigma, double r, double M, double u0, 
+                struct Sim *theSim)
+{
+    /*
+     * A Newton-Raphson solver to find the central density 'rho' for a
+     * given surface density 'sigma' and temperature (given in prim array 'p').
+     * The value of p[RHO] is updated. Returns non-zero if an error occurs.
+     */
+
+    double rho0, rho1, rho;
+    double rhoH, drhoH;
+    double c = sqrt(r*r*r/M)/u0;
+    int err = 0;
+    double tol = 1.0e-12;
+
+    rho0 = p[RHO];
+
+    rho1 = rho0;
+    int i = 0;
+    do
+    {
+        rho = rho1;
+        p[RHO] = rho;
+        double eps = eos_eps(p, theSim);
+        double P   = eos_ppp(p, theSim);
+        double dedp = eos_depsdrho(p, theSim);
+        double dPdp = eos_dpppdrho(p, theSim);
+
+        double rhoh = rho + rho*eps + P;
+        rhoH = rho * c * sqrt(P/rhoh);
+        drhoH = 0.5 * rhoH/rhoh * (1.0 + eps + 2*P/rho - rho*dedp
+                        + (rho+rho*eps)/P*dPdp);
+
+        rho1 = rho - (rhoH-sigma) / drhoH;
+        if(rho1 < 0.0)
+            rho1 = 0.5*rho;
+
+        i++;
+    }
+    while(fabs(rho-rho1)/rho > tol && i < 100);
+    if(i>=100)
+    {
+        printf("ERROR: NR failed to converge in rho_solve().\n");
+        printf("    rho0=%.12lg, rho1=%.12lg, T=%.12lg, err=%.12lg\n",
+                rho0, rho1, p[TTT], (rho-rho1)/rho);
+        err = 1;
+    }
+
+    p[RHO] = rho1;
+    
+    return err;
+}
