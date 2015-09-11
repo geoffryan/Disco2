@@ -109,6 +109,10 @@ def ISCO(M, a):
 
     return Risco
 
+def EH(M, a):
+
+    return M * (1.0 + math.sqrt(1-a*a))
+
 def allTheThings(g, r, prim):
 
     M = g._pars['GravM']
@@ -301,6 +305,7 @@ def plotSigNice(g):
         rad = True
 
     Risco = ISCO(M,a)
+    Reh = EH(M,a)
 
     R = np.logspace(math.log10(Risco)+0.01, math.log10(r.max()), base=10.0, num=200)
     R2 = np.logspace(math.log10(r.min()), math.log10(Risco)-0.05, base=10.0, num=200)
@@ -309,6 +314,11 @@ def plotSigNice(g):
     MDOT = 270
     K = 3.5e-5
 
+    labelsize = 24
+    ticksize = 18
+    titlesize = 36
+    legendsize = 24
+
     if rad:
         SSdat, NTdat, NTraddat = calcNT(g, R, RS, MDOT)
     else:
@@ -316,29 +326,35 @@ def plotSigNice(g):
 
     GEOdat = calcGEO(g, R2, MDOT, K)
 
-    if a != 0.0:
-        g._pars['GravA'] = 0.0
-        R3 = np.logspace(math.log10(6*M)+0.01, math.log10(r.max()), base=10.0, num=200)
-        SSdat2, NTdat2 = calcNT(g, R3, 6*M, MDOT)
-        g._pars['GravA'] = a
-
-    fig, ax = plt.subplots(1,1, figsize=(14,9))
+    fig, ax = plt.subplots(1,1, figsize=(12,9))
 
     xlim = (1.0, 1.0e2)
 
-    ax.plot(r, sig * rho_scale*r_scale, 'k+', label='Disco')
-    #ax[0,0].plot(R, SSdat[0], ls='-', lw=3.0, color=orange)
-    ax.plot(R2, GEOdat[0], ls='-', lw=3.0, color=green, label='Plunge')
-    ax.plot(R, NTdat[0], ls='-', lw=3.0, color=blue, label='Novikov-Thorne')
-    #if a != 0.0:
-    #    ax.plot(R3, NTdat2[0], ls='-', lw=3.0, color=red)
-    #if rad:
-    #    ax.plot(R, NTraddat[0], ls='-', lw=3.0, color=purple)
-    ax.set_xlabel(r"$r$ $(GM_\odot / c^2)$")
-    ax.set_ylabel(r"$\Sigma$ $(g/cm^2)$")
+    real_units = rho_scale*r_scale
+
+    ax.axvspan(xlim[0], 2*M, color='lightgrey', alpha=0.5, 
+                label='Event Horizon')
+    ax.axvspan(xlim[0], Reh, color='grey', alpha=0.5, 
+                label='Ergosphere')
+    ax.axvline(Risco, ls='--', lw=5.0, color='lightgrey',
+                label='ISCO')
+
+    ax.plot(R2, GEOdat[0]*real_units, ls='-', lw=5.0, color=orange, 
+            label='Plunging')
+    ax.plot(R, NTdat[0]*real_units, ls='-', lw=5.0, color=blue, 
+            label='Novikov-Thorne')
+    ax.plot(r, sig * real_units, 'k+', ms=10, label='Disco')
+    ax.set_xlabel(r"$r$ $(GM_\odot / c^2)$", fontsize=labelsize)
+    ax.set_ylabel(r"$\Sigma$ $(g/cm^2)$", fontsize=labelsize)
     ax.set_xscale('log')
     ax.set_yscale('log')
+    ax.tick_params(labelsize=ticksize)
     ax.set_xlim(xlim)
+    plt.legend(loc="lower right", fontsize=legendsize)
+
+    title = ax.set_title(r"$M=M_\odot$   $a=0.9$   $\mathcal{M}_{ISCO}=20$", 
+            fontsize=titlesize)
+    title.set_position((0.5,1.02))
 
     return fig, ax
 
@@ -476,16 +492,20 @@ if __name__ == "__main__":
     if len(sys.argv) == 3:
 
         checkpoint = sys.argv[2]
+        
         print("Loading {0:s}".format(checkpoint))
         g.loadCheckpoint(sys.argv[2])
         num = int(sys.argv[2].split(".")[-2].split("_")[-1])
         name = "plot_thin_{0:04d}.png".format(num)
+        nameSig = "plot_thin_Sig_{0:04d}.png".format(num)
 
         print("   Plotting {0:s}".format(checkpoint))
-
         fig, ax = plotNT(g)
+        fig2, ax2 = plotSigNice(g)
+        
         print("   Saving {0:s}".format(name))
         fig.savefig(name)
+        fig2.savefig(nameSig)
 
         plt.show()
 
@@ -497,12 +517,16 @@ if __name__ == "__main__":
             g.loadCheckpoint(checkpoint)
             num = int(checkpoint.split(".")[-2].split("_")[-1])
             name = "plot_thin_{0:04d}.png".format(num)
+            nameSig = "plot_thin_Sig_{0:04d}.png".format(num)
             
             print("   Plotting {0:s}".format(checkpoint))
-            fig, ax = plotNT(g)
+            #fig, ax = plotNT(g)
+            fig2, ax2 = plotSigNice(g)
             
             print("   Saving {0:s}".format(name))
-            fig.savefig(name)
+            #fig.savefig(name)
+            fig2.savefig(nameSig)
+            
             plt.close()
 
 
