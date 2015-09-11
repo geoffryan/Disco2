@@ -77,6 +77,21 @@ def eps(g, rho, T):
 
     return e
 
+def gToArr1D(g):
+    R = np.zeros(g.nr_tot)
+    prim = np.zeros((g.nr_tot,5))
+
+    ind = 0
+    for i in xrange(g.nr_tot):
+        r1 = g.rFaces[i]
+        r2 = g.rFaces[i+1]
+        r = 0.5*(r1+r2)
+
+        R[i] = r
+        prim[i,:] = g.prim[0][i][0,:5]
+
+    return R, prim
+
 def gToArr(g):
     R = np.zeros(g.np.sum())
     prim = np.zeros((g.np.sum(),5))
@@ -271,10 +286,10 @@ def calcGEO(g, r, Mdot, K):
 
         u0d = EPS*np.ones(r.shape)
         upd = LLL*np.ones(r.shape)
-        a = grr
-        b = g0r*u0d + grp*upd
-        c = g00*u0d*u0d + 2*g0p*u0d*upd + gpp*upd*upd + 1.0
-        urd = (-b - np.sqrt(b*b - a*c)) / a
+        aa = grr
+        bb = g0r*u0d + grp*upd
+        cc = g00*u0d*u0d + 2*g0p*u0d*upd + gpp*upd*upd + 1.0
+        urd = (-bb - np.sqrt(bb*bb - aa*cc)) / aa
 
         u0 = g00*u0d + g0r*urd + g0p*upd
         ur = g0r*u0d + grr*urd + grp*upd
@@ -284,15 +299,18 @@ def calcGEO(g, r, Mdot, K):
     vr = ur/u0
     vp = up/u0
 
-    rho = -Mdot / (2*math.pi*r*ur)
+    sig = -Mdot / (2*math.pi*r*ur)
 
-    P = K * np.power(rho, GAM)
+    pi = K * np.power(sig, GAM)
 
-    return rho, P, vr, vp
+    T = mp*c*c * pi/sig
+    qdot = 8*sb * T*T*T*T / (3*ka_bbes*sig * c*c*c*rho_scale*r_scale)
+
+    return sig, pi, vr, vp, qdot
 
 def plotSigNice(g):
 
-    r, prim = gToArr(g)
+    r, prim = gToArr1D(g)
 
     rho, sig, p, pi, H, T, vr, vp, mdot, qdot = allTheThings(g, r, prim)
 
@@ -311,7 +329,7 @@ def plotSigNice(g):
     R2 = np.logspace(math.log10(r.min()), math.log10(Risco)-0.05, base=10.0, num=200)
 
     RS = Risco
-    MDOT = 270
+    MDOT = 209
     K = 3.5e-5
 
     labelsize = 24
@@ -358,9 +376,274 @@ def plotSigNice(g):
 
     return fig, ax
 
+def plotQdotNice(g):
+
+    r, prim = gToArr1D(g)
+
+    rho, sig, p, pi, H, T, vr, vp, mdot, qdot = allTheThings(g, r, prim)
+
+    M = g._pars['GravM']
+    a = g._pars['GravA']
+    EOSType = g._pars['EOSType']
+    EOSPar2 = g._pars['EOSPar2']
+    rad = False
+    if EOSType == 1 and EOSPar2 == 1.0:
+        rad = True
+
+    Risco = ISCO(M,a)
+    Reh = EH(M,a)
+
+    R = np.logspace(math.log10(Risco)+0.01, math.log10(r.max()), base=10.0, num=200)
+    R2 = np.logspace(math.log10(r.min()), math.log10(Risco)-0.05, base=10.0, num=200)
+
+    RS = Risco
+    MDOT = 209
+    K = 3.5e-5
+
+    labelsize = 24
+    ticksize = 18
+    titlesize = 36
+    legendsize = 18
+
+    if rad:
+        SSdat, NTdat, NTraddat = calcNT(g, R, RS, MDOT)
+    else:
+        SSdat, NTdat = calcNT(g, R, RS, MDOT)
+
+    GEOdat = calcGEO(g, R2, MDOT, K)
+
+    if a != 0.0:
+        g._pars['GravA'] = 0.0
+        R3 = np.logspace(math.log10(6*M)+0.01, math.log10(r.max()), base=10.0, num=200)
+        SSdat2, NTdat2 = calcNT(g, R3, 6*M, MDOT)
+        g._pars['GravA'] = a
+
+    fig, ax = plt.subplots(1,1, figsize=(12,9))
+
+    xlim = (1.0, 1.0e2)
+
+    real_units = rho_scale*c*c*c
+
+    ax.axvspan(xlim[0], 2*M, color='lightgrey', alpha=0.5, 
+                label='Event Horizon')
+    ax.axvspan(xlim[0], Reh, color='grey', alpha=0.5, 
+                label='Ergosphere')
+    ax.axvline(Risco, ls='--', lw=5.0, color='lightgrey',
+                label='ISCO')
+
+    ax.plot(R2, GEOdat[4]*real_units, ls='-', lw=5.0, color=orange, 
+            label='Plunging')
+    ax.plot(R, NTdat[4]*real_units, ls='-', lw=5.0, color=blue, 
+            label='Novikov-Thorne')
+    if a != 0.0:
+        ax.plot(R3, NTdat2[4]*real_units, ls='-', lw=5.0, color=green, 
+                label='Novikov-Thorne $a=0$')
+    ax.plot(r, qdot * real_units, 'k+', ms=10, label='Disco')
+    ax.set_xlabel(r"$r$ $(GM_\odot / c^2)$", fontsize=labelsize)
+    ax.set_ylabel(r"$\dot{Q}$ $(erg/cm^2 s)$", fontsize=labelsize)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.tick_params(labelsize=ticksize)
+    ax.set_xlim(xlim)
+    plt.legend(loc="lower right", fontsize=legendsize)
+
+    title = ax.set_title(r"$M=M_\odot$   $a=0.9$   $\mathcal{M}_{ISCO}=20$", 
+            fontsize=titlesize)
+    title.set_position((0.5,1.02))
+
+    return fig, ax
+
+def plotHeightProfile(g):
+
+    r, prim = gToArr1D(g)
+
+    rho, sig, p, pi, H, T, vr, vp, mdot, qdot = allTheThings(g, r, prim)
+
+    M = g._pars['GravM']
+    a = g._pars['GravA']
+    EOSType = g._pars['EOSType']
+    EOSPar2 = g._pars['EOSPar2']
+    rad = False
+    if EOSType == 1 and EOSPar2 == 1.0:
+        rad = True
+
+    Risco = ISCO(M,a)
+    Reh = EH(M,a)
+
+    labelsize = 24
+    ticksize = 18
+    titlesize = 36
+    legendsize = 18
+
+    fig, ax = plt.subplots(1,1, figsize=(12,9))
+
+    xlim = (1.0, 3)
+
+    ax.axvspan(xlim[0], 2*M, color='lightgrey', alpha=0.5, 
+                label='Event Horizon')
+    ax.axvspan(xlim[0], Reh, color='grey', alpha=0.5, 
+                label='Ergosphere')
+    ax.axvline(Risco, ls='--', lw=5.0, color='lightgrey',
+                label='ISCO')
+
+    ax.fill_between(r, -H, H)
+
+
+    ax.set_xlabel(r"$r$ $(GM_\odot / c^2)$", fontsize=labelsize)
+    ax.set_ylabel(r"$H$ $(GM_\odot / c^2)$", fontsize=labelsize)
+    ax.set_xscale('linear')
+    ax.set_yscale('linear')
+    ax.tick_params(labelsize=ticksize)
+    ax.set_xlim(xlim)
+    ax.set_ylim((-xlim[1],xlim[1]))
+    ax.set_aspect("equal")
+    plt.legend(loc="lower right", fontsize=legendsize)
+
+    title = ax.set_title(r"$M=M_\odot$   $a=0.9$   $\mathcal{M}_{ISCO}=20$", 
+            fontsize=titlesize)
+    title.set_position((0.5,1.02))
+
+    return fig, ax
+
+def plot_shear(g):
+    
+    R, prim = gToArr1D(g)
+    rho, sig, p, pi, H, T, VR, VP, mdot, qdot = allTheThings(g, R, prim)
+
+    r = 0.5*(R[:-1]+R[1:])
+    vr = 0.5*(VR[:-1]+VR[1:])
+    vp = 0.5*(VP[:-1]+VP[1:])
+
+    M = g._pars['GravM']
+    a = g._pars['GravA']
+
+    g00 = -1 + 2*M/r
+    g0r = 2*M/r
+    g0p = -2*M*M*a/r
+    grr = 1+2*M/r
+    grp = -a*M*(1+2*M/r)
+    gpp = r*r + a*a*M*M + 2*M*M*M*a*a/r
+
+    ig00 = -1 - 2*M/r
+    ig0r = 2*M/r
+    ig0p = 0
+    igrr = 1-2*M/r+a*a*M*M/(r*r)
+    igrp = a*M/(r*r)
+    igpp = 1.0/(r*r)
+
+    dg00 = -2*M/(r*r)
+    dg0r = -2*M/(r*r)
+    dg0p = 2*M*M*a/(r*r)
+    dgrr = -2*M/(r*r)
+    dgrp = 2*M*M*a/(r*r)
+    dgpp = 2*r - 2*M*M*M*a*a/(r*r)
+
+    G000 = 0.5*ig0r*(-dg00)
+    G00r = 0.5*(ig00*(dg00) + ig0r*(0) + ig0p*(dg0p))
+    G00p = 0.5*ig0r*(-dg0p)
+    G0rr = 0.5*(ig00*(2*dg0r) + ig0r*(dgrr) + ig0p*(2*dgrp))
+    G0rp = 0.5*(ig00*(dg0p) + ig0r*(0) + ig0p*(dgpp))
+    G0pp = 0.5*(ig0r*(-dgpp))
+    Gr00 = 0.5*(igrr*(-dg00))
+    Gr0r = 0.5*(ig0r*(dg00) + igrr*(0) + igrp*(dg0p))
+    Gr0p = 0.5*(igrr*(-dg0p))
+    Grrr = 0.5*(ig0r*(2*dg0r) + igrr*(dgrr) + igrp*(2*dgrp))
+    Grrp = 0.5*(ig0r*(dg0p) + igrr*(0) + igrp*(dgpp))
+    Grpp = 0.5*(igrr*(-dgpp))
+    Gp00 = 0.5*(igrp*(-dg00))
+    Gp0r = 0.5*(ig0p*(dg00) + igrp*(0) + igpp*(dg0p))
+    Gp0p = 0.5*(igrp*(-dg0p))
+    Gprr = 0.5*(ig0p*(2*dg0r) + igrp*(dgrr) + igpp*(2*dgrp))
+    Gprp = 0.5*(ig0p*(dg0p) + igrp*(0) + igpp*(dgpp))
+    Gppp = 0.5*(igrp*(-dgpp))
+
+    u0 = 1.0 / np.sqrt(-g00 - 2*g0r*vr - 2*g0p*vp - grr*vr*vr - 2*grp*vr*vp
+                            - gpp*vp*vp)
+    ur = u0*vr
+    up = u0*vp
+
+    dvr = (VR[1:]-VR[:-1]) / (R[1:]-R[:-1])
+    dvp = (VP[1:]-VP[:-1]) / (R[1:]-R[:-1])
+
+    du0 = 0.5*u0*u0*u0 * (dg00 + 2*dg0r*vr + 2*g0r*dvr + 2*dg0p*vp + 2*g0p*dvp
+                        + dgrr*vr*vr + 2*grr*vr*dvr + 2*dgrp*vr*vp
+                        + 2*grp*dvr*vp + 2*grp*vr*dvp + dgpp*vp*vp
+                        + 2*gpp*vp*dvp)
+    dur = du0*vr + u0*dvr
+    dup = du0*vp + u0*dvp
+
+    D0u0 = G000*u0 + G00r*ur + G00p*up
+    D0ur = Gr00*u0 + Gr0r*ur + Gr0p*up
+    D0up = Gp00*u0 + Gp0r*ur + Gp0p*up
+    Dru0 = du0 + G00r*u0 + G0rr*ur + G0rp*up
+    Drur = dur + Gr0r*u0 + Grrr*ur + Grrp*up
+    Drup = dup + Gp0r*u0 + Gprr*ur + Gprp*up
+    Dpu0 = G00p*u0 + G0rp*ur + G0pp*up
+    Dpur = Gr0p*u0 + Grrp*ur + Grpp*up
+    Dpup = Gp0p*u0 + Gprp*ur + Gppp*up
+
+    h00 = ig00 + u0*u0
+    h0r = ig0r + u0*ur
+    h0p = ig0p + u0*up
+    hrr = igrr + ur*ur
+    hrp = igrp + ur*up
+    hpp = igpp + up*up
+
+    th = D0u0 + Drur + Dpup
+
+    sig00 = h00*D0u0 + h0r*Dru0 + h0p*Dpu0 - h00*th
+    sigrr = h0r*D0ur + hrr*Drur + hrp*Dpur - hrr*th
+    sigpp = h0p*D0up + hrp*Drup + hpp*Dpup - hpp*th
+    sig0r = 0.5*(h00*D0ur + h0r*Drur + h0p*Dpur
+                + h0r*D0u0 + hrr*Dru0 + hrp*Dpu0) - h0r*th
+    sig0p = 0.5*(h00*D0up + h0r*Drup + h0p*Dpup
+                + h0p*D0u0 + hrp*Dru0 + hpp*Dpu0) - h0p*th
+    sigrp = 0.5*(h0r*D0up + hrr*Drup + hrp*Dpup
+                + h0p*D0ur + hrp*Drur + hpp*Dpur) - hrp*th
+
+    xlim = (1, 100)
+    fig, ax = plt.subplots(2,3, figsize=(14,9))
+    ax[0,0].plot(r, sig00, 'k+')
+    ax[0,0].set_xscale("log")
+    ax[0,0].set_yscale("linear")
+    ax[0,0].set_ylabel(r"$\sigma^{00}$")
+    ax[0,0].set_xlim(xlim)
+    ax[0,1].plot(r, sigrr, 'k+')
+    ax[0,1].set_xscale("log")
+    ax[0,1].set_yscale("linear")
+    ax[0,1].set_ylabel(r"$\sigma^{rr}$")
+    ax[0,1].set_xlim(xlim)
+    ax[0,2].plot(r, sigpp, 'k+')
+    ax[0,2].set_xscale("log")
+    ax[0,2].set_yscale("linear")
+    ax[0,2].set_ylabel(r"$\sigma^{\phi\phi}$")
+    ax[0,2].set_xlim(xlim)
+    ax[1,0].plot(r, sig0r, 'k+')
+    ax[1,0].set_xscale("log")
+    ax[1,0].set_yscale("linear")
+    ax[1,0].set_ylabel(r"$\sigma^{0r}$")
+    ax[1,0].set_xlim(xlim)
+    ax[1,1].plot(r, sig0p, 'k+')
+    ax[1,1].set_xscale("log")
+    ax[1,1].set_yscale("linear")
+    ax[1,1].set_ylabel(r"$\sigma^{0\phi}$")
+    ax[1,1].set_xlim(xlim)
+
+    ax[1,2].plot(r, sigrp, 'k+')
+    ax[1,2].plot(r, -1.5 * np.sqrt(M/(r*r*r*r*r)), ls='-', color=blue)
+    ax[1,2].set_xscale("log")
+    ax[1,2].set_yscale("linear")
+    ax[1,2].set_ylabel(r"$\sigma^{r\phi}$")
+    ax[1,2].set_xlim(xlim)
+
+    plt.tight_layout()
+
+    return fig, ax
+
+
 def plotNT(g):
 
-    r, prim = gToArr(g)
+    r, prim = gToArr1D(g)
 
     rho, sig, p, pi, H, T, vr, vp, mdot, qdot = allTheThings(g, r, prim)
 
@@ -378,7 +661,7 @@ def plotNT(g):
     R2 = np.logspace(math.log10(r.min()), math.log10(Risco)-0.05, base=10.0, num=200)
 
     RS = Risco
-    MDOT = 270
+    MDOT = 209
     K = 3.5e-5
 
     if rad:
@@ -456,6 +739,7 @@ def plotNT(g):
     
     ax[0,2].plot(r, qdot, 'k+')
     ax[0,2].plot(R, SSdat[4], ls='-', lw=3.0, color=orange)
+    ax[0,2].plot(R2, GEOdat[4], ls='-', lw=3.0, color=green)
     ax[0,2].plot(R, NTdat[4], ls='-', lw=3.0, color=blue)
     if a != 0.0:
         ax[0,2].plot(R3, NTdat2[4], ls='-', lw=3.0, color=red)
@@ -498,14 +782,20 @@ if __name__ == "__main__":
         num = int(sys.argv[2].split(".")[-2].split("_")[-1])
         name = "plot_thin_{0:04d}.png".format(num)
         nameSig = "plot_thin_Sig_{0:04d}.png".format(num)
+        nameQdot = "plot_thin_Qdot_{0:04d}.png".format(num)
+        nameShear = "plot_thin_shear_{0:04d}.png".format(num)
 
         print("   Plotting {0:s}".format(checkpoint))
         fig, ax = plotNT(g)
         fig2, ax2 = plotSigNice(g)
+        fig3, ax3 = plotQdotNice(g)
+        fig4, ax4 = plot_shear(g)
         
         print("   Saving {0:s}".format(name))
         fig.savefig(name)
         fig2.savefig(nameSig)
+        fig3.savefig(nameQdot)
+        fig4.savefig(nameShear)
 
         plt.show()
 
