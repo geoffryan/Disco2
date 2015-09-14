@@ -291,7 +291,7 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
 
     int i;
     int NUMQ = sim_NUM_Q(theSim);
-    double res = 1.0e-15;
+    double res = 1.0e-3;
 
     double r = pos[R_DIR];
 
@@ -310,7 +310,7 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
     double sigma = rho * H;
 
     if(sim_CoolingType(theSim) == COOL_NONE) {}
-    else if(sim_CoolingType(theSim) == COOL_ISOTHERM)
+    /*else if(sim_CoolingType(theSim) == COOL_ISOTHERM)
     {
         logT = log(sim_CoolPar1(theSim));
     }
@@ -325,43 +325,43 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
         T1 = pow(1.0 + 3*(GAM-1)*qdot/(prim[RHO]*u0*H*T0)*dt, -1.0/3.0) * T0;
 
         logT = log(T1);
-    }
+    }*/
     else
     {
-    double t = 0;
+        double t = 0;
 
-    // Cool using adaptive Forward Euler or RK4.
-    // TODO: Verify convergence, etc.
-    //
-    i = 0;
-    while(t < dt)
-    {
-        double logTprime = logT_prime(logT, p, r, M, u0, sigma, theSim);
+        // Cool using adaptive Forward Euler or RK4.
+        // TODO: Verify convergence, etc.
+        //
+        i = 0;
+        while(t < dt)
+        {
+            double logTprime = logT_prime(logT, p, r, M, u0, sigma, theSim);
 
-        double step = res / logTprime;
-        step = step < dt-t ? step : dt-t;
-        
-        //FE
-        //logT += -logTprime * step;
-        
-        //RK4
-        
-        double logT1 = logT - 0.5*step*logTprime;
-        double logTp2 = logT_prime(logT1, p, r, M, u0, sigma, theSim);
-        double logT2 = logT - 0.5*step*logTp2;
-        double logTp3 = logT_prime(logT2, p, r, M, u0, sigma, theSim);
-        double logT3 = logT - step*logTp3;
-        double logTp4 = logT_prime(logT3, p, r, M, u0, sigma, theSim);
-        logT += -step*(logTprime + 2*logTp2 + 2*logTp3 + logTp4)/6.0;
-        
+            double step = res / logTprime;
+            step = step < dt-t ? step : dt-t;
+            
+            //FE
+            //logT += -logTprime * step;
+            
+            //RK4
+            
+            double logT1 = logT - 0.5*step*logTprime;
+            double logTp2 = logT_prime(logT1, p, r, M, u0, sigma, theSim);
+            double logT2 = logT - 0.5*step*logTp2;
+            double logTp3 = logT_prime(logT2, p, r, M, u0, sigma, theSim);
+            double logT3 = logT - step*logTp3;
+            double logTp4 = logT_prime(logT3, p, r, M, u0, sigma, theSim);
+            logT += -step*(logTprime + 2*logTp2 + 2*logTp3 + logTp4)/6.0;
+            
 
-        t += step;
-        i++;
-    }
-    
-    if(i>100)
-        printf("   Cell at (%.12lg, %.12lg, %.12lg) cooled in %d steps.\n",
-                pos[R_DIR], pos[P_DIR], pos[Z_DIR], i);
+            t += step;
+            i++;
+        }
+        
+        if(i>100)
+            printf("   Cell at (%.12lg, %.12lg, %.12lg) cooled in %d steps.\n",
+                    pos[R_DIR], pos[P_DIR], pos[Z_DIR], i);
     }
 
     /*
