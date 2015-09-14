@@ -30,10 +30,10 @@ aspect         1.0
 
 NUM_C                   5
 NUM_N                   1
-Time_Max                1.0e-3
-Num_Checkpoints	        2
-Num_Diag_Dump           2
-Num_Diag_Measure        2
+Time_Max                1.0
+Num_Checkpoints	        101
+Num_Diag_Dump           11
+Num_Diag_Measure        11
 
 
 NoInnerBC               0

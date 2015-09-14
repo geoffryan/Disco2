@@ -571,6 +571,8 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
         double GAM = sim_GAMMALAW(theSim);
         double M = sim_GravM(theSim);
         int bg = sim_Background(theSim);
+        if(bg == GRDISC)
+            GAM = 0;
         
         //Calculate accretion rate & Isentropic constant
         i = sim_Nghost_min(theSim,R_DIR);
@@ -604,7 +606,7 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
                                 - metric_square3_u(g,v));
                 metric_destroy(g);
 
-                double Sigma, Pi;
+                double Sigma, Pi, gam;
 
                 if(bg == GRDISC)
                 {
@@ -628,6 +630,9 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
                      * ANYWAYS, so gas pressure should be dominant.
                      */
 
+                    gam = (rho+rho*eps+P)/P * eos_cs2(theCells[k][i][j].prim,
+                                                        theSim);
+                    GAM += gam*dphi*dz;
                     Sigma = rho*H;
                     Pi = P*H;
                 }
@@ -638,9 +643,10 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
 
                     Sigma = rho;
                     Pi = P;
+                    gam = GAM;
                 }
 
-                double s = log(pow(Pi/Sigma,1.0/(GAM-1.0)) / Sigma);
+                double s = log(pow(Pi/Sigma,1.0/(gam-1.0)) / Sigma);
 
                 mdot += -Sigma * u0*v[0] * R*dphi*dz;
                 Sdot += -s * Sigma * u0*v[0] * R*dphi*dz;
@@ -652,6 +658,8 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
         Sdot /= 2*M_PI*dZ;
 
         double s = Sdot / mdot;
+        if(bg == GRDISC)
+            GAM /= 2*M_PI*dZ;
 
         //printf("%lg %lg\n", mdot, K);
 
@@ -682,23 +690,101 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
 
                     double Sigma = -mdot / (r*U[1]);
                     double Pi = pow(Sigma, GAM) * exp((GAM-1.0)*s);
+                    double vr = U[1]/U[0];
+                    double vp = U[2]/U[0];
+                    double vz = U[3]/U[0];
 
                     if(bg == GRDISC)
                     {
-                        double vr = U[1]/U[0];
-                        double vp = U[2]/U[0];
-                        double vz = U[3]/U[0];
+                        // Perform 2D Newton Raphson in (rho,T) to match
+                        // the Sigma and Pi/Sigma found from Mdot and S.
+                        double tol = 1.0e-12;
+                        int maxIter = 100;
+                        double res;
 
-                        double Sigmah = Sigma+GAM/(GAM-1.0)*Pi;
-                        double H = sqrt(r*r*r*Pi/(M*Sigmah)) / U[0];
+                        double S2 = Pi/Sigma;
 
-                        double rho = Sigma/H;
-                        double P = Pi/H;
-                        double T = P / rho; //TODO: MAKE SURE THIS RESPECTS
-                                            //      EOS.
-                        
-                        theCells[k][i][j].prim[RHO] = rho;
-                        theCells[k][i][j].prim[TTT] = T;
+                        double rho0 = theCells[k][i][j].prim[RHO];
+                        double T0 = theCells[k][i][j].prim[TTT];
+
+                        double prim[5];
+                        prim[RHO] = rho0;
+                        prim[TTT] = T0;
+                        prim[URR] = vr;
+                        prim[UPP] = vp;
+                        prim[UZZ] = vz;
+
+                        double rho = rho0;
+                        double T = T0;
+                        int i = 0;
+
+                        do
+                        {
+                            prim[RHO] = rho;
+                            prim[TTT] = T;
+                            double P = eos_ppp(prim, theSim);
+                            double e = eos_eps(prim, theSim);
+                            double dPdr = eos_dpppdrho(prim, theSim);
+                            double dPdt = eos_dpppdttt(prim, theSim);
+                            double dedr = eos_depsdrho(prim, theSim);
+                            double dedt = eos_depsdttt(prim, theSim);
+
+                            double rhoh = rho + rho*e + P;
+                            double H = sqrt(r*r*r*P/(M*rhoh)) / U[0];
+                            double sig = rho*H;
+                            double s2 = P/rho;
+
+                            double dHdr = 0.5*H*(dPdr/P + 
+                                            (1+e+rho*dedr+dPdr)/rhoh);
+                            double dHdt = 0.5*H*(dPdt/P+(rho*dedt+dPdt)/rhoh);
+
+                            double dsigdrho = H + rho*dHdr;
+                            double dsigdttt = rho*dHdt;
+                            double ds2drho = (rho*dPdr - P)/(rho*rho);
+                            double ds2dttt = dPdt/rho;
+
+                            double detJ = dsigdrho*ds2dttt - dsigdttt*ds2drho;
+
+                            rho -= (ds2dttt*(sig-Sigma)-dsigdttt*(s2-S2))/detJ;
+                            T -= (-ds2drho*(sig-Sigma)+dsigdrho*(s2-S2))/detJ;
+
+                            if(rho <= 0.0)
+                            {
+                                T = 0.5*prim[RHO]/(prim[RHO]-rho)
+                                        * (T-prim[TTT]) + prim[TTT];
+                                rho = 0.5*prim[RHO];
+                                printf("%d: Small rho\n", i);
+                            }
+                            if(T <= 0.0)
+                            {
+                                rho = 0.5*prim[TTT]/(prim[TTT]-T)
+                                        * (rho-prim[RHO]) + prim[RHO];
+                                T = 0.5*prim[TTT];
+                                printf("%d: Small T\n", i);
+                            }
+
+                            res = sqrt((rho-prim[RHO])*(rho-prim[RHO])
+                                        /(rho*rho)
+                                    + (T-prim[TTT])*(T-prim[TTT])/(T*T));
+                            i++;
+                        }
+                        while(res > tol && i < maxIter);
+
+                        if(i == maxIter)
+                        {
+                            printf("ERROR: NR failed to converge after %d iterations.  Res = %.12lg\n",
+                                maxIter, res);
+                            printf("Mdot = %.12lg S = %.12lg, gam = %.12lg\n", 
+                                    mdot, s, GAM);
+                            printf("Sig = %.12lg Pi = %.12lg rho = %.12lg T = %.12lg\n", Sigma, Pi, rho, T);
+                        }
+
+                        printf("r = %.12lg: %.12lg %.12lg\n", r, rho, T);
+
+                        double H = sqrt(r*r*r*Pi/(M*(Sigma + GAM/(GAM-1)*Pi)))/U[0];
+
+                        theCells[k][i][j].prim[RHO] = Sigma/H;
+                        theCells[k][i][j].prim[TTT] = Pi/Sigma;
                         theCells[k][i][j].prim[URR] = vr;
                         theCells[k][i][j].prim[UPP] = vp;
                         theCells[k][i][j].prim[UZZ] = vz;
@@ -706,10 +792,11 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
                     else
                     {
                         double rho = Sigma;
-                        double vr = U[1]/U[0];
-                        double vp = U[2]/U[0];
-                        double vz = U[3]/U[0];
                         double P = Pi;
+                        
+                        double H = sqrt(r*r*r*Pi/(M*(Sigma + GAM/(GAM-1)*Pi)))/U[0];
+                        printf("r = %.12lg: %.12lg %.12lg\n", r, Sigma/H, Pi/Sigma);
+
 
                         theCells[k][i][j].prim[RHO] = rho;
                         theCells[k][i][j].prim[PPP] = P;
@@ -722,6 +809,7 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
         }
     }
 }
+
 void cell_boundary_nozzle(struct Cell ***theCells, struct Sim *theSim, 
                 struct MPIsetup *theMPIsetup)
 {
