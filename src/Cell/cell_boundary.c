@@ -716,7 +716,7 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
 
                         double rho = rho0;
                         double T = T0;
-                        int i = 0;
+                        int iter = 0;
 
                         do
                         {
@@ -753,38 +753,34 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
                                 T = 0.5*prim[RHO]/(prim[RHO]-rho)
                                         * (T-prim[TTT]) + prim[TTT];
                                 rho = 0.5*prim[RHO];
-                                printf("%d: Small rho\n", i);
+                                printf("%d: Small rho\n", iter);
                             }
                             if(T <= 0.0)
                             {
                                 rho = 0.5*prim[TTT]/(prim[TTT]-T)
                                         * (rho-prim[RHO]) + prim[RHO];
                                 T = 0.5*prim[TTT];
-                                printf("%d: Small T\n", i);
+                                printf("%d: Small T\n", iter);
                             }
 
                             res = sqrt((rho-prim[RHO])*(rho-prim[RHO])
                                         /(rho*rho)
                                     + (T-prim[TTT])*(T-prim[TTT])/(T*T));
-                            i++;
+                            iter++;
                         }
-                        while(res > tol && i < maxIter);
+                        while(res > tol && iter < maxIter);
 
-                        if(i == maxIter)
+                        if(iter == maxIter)
                         {
-                            printf("ERROR: NR failed to converge after %d iterations.  Res = %.12lg\n",
+                            printf("ERROR: Plunge BC - NR failed to converge after %d iterations.  Res = %.12lg\n",
                                 maxIter, res);
                             printf("Mdot = %.12lg S = %.12lg, gam = %.12lg\n", 
                                     mdot, s, GAM);
                             printf("Sig = %.12lg Pi = %.12lg rho = %.12lg T = %.12lg\n", Sigma, Pi, rho, T);
                         }
 
-                        printf("r = %.12lg: %.12lg %.12lg\n", r, rho, T);
-
-                        double H = sqrt(r*r*r*Pi/(M*(Sigma + GAM/(GAM-1)*Pi)))/U[0];
-
-                        theCells[k][i][j].prim[RHO] = Sigma/H;
-                        theCells[k][i][j].prim[TTT] = Pi/Sigma;
+                        theCells[k][i][j].prim[RHO] = rho;
+                        theCells[k][i][j].prim[TTT] = T;
                         theCells[k][i][j].prim[URR] = vr;
                         theCells[k][i][j].prim[UPP] = vp;
                         theCells[k][i][j].prim[UZZ] = vz;

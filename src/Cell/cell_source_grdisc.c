@@ -374,8 +374,8 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
     p[TTT] = T;
     int err = rho_solve(p, sigma, r, M, u0, theSim);
 
-    if(T > prim[TTT])
-        printf("WAT\n");
+    if((T-prim[TTT])/prim[TTT] > 1.0e-14)
+        printf("WAT: x %.12lg T0 %.24lg T1 %.24lg\n", (T-prim[TTT])/prim[TTT], prim[TTT], T);
 
     //printf("%.12lg %.12lg\n", prim[PPP]/prim[RHO], T);
 
@@ -394,8 +394,8 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
     for(i=5; i<NUMQ; i++)
         dcons[i] = 0.0;
 
-    if(dcons[TAU] > 0.0)
-        printf("WAT WAT\n");
+    if(dcons[TAU]/cons0[TAU] > 1.0e-14)
+        printf("WAT WAT %.12lg\n", dcons[TAU]/cons0[TAU]);
 
     free(cons0);
     free(cons1);
