@@ -4,30 +4,50 @@
 #include <math.h>
 #include "../Headers/Cell.h"
 #include "../Headers/Sim.h"
+#include "../Headers/EOS.h"
 #include "../Headers/Face.h"
 #include "../Headers/GravMass.h"
+#include "../headers/Metric.h"
 #include "../Headers/header.h"
 
 //Novikov-Thorne Disc
 
+double isco(double M, double a);
+double Pfunction(double x, double xisco, double a);
+
 //Thompson Cooling
 void cell_init_ntdisc_thompson(struct Cell *c, double r, double phi, double z, struct Sim *theSim)
 {
-    double Mdot = sim_InitPar1(theSim);
-    double r0 = sim_InitPar2(theSim);
-    double DR = sim_InitPar3(theSim);
+    //In outer regions this is a Novikov-Thorne disc with gas pressure
+    //and thompson opacity.  At an inner radius it transitions to fully 
+    //geodesic flow with constant temperature and surface density.
+
+    double Mdot = sim_InitPar1(theSim); // Solar Masses per year
+    double r0 = sim_InitPar2(theSim);   // radius to transition to geodesic
+    double DR = sim_InitPar3(theSim);   // width of transition region
     double GAM = sim_GAMMALAW(theSim);
     double M = sim_GravM(theSim);
+    double a = M*sim_GravA(theSim);
     double alpha = sim_AlphaVisc(theSim);
-    double q0 = sim_CoolPar1(theSim); //TODO: Assumes CoolingType == COOL_BB_ES
-    double rs = 6*M;
+    double kappa = 0.2;
 
-    if(q0 == 0.0)
-        q0 = 1.0;
+    struct Metric *g = metric_create(time_global, r, phi, z , theSim);
+    double U0 = metric_frame_U_u_geo(g, 0, theSim);
+    double UR = metric_frame_U_u_geo(g, 1, theSim);
+    double UP = metric_frame_U_u_geo(g, 2, theSim);
+    metric_destroy(g);
 
-    double C = 1.0-3*M/r;
-    double D = 1.0-2*M/r;
-    double P = 1.0 - sqrt(rs/r) + sqrt(3*M/r)*(atanh(sqrt(3*M/r)) - atanh(sqrt(3*M/rs)));
+    Mdot /= rho_scale*r_scale*r_scale*eos_c; //Code Units
+    double rs = isco(M, a/M);
+
+    double omk = sqrt(M/(r*r*r));
+    double C = 1.0-3*M/r+2*a*omk;
+    double D = 1.0-2*M/r+a*a/(r*r);
+    double P = Pfunction(r/M, rs/M, a/M);
+
+    double PiOut = Mdot / (3.0*M_PI*alpha*sqrt(GAM)) * omk * sqrt(C)*P/(D*D);
+    double QdotOut = 3.0*Mdot / (4.0*M_PI) * omk*omk * P/C;
+    double SigOut = pow(8*eos_sb/(3* 
     
     double rho0 = 1.0/3.0*pow(Mdot*Mdot*Mdot*q0/(4*M_PI*M_PI*M_PI*alpha*alpha*alpha*alpha*GAM*GAM), 0.2);
     double P0 = Mdot/(6*M_PI*alpha*sqrt(GAM));
@@ -162,4 +182,43 @@ void cell_init_ntdisc(struct Cell ***theCells,struct Sim *theSim,struct MPIsetup
             }
         }
     }
+}
+
+double isco(double M, double a)
+{
+    //ISCO in Kerr spacetime. a is dimensionless.
+
+    double Z1 = 1.0 + pow((1-a*a)*(1+a),1.0/3.0) + pow((1-a*a)*(1-a),1.0/3.0);
+    double Z2 = sqrt(3*a*a + Z1*Z1);
+
+    double risco;
+    if(a > 0)
+        risco = M * (3.0 + Z2 - sqrt((3.0-Z1)*(3.0+Z1+2.0*Z2)));
+    else
+        risco = M * (3.0 + Z2 + sqrt((3.0-Z1)*(3.0+Z1+2.0*Z2)));
+
+    return risco;
+}
+
+double Pfunction(double X, double Xisco, double a)
+{
+    // Novikov and Thorne P-function, as calculated in Thorne & Page.
+    // X = r/M, Xisco = risco/M
+    double th = acos(a)/3.0;
+    double ct = cos(th);
+    double st = sin(th);
+    double x1 = ct - sqrt(3.0)*st;
+    double x2 = ct + sqrt(3.0)*st;
+    double x3 = -2.0*ct;
+    double c0 = -a*a / (x1*x2*x3);
+    double c1 = (x1-a)*(x1-a) / (x1*(x2-x1)*(x3-x1));
+    double c2 = (x2-a)*(x2-a) / (x2*(x1-x2)*(x3-x2));
+    double c3 = (x3-a)*(x3-a) / (x3*(x1-x3)*(x2-x3));
+
+    double x = sqrt(X);
+    double xs = sqrt(Xisco);
+    double P = 1.0 - xs/x - 3.0/x * (c0*log(x/xs) + c1*log((x-x1)/(xs-x1))
+                            + c2*log((x-x2)/(xs-x2)) + c3*log((x-x3)/(xs-x3)));
+
+    return P;
 }
