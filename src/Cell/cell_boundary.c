@@ -790,10 +790,6 @@ void cell_boundary_plunge_r_inner(struct Cell ***theCells,
                         double rho = Sigma;
                         double P = Pi;
                         
-                        double H = sqrt(r*r*r*Pi/(M*(Sigma + GAM/(GAM-1)*Pi)))/U[0];
-                        printf("r = %.12lg: %.12lg %.12lg\n", r, Sigma/H, Pi/Sigma);
-
-
                         theCells[k][i][j].prim[RHO] = rho;
                         theCells[k][i][j].prim[PPP] = P;
                         theCells[k][i][j].prim[URR] = vr;

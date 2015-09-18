@@ -13,6 +13,8 @@ const static double eos_h = 6.62606957e-27;     //Planck Constant
 const static double eos_k = 1.3806488e-16;      //Boltzmann (erg/K)
 const static double eos_sb = 1.56055371e59;     //Stefan-Boltzmann
 const static double eos_mp = 1.672621777e-24;   //Proton Mass
+const static double eos_Msolar = 1.9885e33;     //Solar Mass
+const static double eos_year = 3.15569252e7;    //Year (Tropical)
 const static double eos_rho_scale = 1.0;
 const static double eos_r_scale = 1.4766250385e5;
 

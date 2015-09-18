@@ -43,7 +43,7 @@ double eos_cool_bb_es(double *prim, double H, struct Sim *theSim)
         rho = prim[RHO]*eos_rho_scale;
         T = prim[TTT] * eos_mp*eos_c*eos_c; //in ergs
     }
-    double kappa = 0.2;
+    double kappa = 0.4; // Pure Hydrogen
     double h = H*eos_r_scale;
     double q0 = sim_CoolPar1(theSim);
     double tau = kappa*rho*h;
