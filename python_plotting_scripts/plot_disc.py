@@ -214,7 +214,7 @@ def plot_r_profile(filename, sca='linear', plot=True, bounds=None):
         ax1 = plt.gca()
         ax1.set_yscale('linear')
         ax2 = ax1.twinx()
-        ax2.set_ylabel(r"\mathcal{M}")
+        ax2.set_ylabel(r"$\mathcal{M}$")
         ax2.set_yscale(sca)
         ax2.plot(r, mach, 'r+')
 
@@ -222,8 +222,9 @@ def plot_r_profile(filename, sca='linear', plot=True, bounds=None):
         plot_r_profile_single(r, H, sca, r"$H$", bounds[6])
 
         plt.subplot(338)
-        plot_r_profile_single(r, Mdot, sca, r"$\dot{M}$ ($M_\odot / s$)",
+        plot_r_profile_single(r, Mdot, "linear", r"$\dot{M}$ ($M_\odot / s$)",
                                 bounds[7])
+        plt.gca().set_xscale(sca)
 
         plt.subplot(339)
         plt.plot(r, VR, 'r+')
