@@ -374,7 +374,7 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
     p[TTT] = T;
     int err = rho_solve(p, sigma, r, M, u0, theSim);
 
-    if((T-prim[TTT])/prim[TTT] > 1.0e-14)
+    if((T-prim[TTT])/prim[TTT] > 1.0e-10)
         printf("WAT: x %.12lg T0 %.24lg T1 %.24lg\n", (T-prim[TTT])/prim[TTT], prim[TTT], T);
 
     //printf("%.12lg %.12lg\n", prim[PPP]/prim[RHO], T);

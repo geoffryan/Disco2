@@ -18,16 +18,16 @@ Restart                 0       // If this=1 restart using input.h5
 NumR			512			//Radial Zones
 NumZ			1           //Vertical Zones
 ng              2
-R_Min		    1.4
-R_Max			100.0
-Z_Min			-1.0e3
-Z_Max			1.0e3
+R_Min		    1.4e6
+R_Max			1.0e9
+Z_Min			-1.0e9
+Z_Max			1.0e9
 NP_CONST        3
 aspect          1.0
 
 NUM_C                   5
 NUM_N                   0
-Time_Max                1.0e2
+Time_Max                1.0e6
 Num_Checkpoints         1001
 Num_Diag_Dump           21
 Num_Diag_Measure        21
@@ -56,7 +56,7 @@ PLM			1.0
 
 Grav_2D			1
 G_EPS			0.0
-GravM           1.0
+GravM           1.0e6
 GravA           0.0
 AlphaVisc       0.1
 
@@ -83,9 +83,9 @@ CoolPar4            0.0
 
 //Initial Condition Parameters
 InitPar0        0        //0 Thompson Cooling
-InitPar1        1.0e-3    // Accretion Rate (solar masses per year)
-InitPar2        30.0    // R0 (radius to transition)
-InitPar3        10.0     // DR (transition width)
+InitPar1        1.0e8    // Accretion Rate (solar masses per year)
+InitPar2        3.0e7    // R0 (radius to transition)
+InitPar3        1.0e7     // DR (transition width)
 InitPar4        -1
 InitPar5        -1
 InitPar6        -1

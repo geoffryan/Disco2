@@ -7,7 +7,7 @@ import numpy as np
 import discopy as dp
 
 GAM = 5.0/3.0
-M = 1.0
+M = 1.0e6
 a = 0.0
 scale = 'log'
 eos_x1 = 1.0
