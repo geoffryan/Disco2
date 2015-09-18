@@ -8,7 +8,7 @@
 #include "../Headers/EOS.h"
 #include "../Headers/Face.h"
 #include "../Headers/GravMass.h"
-#include "../headers/Metric.h"
+#include "../Headers/Metric.h"
 #include "../Headers/header.h"
 
 //Novikov-Thorne Disc
