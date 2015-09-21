@@ -7,7 +7,7 @@ InitialDataType        14       // 0 Torus, 1 Bondi, 2 Vortex, 3 Uniform,
                                 // 14 NTDisc, 15 ConstantDisc,
                                 // 16 Cartesian-Shear, 17 Disc Tests
 GravMassType            0       // 0 none, 1 single, 2 binary
-Background              3       // 0 Newtonian, 1 GR, 2 GRvisc, 3 GRDisc
+Background              2       // 0 Newtonian, 1 GR, 2 GRvisc, 3 GRDisc
 Metric                  2       // 0 Flat, 1 Schwarzschild-SC,
                                 // 2 Schwarzschild-KS, 4 Kerr-KS, 5 FlatADM,
                                 // 6 Schwarzschild-KS-ADM, 
@@ -27,7 +27,7 @@ aspect          1.0
 
 NUM_C                   5
 NUM_N                   0
-Time_Max                1.0e6
+Time_Max                1.0e8
 Num_Checkpoints         1001
 Num_Diag_Dump           21
 Num_Diag_Measure        21
@@ -66,7 +66,7 @@ BinW        5e-4
 BinM        1.0
 
 //EoS
-EOSType            1       //0 Gammalaw, 1 Gas+Rad, 2 Gas+Rad+Deg, 3 PWF
+EOSType            0       //0 Gammalaw, 1 Gas+Rad, 2 Gas+Rad+Deg, 3 PWF
 EOSPar1            1.0      // Gas
 EOSPar2            1.0      // Radiation
 EOSPar3            0.0      // Degeneracy
