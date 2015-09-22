@@ -43,37 +43,71 @@ def allTheThings(filename, pars):
     return t, r, rho, sig, T, P, pi, H, vr, vp, u0
 
 
-def plot_r_profile_single(r, f, pars, sca, ylabel, bounds=None, 
-                            R=None, F=None):
+def plot_data(ax, x, f, color='k', marker='+'):
+    ax.plot(x, f, marker=marker, ls='', color=color)
 
-    M = pars['GravM']
-    a = pars['GravA']
+def plot_line(ax, x, f, color='k', ls='-', lw=2.0, alpha=0.5):
+    ax.plot(x, f, color=color, ls=ls, lw=lw, alpha=alpha)
 
-    plt.plot(r, f, 'k+')
-    if R != None and F != None:
-        plt.plot(R, F, 'r')
+def floor_sig(x, sig):
+    if x == 0.0:
+        return 0.0
+    exp = int(math.floor(math.log10(math.fabs(x))))
+    y = np.around(x, -exp+sig)
+    if y > x:
+        y -= math.pow(10, sig-sig)
+    return y
 
-    plt.gca().set_xscale(sca)
-    if (f == 0.0).all():
-        plt.gca().set_yscale('linear')
-    else:
-        plt.gca().set_yscale(sca)
-    plt.xlabel(r"$r$")
-    plt.ylabel(ylabel)
+def ceil_sig(x, sig):
+    if x == 0.0:
+        return 0.0
+    exp = int(math.floor(math.log10(math.fabs(x))))
+    y = np.around(x, -exp+sig)
+    if y < x:
+        y += math.pow(10, sig-sig)
+    return y
 
-    plt.axvspan(M*(1.0-math.sqrt(1.0-a*a)), M*(1.0+math.sqrt(1.0-a*a)), 
-                    color='grey', alpha=0.5)
-    plt.axvspan(plt.xlim()[0], 2*M, color='lightgrey', alpha=0.5)
-    plt.xlim(r.min(), r.max())
+def pretty_axis(ax, pars, xscale="linear", yscale="linear", 
+                xlabel=None, ylabel=None, xlim=None, ylim=None, twin=False):
 
-    #if bounds is not None:
-    #    if sca == "log":
-    #        upper = 10.0 ** (math.ceil(math.log10(bounds[1]))+0.1)
-    #        if bounds[0] > 0:
-    #            lower = 10.0 ** (math.floor(math.log10(bounds[0]))-0.1)
-    #        else:
-    #            lower = 10.0 ** (math.floor(math.log10(f[f>0].min()))-0.1)
-    #        plt.ylim(lower, upper)
+    if ylim is None:
+        ylim = list(ax.get_ylim())
+        ylim[0] = floor_sig(ylim[0], 1)
+        ylim[1] = ceil_sig(ylim[1], 1)
+
+    if ylim[0] > ylim[1]:
+        print ylim
+    ax.set_yscale(yscale)
+    ax.set_ylim(ylim)
+    if ylabel != None:
+        ax.set_ylabel(ylabel)
+
+    if not twin:
+        M = pars['GravM']
+        a = pars['GravA']
+
+        Rsp = M*(1.0+math.sqrt(1.0-a*a))
+        Rsm = M*(1.0-math.sqrt(1.0-a*a))
+        Rer = 2*M
+
+        if xlim is None:
+            xlim = list(ax.get_xlim())
+            xlim[0] = floor_sig(xlim[0], 1)
+            xlim[1] = ceil_sig(xlim[1], 1)
+        if xlim[0] > xlim[1]:
+            print xlim
+        ax.set_xscale(xscale)
+        ax.set_xlim(xlim)
+
+        if xlabel != None:
+            ax.set_xlabel(xlabel)
+
+        #Horizon
+        plt.axvspan(max(Rsm,xlim[0]), min(Rsp,xlim[1]), color='grey', 
+                                                        zorder=-10)
+        #Ergosphere
+        plt.axvspan(max(0,xlim[0]), min(Rer,xlim[1]), color='lightgrey', 
+                                                        zorder=-11)
 
 def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
@@ -102,7 +136,8 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     W = u0 * gr.lapse(r, pars)
     U = np.sqrt(W*W-1)
 
-    Mdot = -2*math.pi*r*rho*u0*vr*H * (eos.c * eos.rg_solar**2 / eos.M_solar)
+    Mdot = -2*math.pi*r*rho*u0*vr*H * (eos.c * eos.rg_solar**2 * eos.year
+                                        / eos.M_solar)
 
     cs2 = eos.cs2(rho, T, pars)
     cs = np.sqrt(cs2)
@@ -128,62 +163,75 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         print("Plotting t = {0:g}".format(t))
 
         #Plot.
-        fig = plt.figure(figsize=(12,9))
+        fig, ax = plt.subplots(3,3,figsize=(12,9))
 
-        plt.subplot(331)
-        plot_r_profile_single(r, rho, pars, sca, r"$\rho_0$ ($g/cm^3$)", 
-                                bounds[0])
-        ax1 = plt.gca()
-        ax2 = ax1.twinx()
-        ax2.set_ylabel(r"$\Sigma_0$ ($g/cm^2$)")
-        ax2.set_yscale(sca)
-        ax2.plot(r, sig * eos.rg_solar, 'r+')
+        # Density
+        ax2 = ax[0,0].twinx()
+        plot_data(ax[0,0], r, rho)
+        plot_data(ax2, r, sig * eos.rg_solar, color='b')
+        pretty_axis(ax[0,0], pars, xscale="log", yscale="log", 
+                    ylabel=r"$\rho_0$ ($g/cm^3$)")
+        pretty_axis(ax2, pars, xscale="log", yscale="log", 
+                    ylabel=r"$\Sigma_0$ ($g/cm^2$)", twin=True)
 
-        plt.subplot(332)
-        plot_r_profile_single(r, T, pars, sca, r"$T$ ($m_p c^2$)", bounds[1])
+        # Temperature
+        plot_data(ax[0,1], r, T)
+        pretty_axis(ax[0,1], pars, xscale="log", yscale="log", 
+                    ylabel=r"$T$ ($m_p c^2$)")
 
-        plt.subplot(333)
+        # Pressure
+        ax2 = ax[0,2].twinx()
         if pars['Background'] == 3 and pars['EOSType'] == 1:
-            plt.plot(r, eos.P_gas(rho,T,pars), 'g+')
-            plt.plot(r, eos.P_rad(rho,T,pars), 'b+')
+            plot_data(ax[0,2], r, eos.P_gas(rho,T,pars), color='g')
+            plot_data(ax[0,2], r, eos.P_rad(rho,T,pars), color='r')
         elif pars['Background'] == 3 and pars['EOSType'] == 2:
-            plt.plot(r, eos.P_gas(rho,T,pars), 'g+')
-            plt.plot(r, eos.P_rad(rho,T,pars), 'b+')
-            plt.plot(r, eos.P_deg(rho,T,pars), 'y+')
-        plot_r_profile_single(r, P, pars, sca, r"$P$ ($g\ c^2/cm^3$)", 
-                                bounds[2])
-        ax1 = plt.gca()
-        ax2 = ax1.twinx()
-        ax2.set_ylabel(r"$\Pi$ ($g c^2/cm^2$)")
-        ax2.set_yscale(sca)
-        ax2.plot(r, pi * eos.rg_solar, 'r+')
+            plot_data(ax[0,2], r, eos.P_gas(rho,T,pars), color='g')
+            plot_data(ax[0,2], r, eos.P_rad(rho,T,pars), color='r')
+            plot_data(ax[0,2], r, eos.P_deg(rho,T,pars), color='y')
+        plot_data(ax[0,2], r, P)
+        plot_data(ax2, r, pi * eos.rg_solar, color='b')
+        pretty_axis(ax[0,2], pars, xscale="log", yscale="log", 
+                    ylabel=r"$P$ ($g\ c^2 / cm^3$)")
+        pretty_axis(ax2, pars, xscale="log", yscale="log", 
+                    ylabel=r"$\Pi$ ($g\ c^2 / cm^2$)", twin=True)
 
-        plt.subplot(334)
-        plot_r_profile_single(r, vr, pars, "linear", r"$v^r$", bounds[3])
-        plt.gca().set_xscale(sca)
+        # Radial Velocity
+        plot_data(ax[1,0], r, vr)
+        pretty_axis(ax[1,0], pars, xscale="log", yscale="linear", 
+                    ylabel=r"$v^r$")
 
-        plt.subplot(335)
-        plot_r_profile_single(r, vp, pars, sca, r"$v^\phi$", bounds[4])
+        # Azimuthal Velocity
+        plot_data(ax[1,1], r, vp)
+        pretty_axis(ax[1,0], pars, xscale="log", yscale="log", 
+                    ylabel=r"$v^\phi$")
 
-        plt.subplot(336)
-        plot_r_profile_single(r, W, pars, sca, r"$W$", bounds[5])
-        ax1 = plt.gca()
-        ax1.set_yscale('linear')
-        ax2 = ax1.twinx()
-        ax2.set_ylabel(r"$\mathcal{M}$")
-        ax2.set_yscale(sca)
-        ax2.plot(r, mach, 'r+')
+        # Lorentz Factor and Mach Number
+        ax2 = ax[1,2].twinx()
+        plot_data(ax[1,2], r, mach)
+        plot_data(ax2, r, W, color='b')
+        pretty_axis(ax[1,2], pars, xscale="log", yscale="log", 
+                    ylabel=r"$\mathcal{M}$")
+        pretty_axis(ax2, pars, xscale="log", yscale="linear", 
+                    ylabel=r"$W$")
 
-        plt.subplot(337)
-        plot_r_profile_single(r, H, pars, sca, r"$H$", bounds[6])
+        # Scale Height
+        plot_data(ax[2,0], r, H)
+        pretty_axis(ax[2,0], pars, xscale="log", yscale="log", 
+                    xlabel=r"$r$ ($G M_\odot / c^2)$", 
+                    ylabel=r"$H ($G M_\odot / c^2)$")
 
-        plt.subplot(338)
-        plot_r_profile_single(r, Mdot, pars, "linear", 
-                                r"$\dot{M}$ ($M_\odot / s$)", bounds[7])
-        plt.gca().set_xscale("linear")
+        # Accretion rate
+        plot_data(ax[2,1], r, Mdot)
+        pretty_axis(ax[2,1], pars, xscale="linear", yscale="linear", 
+                    xlabel=r"$r$ ($G M_\odot / c^2)$", 
+                    ylabel=r"$\dot{M}$ ($M_\odot/y$)")
 
-        plt.subplot(339)
-        plot_r_profile_single(r, cs, pars, sca, r"$c_s$ ($c$)", bounds[8])
+        # Sound Speed
+        plot_data(ax[2,2], r, cs)
+        pretty_axis(ax[2,2], pars, xscale="linear", yscale="linear", 
+                    xlabel=r"$r$ ($G M_\odot / c^2)$", ylabel=r"$c_s$")
+
+        fig.suptitle(r"DISCO $M = {0:.1g}M_\odot$ a_* = {1:.2f}".format(M,a))
 
         plt.tight_layout()
 
