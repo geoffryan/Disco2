@@ -467,6 +467,41 @@ double metric_frame_U_u_geo(struct Metric *g, int mu, struct Sim *theSim)
                 return 0.0;
         }
     }
+    else if(sim_Metric(theSim) == SCHWARZSCHILD_KS_ADM)
+    {
+        // Solution: U_phi = U_phi (no boost)
+        //           U_r   = U_r   (no boost)
+        
+        double Risco = 6*M;
+        double Urd, Upd;
+        double x = M/r;
+
+        if(r >= Risco)
+        {
+            Urd = 2*x / sqrt(1-3*x);
+            Upd = sqrt(M*r / (1-3*x));
+        }
+        else
+        {
+            Urd = (-sqrt(6*x-1)*(6*x-1)+4*sqrt(2)*x) / (3*(1-2*x));
+            Upd = 2*sqrt(3.0)*M;
+        }
+
+        double U2 = Urd*Urd * metric_gamma_uu(g,0,0)
+                    + 2*Urd*Upd * metric_gamma_uu(g,0,1)
+                    + Upd*Upd * metric_gamma_uu(g,1,1);
+        double U0 = sqrt(1+U2) / metric_lapse(g);
+
+        if(mu == 0)
+            return U0;
+        else if(mu == 1 || mu == 2)
+        {
+            double U0d = (U0 - metric_g_uu(g,0,1)*Urd - metric_g_uu(g,0,2)*Upd)
+                             / metric_g_uu(g,0,0);
+            return metric_g_uu(g,mu,0)*U0d + metric_g_uu(g,mu,1)*Urd
+                    + metric_g_uu(g,mu,2)*Upd;
+        }
+    }
 
     return 0.0;
 }
@@ -591,6 +626,103 @@ double metric_frame_dU_du_geo(struct Metric *g, int mu, int nu,
                     + metric_dg_uu(g,1,2,1)*urd + metric_g_uu(g,2,1)*durd;
             else
                 return 0.0;
+        }
+    }
+    else if(sim_Metric(theSim) == SCHWARZSCHILD_KS_ADM)
+    {
+        // Solution: U_phi = U_phi (no boost)
+        //           U_r   = U_r   (no boost)
+        
+        double Risco = 6*M;
+        double Urd, Upd;
+        double x = M/r;
+        double dUrd = 0.0;
+        double dUpd = 0.0;
+        double dx = 0.0;
+
+        if(mu == 1)
+            dx = -M/(r*r);
+
+        if(r >= Risco)
+        {
+            Urd = 2*x / sqrt(1-3*x);
+            Upd = sqrt(M*r / (1-3*x));
+
+            if(mu == 1)
+            {
+                dUrd = (2-3*x) / (sqrt(1-3*x)*(1-3*x)) * dx;
+                dUpd = 0.5 * sqrt(x)*(1-6*x) / (sqrt(1-3*x)*(1-3*x));
+            }
+        }
+        else
+        {
+            Urd = (-sqrt(6*x-1)*(6*x-1)+4*sqrt(2)*x) / (3*(1-2*x));
+            Upd = 2*sqrt(3.0)*M;
+            if(mu == 1)
+                dUrd = ((-1.5*6*sqrt(6*x-1) + 4*sqrt(2)) * (3*(1-2*x))
+                        - (-sqrt(6*x-1)*(6*x-1) + 4*sqrt(2)*x) * -6)
+                         / (9*(1-2*x)*(1-2*x)) * dx;
+        }
+
+        double grr = metric_gamma_dd(g,0,0);
+        double grp = metric_gamma_dd(g,0,1);
+        double gpp = metric_gamma_dd(g,1,1);
+        double igrr = metric_gamma_uu(g,0,0);
+        double igrp = metric_gamma_uu(g,0,1);
+        double igpp = metric_gamma_uu(g,1,1);
+        double dgrr = metric_dg_dd(g,mu,1,1);
+        double dgrp = metric_dg_dd(g,mu,1,2);
+        double dgpp = metric_dg_dd(g,mu,2,2);
+        double gam = grr*gpp-grp*grp;
+        double dgam = dgrr*gpp+grr*dgpp-2*grp*dgrp;
+
+        // Derivatives of inverse spatial metric ASSUMING 2D (r-phi)
+        // TODO: 3D?
+        double digrr = (dgpp*gam - gpp*dgam) / (gam*gam);
+        double digrp = (-dgrp*gam + grp*dgam) / (gam*gam);
+        double digpp = (dgrr*gam - grr*dgam) / (gam*gam);
+
+        double U2 = Urd*Urd*igrr + 2*Urd*Upd*igrp + Upd*Upd*igpp;
+        double dU2 = 2*Urd*dUrd*igrr + Urd*Urd*digrr
+                    + 2*dUrd*Upd*igrp + 2*Urd*dUpd*igrp + 2*Urd*Upd*digrp
+                    + 2*Upd*dUpd*igpp + Upd*Upd*digpp;
+        double a = metric_lapse(g);
+        double da = metric_dlapse(g,mu);
+        double U0 = sqrt(1+U2) / a;
+        double dU0 = ((0.5*dU2/sqrt(1+U2))*a - sqrt(1+U2)*da) / (a*a);
+
+        if(nu == 0)
+            return dU0;
+        else if(nu == 1 || nu == 2)
+        {
+            double br = metric_shift_u(g,0);
+            double bp = metric_shift_u(g,1);
+            double dbr = metric_dshift_u(g,mu,0);
+            double dbp = metric_dshift_u(g,mu,1);
+
+            double U0d = -a*a*U0 + br*Urd + bp*Upd;
+            double dU0d = -2*a*da*U0 - a*a*dU0 + dbr*Urd + br*dUrd
+                            + dbp*Upd+bp*dUpd;
+            
+            double ub = U0d - br*Urd - bp*Upd;
+            double dub = dU0d - dbr*Urd-br*dUrd - dbp*Upd-bp*Upd;
+
+            if(nu == 1)
+            {
+                //ur = br*(U0d - br*Urd - bp*Upd)/(a*a) + igrr*Urd + igrp*Upd
+
+                double du1 = digrr*Urd + igrr*dUrd + digrp*Upd + igrp*dUpd;
+                double du2 = (dbr*a*a-br*2*a*da)/(a*a*a*a)*ub + br/(a*a)*dub;
+                return du1 + du2;
+            }
+            else if(nu == 2)
+            {
+                //up = bp*(U0d - br*Urd - bp*Upd)/(a*a) + igrp*Urd + igpp*Upd
+
+                double du1 = digrp*Urd + igrp*dUrd + digpp*Upd + igpp*dUpd;
+                double du2 = (dbp*a*a-bp*2*a*da)/(a*a*a*a)*ub + bp/(a*a)*dub;
+                return du1 + du2;
+            }
         }
     }
 

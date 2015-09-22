@@ -8,26 +8,26 @@ InitialDataType        14       // 0 Torus, 1 Bondi, 2 Vortex, 3 Uniform,
                                 // 16 Cartesian-Shear, 17 Disc Tests
 GravMassType            0       // 0 none, 1 single, 2 binary
 Background              2       // 0 Newtonian, 1 GR, 2 GRvisc, 3 GRDisc
-Metric                  2       // 0 Flat, 1 Schwarzschild-SC,
+Metric                  6       // 0 Flat, 1 Schwarzschild-SC,
                                 // 2 Schwarzschild-KS, 4 Kerr-KS, 5 FlatADM,
                                 // 6 Schwarzschild-KS-ADM, 
 Frame                   3       // 0 Euler, 1 Keplerian, 2 Accreting, 3 Geo
 Restart                 0       // If this=1 restart using input.h5
 
 //Computational Grid
-NumR			512			//Radial Zones
+NumR			128			//Radial Zones
 NumZ			1           //Vertical Zones
 ng              2
-R_Min		    1.4e6
-R_Max			1.0e9
-Z_Min			-1.0e9
-Z_Max			1.0e9
+R_Min		    1.0e0
+R_Max			1.0e2
+Z_Min			-1.0e3
+Z_Max			1.0e3
 NP_CONST        3
 aspect          1.0
 
 NUM_C                   5
 NUM_N                   0
-Time_Max                1.0e8
+Time_Max                1.0e2
 Num_Checkpoints         1001
 Num_Diag_Dump           21
 Num_Diag_Measure        21
@@ -56,7 +56,7 @@ PLM			1.0
 
 Grav_2D			1
 G_EPS			0.0
-GravM           1.0e6
+GravM           1.0
 GravA           0.0
 AlphaVisc       0.1
 
@@ -83,9 +83,9 @@ CoolPar4            0.0
 
 //Initial Condition Parameters
 InitPar0        0        //0 Thompson Cooling
-InitPar1        1.0e8    // Accretion Rate (solar masses per year)
-InitPar2        3.0e7    // R0 (radius to transition)
-InitPar3        1.0e7     // DR (transition width)
+InitPar1        1.0e0    // Accretion Rate (solar masses per year)
+InitPar2        3.0e1    // R0 (radius to transition)
+InitPar3        1.0e1     // DR (transition width)
 InitPar4        -1
 InitPar5        -1
 InitPar6        -1
