@@ -356,7 +356,8 @@ double cell_mindt_gr(struct Cell ***theCells, struct Sim *theSim)
                     double dtb = cell_mindt_binary_step(r, phi, al*sqrtg*dV, 
                                     theCells[k][i][j].cons[TAU], rhoh, u, U,
                                     theSim);
-                    dt = dt/(1.0 + dt/dtb);
+                    if(dtb > 0.0)
+                        dt = dt/(1.0 + dt/dtb);
                 }
 
                 if(dt_m > dt)
