@@ -475,6 +475,10 @@ double metric_frame_U_u_geo(struct Metric *g, int mu, struct Sim *theSim)
         double Risco = 6*M;
         double Urd, Upd;
         double x = M/r;
+        double w = 0.0;
+
+        if(sim_BoostType(theSim) != BOOST_NONE)
+            w = sim_BinW(theSim);
 
         if(r >= Risco)
         {
@@ -487,20 +491,35 @@ double metric_frame_U_u_geo(struct Metric *g, int mu, struct Sim *theSim)
             Upd = 2*sqrt(3.0)*M;
         }
 
+        double br = 2*x/(1+2*x);  //Kerr-Schild radial shift
+        double bp = w;            //Rotating frame
+
+        //First find UR, UP
         double U2 = Urd*Urd * metric_gamma_uu(g,0,0)
                     + 2*Urd*Upd * metric_gamma_uu(g,0,1)
                     + Upd*Upd * metric_gamma_uu(g,1,1);
         double U0 = sqrt(1+U2) / metric_lapse(g);
+        double UR = metric_gamma_uu(g,0,0)*Urd + metric_gamma_uu(g,0,1)*Upd
+                     - br*U0;
+        double UP = metric_gamma_uu(g,1,0)*Urd + metric_gamma_uu(g,1,1)*Upd
+                     - bp*U0;
 
+        //UR, UP are what we want, find corresponding U0.
         if(mu == 0)
-            return U0;
-        else if(mu == 1 || mu == 2)
         {
-            double U0d = (U0 - metric_g_uu(g,0,1)*Urd - metric_g_uu(g,0,2)*Upd)
-                             / metric_g_uu(g,0,0);
-            return metric_g_uu(g,mu,0)*U0d + metric_g_uu(g,mu,1)*Urd
-                    + metric_g_uu(g,mu,2)*Upd;
+            double a = metric_g_dd(g,0,0);
+            double b = metric_g_dd(g,0,1)*UR + metric_g_dd(g,0,2)*UP;
+            double c = metric_g_dd(g,1,1)*UR*UR + metric_g_dd(g,2,2)*UP*UP
+                        + 2*metric_g_dd(g,1,2)*UR*UP + 1.0;
+
+            U0 = (-b - sqrt(b*b - a*c)) / a;
+
+            return U0;
         }
+        else if(mu == 1)
+            return UR;
+        else if(mu == 2)
+            return UP;
     }
 
     return 0.0;
@@ -639,9 +658,18 @@ double metric_frame_dU_du_geo(struct Metric *g, int mu, int nu,
         double dUrd = 0.0;
         double dUpd = 0.0;
         double dx = 0.0;
+        double w = 0.0;
+
+        if(sim_BoostType(theSim) != BOOST_NONE)
+            w = sim_BinW(theSim);
 
         if(mu == 1)
             dx = -M/(r*r);
+
+        double br = 2*x/(1+2*x);
+        double dbr = 2*(1+2*x - x*2) / ((1+2*x)*(1+2*x)) * dx;
+        double bp = w;
+        double dbp = 0.0;
 
         if(r >= Risco)
         {
@@ -691,39 +719,37 @@ double metric_frame_dU_du_geo(struct Metric *g, int mu, int nu,
         double U0 = sqrt(1+U2) / a;
         double dU0 = ((0.5*dU2/sqrt(1+U2))*a - sqrt(1+U2)*da) / (a*a);
 
+        double UR = igrr*Urd + igrp*Upd - br*U0;
+        double UP = igrp*Urd + igpp*Upd - bp*U0;
+        double dUR = digrr*Urd + igrr*dUrd + digrp*Upd + igrp*dUpd
+                        - dbr*U0 - br*dU0;
+        double dUP = digrp*Urd + igrp*dUrd + digpp*Upd + igpp*dUpd
+                        - dbp*U0 - bp*dU0;
+
         if(nu == 0)
-            return dU0;
-        else if(nu == 1 || nu == 2)
         {
-            double br = metric_shift_u(g,0);
-            double bp = metric_shift_u(g,1);
-            double dbr = metric_dshift_u(g,mu,0);
-            double dbp = metric_dshift_u(g,mu,1);
-
-            double U0d = -a*a*U0 + br*Urd + bp*Upd;
-            double dU0d = -2*a*da*U0 - a*a*dU0 + dbr*Urd + br*dUrd
-                            + dbp*Upd+bp*dUpd;
+            double A = metric_g_dd(g,0,0);
+            double B = metric_g_dd(g,0,1)*UR + metric_g_dd(g,0,2)*UP;
+            double C = metric_g_dd(g,1,1)*UR*UR + metric_g_dd(g,2,2)*UP*UP
+                        + 2*metric_g_dd(g,1,2)*UR*UP + 1;
+            double dA = metric_dg_dd(g,mu,0,0);
+            double dB = metric_dg_dd(g,mu,0,1)*UR + metric_g_dd(g,0,1)*dUR
+                        + metric_dg_dd(g,mu,0,2)*UP + metric_g_dd(g,0,2)*dUP;
+            double dC = metric_dg_dd(g,mu,1,1)*UR*UR
+                        + 2*metric_g_dd(g,1,1)*UR*dUR
+                        + metric_dg_dd(g,mu,2,2)*UP*UP
+                        + 2*metric_g_dd(g,2,2)*UP*dUP
+                        + 2*metric_dg_dd(g,mu,1,2)*UR*UP
+                        + 2*metric_g_dd(g,1,2)*(dUR*UP+UR*dUP);
             
-            double ub = U0d - br*Urd - bp*Upd;
-            double dub = dU0d - dbr*Urd-br*dUrd - dbp*Upd-bp*Upd;
-
-            if(nu == 1)
-            {
-                //ur = br*(U0d - br*Urd - bp*Upd)/(a*a) + igrr*Urd + igrp*Upd
-
-                double du1 = digrr*Urd + igrr*dUrd + digrp*Upd + igrp*dUpd;
-                double du2 = (dbr*a*a-br*2*a*da)/(a*a*a*a)*ub + br/(a*a)*dub;
-                return du1 + du2;
-            }
-            else if(nu == 2)
-            {
-                //up = bp*(U0d - br*Urd - bp*Upd)/(a*a) + igrp*Urd + igpp*Upd
-
-                double du1 = digrp*Urd + igrp*dUrd + digpp*Upd + igpp*dUpd;
-                double du2 = (dbp*a*a-bp*2*a*da)/(a*a*a*a)*ub + bp/(a*a)*dub;
-                return du1 + du2;
-            }
+            dU0 = -(dB*A-B*dA)/(A*A) - (A*B*dB - B*B*dA + 0.5*A*(C*dA-A*dC))
+                                        / (A*A*sqrt(B*B-A*C));
+            return dU0;
         }
+        else if(nu == 1)
+            return dUR;
+        else if(nu == 2)
+            return dUP;
     }
 
     return 0.0;
