@@ -294,7 +294,7 @@ void cell_add_src_gr( struct Cell *** theCells ,struct Sim * theSim, struct Grav
                 c->cons[SZZ] += dcons_cool[SZZ] * dV;
                 c->cons[TAU] += dcons_cool[TAU] * dV;
                 
-                if(sim_BoostType(theSim) == BOOST_BIN)
+                if(sim_BoostType(theSim) != BOOST_NONE)
                 {
                     cell_src_boost(time_global, r, phi, z, c->cons, g, rhoh, 
                                     u, U, dV, dt, theSim);
@@ -315,19 +315,24 @@ void cell_src_boost(double t, double r, double phi, double z, double *cons,
                     struct Metric *g, double rhoh, double *u, double *U, 
                     double dV, double dt, struct Sim *theSim)
 {
+    //Newtonian Tidal Forces.
     double a = sim_BinA(theSim);
     double M2 = sim_BinM(theSim);
 
     double al = metric_lapse(g);
     double sqrtg = metric_sqrtgamma(g) / r;
 
-    double Fr, Fp, Ft;
+    double Fx, Fy, Fr, Fp, Ft;
 
-    double X = 2*a + r*cos(phi);
-    double Y = r*sin(phi);
+    double x = r*cos(phi);
+    double y = r*sin(phi);
+    double X = -2*a;
+    double Y = 0.0;
     double R = sqrt(X*X+Y*Y);
-    Fr = -M2/(R*R)*( X*cos(phi)/R + Y*sin(phi)/R)*rhoh*u[0]*u[0];
-    Fp = -M2/(R*R)*(-X*sin(phi)/R + Y*cos(phi)/R)*rhoh*u[0]*u[0]*r;
+    Fx = M2*( x*R*R - 3*(x*X+y*Y)*X) / (R*R*R*R*R) * rhoh*u[0]*u[0];
+    Fy = M2*( y*R*R - 3*(x*X+y*Y)*Y) / (R*R*R*R*R) * rhoh*u[0]*u[0];
+    Fr = Fx*cos(phi) + Fy*sin(phi);
+    Fp = (-Fx*sin(phi) + Fy*cos(phi))*r;
 
     //Energy source ensures no heating/cooling in fluid rest frame.
     Ft = -(u[1]*Fr + u[2]*Fp)/u[0];
@@ -340,7 +345,6 @@ void cell_src_boost(double t, double r, double phi, double z, double *cons,
 void cell_cool_integrateT_gr_num(double *prim, double *dcons, double dt, 
                                 double u0, double GAM, double pos[], double M,
                                 struct Sim *theSim)
-
 {
     int i;
     double res = 1.0e-1;

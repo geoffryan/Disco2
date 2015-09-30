@@ -564,14 +564,18 @@ double cell_mindt_binary_step(double r, double phi, double d4V, double tau,
     
     double a = sim_BinA(theSim);
     double M2 = sim_BinM(theSim);
+    double Fx, Fy, Fr, Fp, Ft;
 
-    double Fr, Fp, Ft;
-    double X = 2*a + r*cos(phi);
-    double Y = r*sin(phi);
+    double x = r*cos(phi);
+    double y = r*sin(phi);
+    double X = -2*a;
+    double Y = 0.0;
     double R = sqrt(X*X+Y*Y);
+    Fx = M2*( x*R*R - 3*(x*X+y*Y)*X) / (R*R*R*R*R) * rhoh*u[0]*u[0];
+    Fy = M2*( y*R*R - 3*(x*X+y*Y)*Y) / (R*R*R*R*R) * rhoh*u[0]*u[0];
+    Fr = Fx*cos(phi) + Fy*sin(phi);
+    Fp = (-Fx*sin(phi) + Fy*cos(phi))*r;
 
-    Fr = -M2/(R*R)*( X*cos(phi)/R + Y*sin(phi)/R)*rhoh*u[0]*u[0];
-    Fp = -M2/(R*R)*(-X*sin(phi)/R + Y*cos(phi)/R)*rhoh*u[0]*u[0]*r;
     Ft = -(u[1]*Fr + u[2]*Fp/r)/u[0];
 
     return 0.5 * fabs(tau / (d4V * (-U[0]*Ft-U[1]*Fr-U[2]*Fp)));
