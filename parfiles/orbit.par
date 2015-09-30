@@ -86,8 +86,8 @@ CoolPar4            0.0
 InitPar0        0           // 0 Normal, 1 Nozzle
 InitPar1        1.0         // rho0
 InitPar2        1.0e-4      // T0
-InitPar3        10.0         // 
-InitPar4        0.0         //
+InitPar3        0.0         // vp0
+InitPar4        10. 0       // R0
 InitPar5        0.0         // 
 InitPar6        0.0         // 
 

@@ -16,24 +16,21 @@ void cell_init_orbit_passive(struct Cell *c, double r, double phi, double z,
                             struct Sim *theSim)
 {
     double rho, P, vr, vp, vz, q;
-    double rho0, P0, R0;
+    double rho0, P0, R0, vp0;
     int i;
 
     rho0 = sim_InitPar1(theSim);
     P0 = sim_InitPar2(theSim);
+    vp0 = sim_InitPar3(theSim);
     R0 = sim_InitPar3(theSim);
 
     rho = rho0;
     P = P0;
     vr = 0.0;
-    vp = 0.0;
+    vp = vp0;
     vz = 0.0;
 
-    if(r < R0)
-        q = 1.0;
-    else
-        q = 0.0;
-    //q = r<R0 ? 1.0 : 0.0;
+    q = r<R0 ? 1.0 : 0.0;
 
     c->prim[RHO] = rho;
     c->prim[PPP] = P;
