@@ -6,6 +6,7 @@ import matplotlib.collections as coll
 import matplotlib.colors as clrs
 import matplotlib.patches as pat
 import matplotlib.ticker as tkr
+import matplotlib.mlab as mlab
 import sys
 import numpy as np
 import discopy as dp
@@ -14,6 +15,7 @@ M = 1.0
 a = 0.0
 gridscale = 'linear'
 datscale = 'linear'
+plotQuiver = True
 A = a*M
 poscmap = plt.cm.afmhot
 divcmap = plt.cm.RdBu
@@ -24,9 +26,10 @@ XROCHE = None
 YROCHE = None
 ZROCHE = None
 RMAX = -1.0
+QUIVER = None
 
 def plot_equat_single(fig, ax, mesh, dat, gridscale="linear", gridbounds=None,
-                    datscale="linear", datbounds=None, label=None, 
+                    datscale="linear", datbounds=None, Vmax=0.0, label=None, 
                     normal=False, **kwargs):
     N = 400
 
@@ -57,6 +60,9 @@ def plot_equat_single(fig, ax, mesh, dat, gridscale="linear", gridbounds=None,
     #Plot Roche Equipotential
     if ROCHE:
         plot_roche(ax, mesh, gridbounds)
+
+    if plotQuiver:
+        plot_quiver(ax, Vmax=Vmax)
 
     #Patches to highlight horizona and ergosphere
     if M > 0.0:
@@ -113,15 +119,63 @@ def plot_roche(ax, mesh, gridbounds):
     #ax.contour(XROCHE, YROCHE, ZROCHE, levels=[1.4*lvl,1.35*lvl,1.3*lvl,1.25*lvl,1.2*lvl,1.15*lvl,1.1*lvl,1.05*lvl,lvl,0.95*lvl,0.9*lvl,0.85*lvl,0.8*lvl,0.75*lvl,0.7*lvl,0.65*lvl,0.6*lvl], colors='m')
     #ax.contour(XROCHE, YROCHE, ZROCHE)
 
+def build_quiver(r, phi, vr, vp, gridbounds):
+
+    global QUIVER
+
+    N = 20
+
+    print("Building Quiver")
+    if gridbounds is None:
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+    else:
+        xlim = gridbounds[0]
+        ylim = gridbounds[1]
+    xq = np.linspace(xlim[0], xlim[1], N)
+    yq = np.linspace(ylim[0], ylim[1], N)
+
+    XQ,YQ = np.meshgrid(xq, yq)
+
+    rm = np.fabs(gridbounds).min()
+    R2 = XQ*XQ+YQ*YQ
+    ind = R2 < rm*rm
+
+    x = r*cos(phi)
+    y = r*sin(phi)
+    vx = vr*np.cos(phi) - r*vp*np.sin(phi)
+    vy = vr*np.sin(phi) + r*vp*np.cos(phi)
+
+    VX = mlab.griddata(x, y, vx, XQ, YQ)
+    VY = mlab.griddata(x, y, vy, XQ, YQ)
+    
+    XQ = XQ[ind]
+    YQ = YQ[ind]
+    VX = VX[ind]
+    VY = VY[ind]
+    
+    QUIVER = (XQ, YQ, VX, VY)
+
+def plot_quiver(ax, Vmax=0.0, **kwargs):
+
+    global QUIVER
+
+    N = 20
+    xlim = ax.get_xlim()
+    scale = Vmax*(N-1)
+    blue = (31.0/255, 119.0/255, 180.0/255)
+
+    ax.quiver(*QUIVER, scale=scale, scale_units='width', color=blue)
+
 
 def make_plot(mesh, dat, gridscale="linear", gridbounds=None, 
-                datscale="linear", datbounds=None, label=None, 
+                datscale="linear", datbounds=None, Vmax=0.0, label=None, 
                 title=None, filename=None, normal=False, **kwargs):
 
     fig = plt.figure(figsize=(12,9))
     ax = fig.add_subplot(1,1,1)
     plot_equat_single(fig, ax, mesh, dat, gridscale, gridbounds,
-                    datscale, datbounds, label, normal, **kwargs)
+                    datscale, datbounds, Vmax, label, normal, **kwargs)
     if title is not None:
         ax.set_title(title)
     if filename is not None:
@@ -129,7 +183,7 @@ def make_plot(mesh, dat, gridscale="linear", gridbounds=None,
         fig.savefig(filename)
     plt.close()
 
-def plot_all(filename, gridscale='linear', plot=True, bounds=None):
+def plot_all(filename, gridscale='linear', plot=True, bounds=None, Vmax=0.0):
 
     print("Reading {0:s}".format(filename))
 
@@ -165,6 +219,8 @@ def plot_all(filename, gridscale='linear', plot=True, bounds=None):
         bounds.append([q[q==q].min(), q[q==q].max()])
         bounds = np.array(bounds)
 
+    Vmax = max(Vmax, math.sqrt((vr*vr+r*r*vp*vp).max()))
+
     if plot:
 
         print("Plotting t = {0:g}".format(t))
@@ -177,6 +233,9 @@ def plot_all(filename, gridscale='linear', plot=True, bounds=None):
             gridbounds = np.array([[-RMAX,RMAX],[-RMAX,RMAX]])
         else:
             gridbounds = np.array([[-r.max(),r.max()],[-r.max(),r.max()]])
+
+        if plotQuiver:
+            build_quiver(r, phi, vr, vp, gridbounds)
 
         outpath = filename.split("/")[:-1]
         chckname = filename.split("/")[-1]
@@ -197,33 +256,33 @@ def plot_all(filename, gridscale='linear', plot=True, bounds=None):
 
         #Rho
         make_plot(mesh, rho, gridscale="linear", gridbounds=gridbounds,
-                datscale=datscale, datbounds=bounds[0],
+                datscale=datscale, datbounds=bounds[0], Vmax=Vmax,
                 label=r'$\rho_0$', title=title, filename=rhoname, cmap=poscmap)
 
         #T
         make_plot(mesh, T, gridscale="linear", gridbounds=gridbounds,
-                datscale="log", datbounds=bounds[1],
+                datscale="log", datbounds=bounds[1], Vmax=Vmax,
                 label=r'$T$', title=title, filename=Tname, cmap=poscmap)
 
         
         #Vr
         make_plot(mesh, vr, gridscale="linear", gridbounds=gridbounds,
-                datscale="linear", datbounds=bounds[2],
+                datscale="linear", datbounds=bounds[2], Vmax=Vmax,
                 label=r'$v^r$', title=title, filename=vrname, normal=True,
                 cmap=divcmap)
 
         #Vp
         make_plot(mesh, vp, gridscale="linear", gridbounds=gridbounds,
-                datscale="linear", datbounds=bounds[3],
+                datscale="linear", datbounds=bounds[3], Vmax=Vmax,
                 label=r'$v^\phi$', title=title, filename=vpname, normal=True,
                 cmap=divcmap)
         
         #q
         make_plot(mesh, q, gridscale="linear", gridbounds=gridbounds,
-                datscale="linear", datbounds=bounds[4],
+                datscale="linear", datbounds=bounds[4], Vmax=Vmax,
                 label=r'$q$', title=title, filename=qname, cmap=poscmap)
 
-    return bounds
+    return bounds, Vmax
 
 
 if __name__ == "__main__":
@@ -241,8 +300,10 @@ if __name__ == "__main__":
         bounds = np.zeros((5,2))
         bounds[:,0] = np.inf
         bounds[:,1] = -np.inf
+        Vmax = 0.0
         for filename in sys.argv[1:]:
-            b = plot_all(filename, gridscale=gridscale, plot=False)
+            b, Vmax = plot_all(filename, gridscale=gridscale, plot=False, 
+                                Vmax=Vmax)
             lower = b[:,0]<bounds[:,0]
             upper = b[:,1]>bounds[:,1]
             bounds[lower,0] = b[lower,0]
