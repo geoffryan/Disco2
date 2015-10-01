@@ -13,7 +13,7 @@ import discopy as dp
 M = 1.0
 a = 0.0
 gridscale = 'linear'
-datscale = 'log'
+datscale = 'linear'
 A = a*M
 poscmap = plt.cm.afmhot
 divcmap = plt.cm.RdBu
@@ -23,6 +23,7 @@ ROCHE = True
 XROCHE = None
 YROCHE = None
 ZROCHE = None
+RMAX = -1.0
 
 def plot_equat_single(fig, ax, mesh, dat, gridscale="linear", gridbounds=None,
                     datscale="linear", datbounds=None, label=None, 
@@ -132,7 +133,7 @@ def plot_all(filename, gridscale='linear', plot=True, bounds=None):
 
     print("Reading {0:s}".format(filename))
 
-    dat = dp.readCheckpoint(filename)
+    dat = dp.readCheckpoint(filename, nq=6)
     t = dat[0]
     r = dat[1]
     phi = dat[2]
@@ -142,7 +143,7 @@ def plot_all(filename, gridscale='linear', plot=True, bounds=None):
     vr = dat[6]
     vp = dat[7]
     dV = dat[9]
-    q = dat[10]
+    q = dat[10][0]
 
     inds = z==z[len(z)/2]
     r = r[inds]
@@ -172,7 +173,10 @@ def plot_all(filename, gridscale='linear', plot=True, bounds=None):
         y = r*sin(phi)
         mesh = tri.Triangulation(x, y)
 
-        gridbounds = np.array([[-r.max(),r.max()],[-r.max(),r.max()]])
+        if RMAX > 0.0:
+            gridbounds = np.array([[-RMAX,RMAX],[-RMAX,RMAX]])
+        else:
+            gridbounds = np.array([[-r.max(),r.max()],[-r.max(),r.max()]])
 
         outpath = filename.split("/")[:-1]
         chckname = filename.split("/")[-1]

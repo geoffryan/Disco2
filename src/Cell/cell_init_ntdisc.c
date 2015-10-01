@@ -55,6 +55,13 @@ void cell_init_ntdisc_thompson(struct Cell *c, double r, double phi, double z, s
         calc_NT(r0, Mdot, rs, GAM, M, a, alpha, &Sig0, &Pi0, &T0, &H0, 
                                                 &vr0, &vp0);
 
+    if(sim_BoostType(theSim) == BOOST_RIGID)
+    {
+        double w = sim_BinW(theSim);
+        vp0 -= w;
+        vpOut -= w;
+    }
+
     double rho, T, sig, pi, vr, vp;
 
     if(r >= r0 + DR)
