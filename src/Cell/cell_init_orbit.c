@@ -22,7 +22,7 @@ void cell_init_orbit_passive(struct Cell *c, double r, double phi, double z,
     rho0 = sim_InitPar1(theSim);
     P0 = sim_InitPar2(theSim);
     vp0 = sim_InitPar3(theSim);
-    R0 = sim_InitPar3(theSim);
+    R0 = sim_InitPar4(theSim);
 
     rho = rho0;
     P = P0;
