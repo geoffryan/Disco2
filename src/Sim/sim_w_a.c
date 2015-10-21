@@ -58,7 +58,12 @@ double sim_dtOm_a(struct Sim * theSim,double r,double a){
   if (sim_W_A_TYPE(theSim)==A_MILOS){
     double a0 = 1.0;
     double tau = sim_OrbShrinkTscale(theSim);
-    double dta_o_a = -.25 * pow(a/a0,-4) / tau;
+    double dta_o_a;
+    if (tau>0.0){
+        dta_o_a = -.25 * pow(a/a0,-4) / tau;
+    } else{
+        dta_o_a = 0.0;
+    }
     int n = w_a_milos_index;
     double Omega_a = (pow(r,n-1.5) + pow(a,n-1.5))/(pow(r,n) + pow(a,n));
     double arn = pow(a/r,n);
