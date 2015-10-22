@@ -26,7 +26,7 @@ def plotDiagEquat(filename):
     ax.set_ylabel(r"$y$")
     fig.suptitle(r"$t = {0:.2g}$".format(t), fontsize=24)
 
-    fig.savefig("rho_{0:07.2f}.png".format(t))
+    fig.savefig("rho_{0:010.2f}.png".format(t))
     plt.close()
 
 if __name__ == "__main__":
