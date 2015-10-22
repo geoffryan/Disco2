@@ -15,10 +15,12 @@ SRCS    := $(shell find $(SRCDIR) -name '*.$(SRCEXT)')
 SRCDIRS := $(shell find . -name '*.$(SRCEXT)' -exec dirname {} \; | uniq)
 OBJS    := $(patsubst %.$(SRCEXT),$(OBJDIR)/%.o,$(SRCS))
 
+GIT_VERSION = $(shell git describe --dirty --always --tags)
+
 DEBUG    = -g -Wall
 OPT      = -O3
 INCLUDES = -I$(H55)/include
-CFLAGS   = -c $(INCLUDES)
+CFLAGS   = -c $(INCLUDES) -DVERSION=\"$(GIT_VERSION)\"
 LDFLAGS  = -lm -lz -L$(H55)/lib -lhdf5
 
 ifeq ($(strip $(USE_DEBUG)), 1)
