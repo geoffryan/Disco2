@@ -2,9 +2,9 @@ import math
 import sys
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.tri as tri
 import matplotlib.colors as clrs
 import matplotlib.ticker as tkr
+import matplotlib.tri as tri
 import discopy as dp
 
 RMAX = 3.5
