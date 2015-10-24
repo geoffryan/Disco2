@@ -7,14 +7,22 @@ import matplotlib.colors as clrs
 import matplotlib.ticker as tkr
 import matplotlib.tri as tri
 import matplotlib.patches as pat
+import scipy.optimize as opt
 import discopy as dp
 
 R1 = 0.5
 R2 = 0.5
-DR1 = 0.1
-DR2 = 0.1
+DR1 = 0.05
+DR2 = 0.05
 
 scale = "log"
+
+ROCHE = True
+XROCHE = None
+YROCHE = None
+ZROCHE = None
+L1x = 0.0
+L1val = 0.0
 
 def makeBoundPlot(ax, phi, dat, scale="linear", label="", **kwargs):
 
@@ -43,12 +51,61 @@ def makeEquatPlot(fig, ax, mesh, dat, scale="linear", title="", label="",
 
     C = ax.tricontourf(mesh, dat, v, norm=norm, **kwargs)
     colorbar = fig.colorbar(C, format=formatter, ticks=locator)
-
+    
     ax.set_xlabel(r"$x$")
     ax.set_ylabel(r"$y$")
     ax.set_aspect('equal')
     colorbar.set_label(label)
     fig.suptitle(title, fontsize=24)
+
+def plot_roche(ax, mesh, q):
+
+    N = 256
+    BINSEP = 1.0
+
+    global XROCHE
+    global YROCHE
+    global ZROCHE
+    global L1r
+    global L1val
+
+    if XROCHE == None or YROCHE == None or ZROCHE == None:
+        print("Building Roche Lobe")
+        xlim = ax.get_xlim()
+        ylim = ax.get_ylim()
+        x = np.linspace(xlim[0], xlim[1], N)
+        y = np.linspace(ylim[0], ylim[1], N)
+
+        M = 1.0
+        M1 = 1.0 / (1.0 + q)
+        M2 = 1.0 / (1.0 + 1.0/q)
+        a1 = 1.0 / (1.0 + 1.0/q)
+        a2 = 1.0 / (1.0 + q)
+
+        XROCHE,YROCHE = np.meshgrid(x, y)
+
+        def phiRoche(x, y, M1, M2, a1, a2):
+            phi1 = -M1 / np.sqrt((x-a1)*(x-a1) + y*y)
+            phi2 = -M2 / np.sqrt((x+a2)*(x+a2) + y*y)
+            phic = -0.5 * (M1+M2) * (x*x+y*y)  / ((a1+a2)*(a1+a2)*(a1+a2))
+            return phi1 + phi2 + phic
+
+        def rochel1(x, M1, M2, a1, a2):
+            f1 = M1 / math.fabs((x-a1)*(x-a1)*(x-a1)) * (x-a1)
+            f2 = M2 / math.fabs((x+a2)*(x+a2)*(x+a2)) * (x+a2)
+            fc = -M * x / ((a1+a2)*(a1+a2)*(a1+a2))
+            return f1+f2+fc
+
+        ZROCHE = phiRoche(XROCHE, YROCHE, M1, M2, a1, a2)
+        L1x = opt.newton(rochel1, 0.0, args=(M1,M2,a1,a2))
+        L1val = phiRoche(L1x, 0.0, M1, M2, a1, a2)
+
+    lvl = L1val
+    ax.contour(XROCHE, YROCHE, ZROCHE, levels=[lvl], colors='m')
+    #ax.contour(XROCHE, YROCHE, ZROCHE, levels=[1.4*lvl,1.35*lvl,1.3*lvl,1.25*lvl,1.2*lvl,1.15*lvl,1.1*lvl,1.05*lvl,lvl,0.95*lvl,0.9*lvl,0.85*lvl,0.8*lvl,0.75*lvl,0.7*lvl,0.65*lvl,0.6*lvl], colors='m')
+    #ax.contour(XROCHE, YROCHE, ZROCHE)
+
+    return L1x
 
 def plotBoundaryExtract(filename, pars):
    
@@ -68,14 +125,17 @@ def plotBoundaryExtract(filename, pars):
 
     # Equatorial Plot
     fig, ax = plt.subplots()
-    inds = r < 3.5
+    inds = r < 2.5
     mesh = tri.Triangulation(x[inds], y[inds])
-    makeEquatPlot(fig, ax, mesh, rho[inds], scale="linear", title=title,    
+    makeEquatPlot(fig, ax, mesh, rho[inds], scale=scale, title=title,    
                 label=r"$\Sigma$", cmap=plt.cm.afmhot)
-    primary_cut = pat.Wedge((a1,0), R1+DR1, 0, 360, width=2*DR1)
-    secondary_cut = pat.Wedge((-a2,0), R2+DR2, 0, 360, width=2*DR2)
+    l1x = plot_roche(ax, mesh, q)
+    r1 = a1-l1x
+    r2 = a2+l1x
+    primary_cut = pat.Wedge((a1,0), r1+DR1, 0, 360, width=2*DR1)
+    secondary_cut = pat.Wedge((-a2,0), r2+DR2, 0, 360, width=2*DR2)
     patches = coll.PatchCollection([primary_cut, secondary_cut], color='g', 
-                                    alpha=0.4)
+                                    linewidths=0, alpha=0.4)
     ax.add_collection(patches)
     fig.savefig("bound_equat_rho_{0:010.2f}.png".format(t))
     plt.close(fig)
@@ -94,9 +154,9 @@ def plotBoundaryExtract(filename, pars):
 
     # Primary plot
     fig, ax = plt.subplots(2,2, figsize=(12,9))
-    makeBoundPlot(ax[0,0], phi1, rho[ind1], scale='linear', label=r'$\Sigma$',
+    makeBoundPlot(ax[0,0], phi1, rho[ind1], scale=scale, label=r'$\Sigma$',
                 ls='', marker='+', color='k')
-    makeBoundPlot(ax[0,1], phi1, P[ind1]/rho[ind1], scale='linear', 
+    makeBoundPlot(ax[0,1], phi1, P[ind1]/rho[ind1], scale=scale, 
                 label=r'$T$', ls='', marker='+', color='k')
     makeBoundPlot(ax[1,0], phi1, vr[ind1], scale='linear', label=r'$v^r$',
                 ls='', marker='+', color='k')
@@ -108,9 +168,9 @@ def plotBoundaryExtract(filename, pars):
 
     # Secondary Plot
     fig, ax = plt.subplots(2,2, figsize=(12,9))
-    makeBoundPlot(ax[0,0], phi2, rho[ind2], scale='linear', label=r'$\Sigma$',
+    makeBoundPlot(ax[0,0], phi2, rho[ind2], scale=scale, label=r'$\Sigma$',
                 ls='', marker='+', color='k')
-    makeBoundPlot(ax[0,1], phi2, P[ind2]/rho[ind2], scale='linear', 
+    makeBoundPlot(ax[0,1], phi2, P[ind2]/rho[ind2], scale=scale, 
                 label=r'$T$', ls='', marker='+', color='k')
     makeBoundPlot(ax[1,0], phi2, vr[ind2], scale='linear', label=r'$v^r$',
                 ls='', marker='+', color='k')
@@ -124,6 +184,10 @@ def plotBoundaryExtract(filename, pars):
 
 if __name__ == "__main__":
 
+    if len(sys.argv[1:]) < 2:
+        print("Need a parfile and a DiagEquat.h5 file!")
+        sys.exit()
+    
     pars = dp.readParfile(sys.argv[1])
 
     for filename in sys.argv[2:]:
