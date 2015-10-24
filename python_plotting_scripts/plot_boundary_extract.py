@@ -66,7 +66,7 @@ def plot_roche(ax, mesh, q):
     global XROCHE
     global YROCHE
     global ZROCHE
-    global L1r
+    global L1x
     global L1val
 
     if XROCHE == None or YROCHE == None or ZROCHE == None:
