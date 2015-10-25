@@ -24,7 +24,6 @@ YROCHE = None
 ZROCHE = None
 L1x = 0.0
 L1val = 0.0
-QUIVER = None
 
 def makeBoundPlot(ax, phi, dat, scale="linear", label="", **kwargs):
 
@@ -142,7 +141,6 @@ def buildQuiver(r, phi, vr, vp, N=20):
 
 def plotQuiver(ax, r, phi, vr, vp, Vmax=-1.0, **kwargs):
 
-    global QUIVER
     N = 60
 
     xlim = ax.get_xlim()
@@ -152,10 +150,9 @@ def plotQuiver(ax, r, phi, vr, vp, Vmax=-1.0, **kwargs):
     scale = Vmax*(N-1)/2
     blue = (31.0/255, 119.0/255, 180.0/255)
 
-    if QUIVER is None:
-        QUIVER = buildQuiver(r, phi, vr, vp, N)
+    quiver = buildQuiver(r, phi, vr, vp, N)
 
-    ax.quiver(*QUIVER, scale=scale, scale_units='width', color=blue)
+    ax.quiver(*quiver, scale=scale, scale_units='width', color=blue)
 
 def plotBoundaryExtract(filename, pars):
    
