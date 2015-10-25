@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.collections as coll
 import matplotlib.colors as clrs
+import matplotlib.mlab as mlab
 import matplotlib.ticker as tkr
 import matplotlib.tri as tri
 import matplotlib.patches as pat
@@ -23,6 +24,7 @@ YROCHE = None
 ZROCHE = None
 L1x = 0.0
 L1val = 0.0
+QUIVER = None
 
 def makeBoundPlot(ax, phi, dat, scale="linear", label="", **kwargs):
 
@@ -107,6 +109,54 @@ def plot_roche(ax, mesh, q):
 
     return L1x
 
+def buildQuiver(r, phi, vr, vp, N=20):
+
+    print("Building Quiver")
+
+    rmax = r.max()
+
+    xlim = (-rmax, rmax)
+    ylim = (-rmax, rmax)
+    xq = np.linspace(xlim[0], xlim[1], N)
+    yq = np.linspace(ylim[0], ylim[1], N)
+
+    XQ,YQ = np.meshgrid(xq, yq)
+
+    R2 = XQ*XQ+YQ*YQ
+    ind = R2 < rmax
+
+    x = r*np.cos(phi)
+    y = r*np.sin(phi)
+    vx = vr*np.cos(phi) - vp*np.sin(phi)
+    vy = vr*np.sin(phi) + vp*np.cos(phi)
+
+    VX = mlab.griddata(x, y, vx, XQ, YQ)
+    VY = mlab.griddata(x, y, vy, XQ, YQ)
+    
+    XQ = XQ[ind]
+    YQ = YQ[ind]
+    VX = VX[ind]
+    VY = VY[ind]
+    
+    return (XQ, YQ, VX, VY)
+
+def plotQuiver(ax, r, phi, vr, vp, Vmax=-1.0, **kwargs):
+
+    global QUIVER
+    N = 60
+
+    xlim = ax.get_xlim()
+
+    if Vmax <= 0.0:
+        Vmax = math.sqrt((vr*vr+vp*vp).max())
+    scale = Vmax*(N-1)/2
+    blue = (31.0/255, 119.0/255, 180.0/255)
+
+    if QUIVER is None:
+        QUIVER = buildQuiver(r, phi, vr, vp, N)
+
+    ax.quiver(*QUIVER, scale=scale, scale_units='width', color=blue)
+
 def plotBoundaryExtract(filename, pars):
    
     q = pars['MassRatio']
@@ -125,7 +175,7 @@ def plotBoundaryExtract(filename, pars):
 
     # Equatorial Plot
     fig, ax = plt.subplots()
-    inds = r < 2.5
+    inds = r < 2.0
     mesh = tri.Triangulation(x[inds], y[inds])
     makeEquatPlot(fig, ax, mesh, rho[inds], scale=scale, title=title,    
                 label=r"$\Sigma$", cmap=plt.cm.afmhot)
@@ -137,7 +187,8 @@ def plotBoundaryExtract(filename, pars):
     patches = coll.PatchCollection([primary_cut, secondary_cut], color='g', 
                                     linewidths=0, alpha=0.4)
     ax.add_collection(patches)
-    fig.savefig("bound_equat_rho_{0:010.2f}.png".format(t))
+    plotQuiver(ax, r[inds], phi[inds], vr[inds], vp[inds])
+    fig.savefig("bound_equat_rho_{0:010.2f}.png".format(t), dpi=300)
     plt.close(fig)
 
     #Extract boundary
@@ -152,15 +203,25 @@ def plotBoundaryExtract(filename, pars):
     phi1 = np.arctan2(y1, x1)
     phi2 = np.arctan2(y2, x2)
 
+    al1 = phi1 - phi[ind1]
+    al2 = phi2 - phi[ind2]
+
+    vr1 =  vr[ind1] * np.cos(al1) + vp[ind1] * np.sin(al1)
+    vp1 = -vr[ind1] * np.sin(al1) + vp[ind1] * np.cos(al1)
+    vr2 =  vr[ind2] * np.cos(al2) + vp[ind2] * np.sin(al2)
+    vp2 = -vr[ind2] * np.sin(al2) + vp[ind2] * np.cos(al2)
+
     # Primary plot
     fig, ax = plt.subplots(2,2, figsize=(12,9))
     makeBoundPlot(ax[0,0], phi1, rho[ind1], scale=scale, label=r'$\Sigma$',
                 ls='', marker='+', color='k')
     makeBoundPlot(ax[0,1], phi1, P[ind1]/rho[ind1], scale=scale, 
                 label=r'$T$', ls='', marker='+', color='k')
-    makeBoundPlot(ax[1,0], phi1, vr[ind1], scale='linear', label=r'$v^r$',
+    makeBoundPlot(ax[1,0], phi1, vr1, scale='linear', label=r'$v^\hat{r}$',
                 ls='', marker='+', color='k')
-    makeBoundPlot(ax[1,1], phi1, vp[ind1], scale='linear', label=r'$v^\phi$',
+    makeBoundPlot(ax[1,0], phi1, vr[ind1], scale='linear', label=r'$v^\hat{r}$',
+                ls='', marker='+', color='r')
+    makeBoundPlot(ax[1,1], phi1, vp1, scale='linear', label=r'$v^\hat{\phi}$',
                 ls='', marker='+', color='k')
     fig.suptitle(title, fontsize=24)
     fig.savefig("bound_primary_{0:010.2f}.png".format(t))
@@ -172,9 +233,9 @@ def plotBoundaryExtract(filename, pars):
                 ls='', marker='+', color='k')
     makeBoundPlot(ax[0,1], phi2, P[ind2]/rho[ind2], scale=scale, 
                 label=r'$T$', ls='', marker='+', color='k')
-    makeBoundPlot(ax[1,0], phi2, vr[ind2], scale='linear', label=r'$v^r$',
+    makeBoundPlot(ax[1,0], phi2, vr2, scale='linear', label=r'$v^\hat{r}$',
                 ls='', marker='+', color='k')
-    makeBoundPlot(ax[1,1], phi2, vp[ind2], scale='linear', label=r'$v^\phi$',
+    makeBoundPlot(ax[1,1], phi2, vp2, scale='linear', label=r'$v^\hat{\phi}$',
                 ls='', marker='+', color='k')
     fig.suptitle(title, fontsize=24)
     fig.savefig("bound_secondary_{0:010.2f}.png".format(t))
