@@ -216,8 +216,6 @@ def plotBoundaryExtract(filename, pars):
                 label=r'$T$', ls='', marker='+', color='k')
     makeBoundPlot(ax[1,0], phi1, vr1, scale='linear', label=r'$v^\hat{r}$',
                 ls='', marker='+', color='k')
-    makeBoundPlot(ax[1,0], phi1, vr[ind1], scale='linear', label=r'$v^\hat{r}$',
-                ls='', marker='+', color='r')
     makeBoundPlot(ax[1,1], phi1, vp1, scale='linear', label=r'$v^\hat{\phi}$',
                 ls='', marker='+', color='k')
     fig.suptitle(title, fontsize=24)
