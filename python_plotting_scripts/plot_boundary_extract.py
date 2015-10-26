@@ -129,8 +129,12 @@ def buildQuiver(r, phi, vr, vp, N=20):
     vx = vr*np.cos(phi) - vp*np.sin(phi)
     vy = vr*np.sin(phi) + vp*np.cos(phi)
 
-    VX = mlab.griddata(x, y, vx, XQ, YQ)
-    VY = mlab.griddata(x, y, vy, XQ, YQ)
+    try:
+        VX = mlab.griddata(x, y, vx, XQ, YQ)
+        VY = mlab.griddata(x, y, vy, XQ, YQ)
+    except RuntimeError:
+        VX = mlab.griddata(x, y, vx, XQ, YQ, interp='linear')
+        VY = mlab.griddata(x, y, vy, XQ, YQ, interp='linear')
     
     XQ = XQ[ind]
     YQ = YQ[ind]
@@ -154,7 +158,7 @@ def plotQuiver(ax, r, phi, vr, vp, Vmax=-1.0, **kwargs):
 
     ax.quiver(*quiver, scale=scale, scale_units='width', color=blue)
 
-def plotBoundaryExtract(filename, pars, axMdotPrimAll, axMdotSecAll):
+def plotBoundaryExtract(filename, pars, axPrimAll, axSecAll):
    
     q = pars['MassRatio']
     M = 1.0
@@ -163,6 +167,7 @@ def plotBoundaryExtract(filename, pars, axMdotPrimAll, axMdotSecAll):
     M2 = M / (1.0 + 1.0/q)
     a1 = a / (1.0 + 1.0/q) 
     a2 = a / (1.0 + q)
+    GAM = pars['Adiabatic_Index']
 
     OMK = math.sqrt(M/(a*a*a))
 
@@ -195,8 +200,10 @@ def plotBoundaryExtract(filename, pars, axMdotPrimAll, axMdotSecAll):
     plt.close(fig)
 
     #Extract boundary
-    ind1 = np.fabs(np.sqrt((x-a1)*(x-a1)+y*y) - R1) < DR1
-    ind2 = np.fabs(np.sqrt((x+a2)*(x+a2)+y*y) - R2) < DR2
+    d1 = np.sqrt((x-a1)*(x-a1)+y*y)
+    d2 = np.sqrt((x+a2)*(x+a2)+y*y)
+    ind1 = np.fabs(d1 - R1) < DR1
+    ind2 = np.fabs(d2 - R2) < DR2
 
     x1 = x[ind1]-a1
     y1 = y[ind1]
@@ -214,6 +221,20 @@ def plotBoundaryExtract(filename, pars, axMdotPrimAll, axMdotSecAll):
     vr2 =  vr[ind2] * np.cos(al2) + vp[ind2] * np.sin(al2)
     vp2 = -vr[ind2] * np.sin(al2) + vp[ind2] * np.cos(al2)
 
+    mdot1 = r[ind1] * rho[ind1] * vr1
+    mdot2 = r[ind2] * rho[ind2] * vr2
+
+    e1 = 0.5*(vr1*vr1+(vp1+d1[ind1]*OMK)*(vp1+d1[ind1]*OMK)) - M1/d1[ind1]
+    e2 = 0.5*(vr2*vr2+(vp2+d2[ind2]*OMK)*(vp2+d2[ind2]*OMK)) - M2/d2[ind2]
+
+    j1 = d1[ind1] * (vp1+d1[ind1]*OMK)
+    j2 = d2[ind2] * (vp2+d2[ind2]*OMK)
+
+    mach1 = np.sqrt((vr[ind1]*vr[ind1]+vp0[ind1]*vp0[ind1])
+                        * (rho[ind1]/(GAM*P[ind1])))
+    mach2 = np.sqrt((vr[ind2]*vr[ind2]+vp0[ind2]*vp0[ind2])
+                        * (rho[ind2]/(GAM*P[ind2])))
+
     # Primary plot
     fig, ax = plt.subplots(2,2, figsize=(12,9))
     makeBoundPlot(ax[0,0], phi1, rho[ind1], scale=scale, label=r'$\Sigma$',
@@ -228,15 +249,30 @@ def plotBoundaryExtract(filename, pars, axMdotPrimAll, axMdotSecAll):
     fig.savefig("bound_primary_{0:010.2f}.png".format(t))
     plt.close(fig)
 
-    fig, ax = plt.subplots(figsize=(12,9))
-    makeBoundPlot(ax, phi1, r[ind1]*rho[ind1]*vr1, scale="linear", 
+    fig, ax = plt.subplots(2,2,figsize=(12,9))
+    makeBoundPlot(ax[0,0], phi1, mdot1, scale="linear", 
                     label=r'$\dot{M}$', ls='', marker='+', color='k')
+    makeBoundPlot(ax[0,1], phi1, mach1, scale="linear", 
+                    label=r'$\mathcal{M}$', ls='', marker='+', color='k')
+    makeBoundPlot(ax[1,0], phi1, e1, scale="linear", 
+                    label=r'$e$', ls='', marker='+', color='k')
+    makeBoundPlot(ax[1,1], phi1, j1, scale="linear", 
+                    label=r'$\ell$', ls='', marker='+', color='k')
     fig.suptitle(title, fontsize=24)
-    fig.savefig("bound_primary_mdot_{0:010.2f}.png".format(t))
+    fig.savefig("bound_primary_orb_{0:010.2f}.png".format(t))
     plt.close(fig)
     
-    makeBoundPlot(axMdotPrimAll, phi1, r[ind1]*rho[ind1]*vr1, scale="linear", 
+    makeBoundPlot(axPrimAll[0,0], phi1, mdot1, scale="linear", 
                     label=r'$\dot{M}$', ls='', marker='+', color='k',
+                    alpha=0.1)
+    makeBoundPlot(axPrimAll[0,1], phi1, mach1, scale="linear", 
+                    label=r'$\mathcal{M}$', ls='', marker='+', color='k',
+                    alpha=0.1)
+    makeBoundPlot(axPrimAll[1,0], phi1, e1, scale="linear", 
+                    label=r'$e$', ls='', marker='+', color='k',
+                    alpha=0.1)
+    makeBoundPlot(axPrimAll[1,1], phi1, j1, scale="linear", 
+                    label=r'$\ell$', ls='', marker='+', color='k',
                     alpha=0.1)
 
     # Secondary Plot
@@ -253,15 +289,30 @@ def plotBoundaryExtract(filename, pars, axMdotPrimAll, axMdotSecAll):
     fig.savefig("bound_secondary_{0:010.2f}.png".format(t))
     plt.close(fig)
 
-    fig, ax = plt.subplots(figsize=(12,9))
-    makeBoundPlot(ax, phi2, r[ind2]*rho[ind2]*vr2, scale="linear", 
+    fig, ax = plt.subplots(2,2,figsize=(12,9))
+    makeBoundPlot(ax[0,0], phi2, mdot2, scale="linear", 
                     label=r'$\dot{M}$', ls='', marker='+', color='k')
+    makeBoundPlot(ax[0,1], phi2, mach2, scale="linear", 
+                    label=r'$\mathcal{M}$', ls='', marker='+', color='k')
+    makeBoundPlot(ax[1,0], phi2, e2, scale="linear", 
+                    label=r'$e$', ls='', marker='+', color='k')
+    makeBoundPlot(ax[1,1], phi2, j2, scale="linear", 
+                    label=r'$\ell$', ls='', marker='+', color='k')
     fig.suptitle(title, fontsize=24)
-    fig.savefig("bound_secondary_mdot_{0:010.2f}.png".format(t))
+    fig.savefig("bound_secondary_orb_{0:010.2f}.png".format(t))
     plt.close(fig)
-
-    makeBoundPlot(axMdotSecAll, phi2, r[ind2]*rho[ind2]*vr2, scale="linear", 
-                    label=r'$\dot{M}$', ls='', marker='+', color='k', 
+    
+    makeBoundPlot(axSecAll[0,0], phi2, mdot2, scale="linear", 
+                    label=r'$\dot{M}$', ls='', marker='+', color='k',
+                    alpha=0.1)
+    makeBoundPlot(axSecAll[0,1], phi2, mach2, scale="linear", 
+                    label=r'$\mathcal{M}$', ls='', marker='+', color='k',
+                    alpha=0.1)
+    makeBoundPlot(axSecAll[1,0], phi2, e2, scale="linear", 
+                    label=r'$e$', ls='', marker='+', color='k',
+                    alpha=0.1)
+    makeBoundPlot(axSecAll[1,1], phi2, j2, scale="linear", 
+                    label=r'$\ell$', ls='', marker='+', color='k',
                     alpha=0.1)
 
 
@@ -274,16 +325,16 @@ if __name__ == "__main__":
     
     pars = dp.readParfile(sys.argv[1])
 
-    fig1, ax1 = plt.subplots(figsize=(12,9))
-    fig2, ax2 = plt.subplots(figsize=(12,9))
+    fig1, ax1 = plt.subplots(2, 2, figsize=(12,9))
+    fig2, ax2 = plt.subplots(2, 2, figsize=(12,9))
 
     for filename in sys.argv[2:]:
         print("Plotting {0:s}...".format(filename))
         plotBoundaryExtract(filename, pars, ax1, ax2)
 
-    fig1.savefig("bound_primary_mdot_all.png")
+    fig1.savefig("bound_primary_orb_all.png")
     plt.close(fig1)
-    fig2.savefig("bound_secondary_mdot_all.png")
+    fig2.savefig("bound_secondary_orb_all.png")
     plt.close(fig2)
 
 
