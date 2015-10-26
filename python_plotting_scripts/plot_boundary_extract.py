@@ -223,7 +223,7 @@ def plotBoundaryExtract(filename, pars):
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(12,9))
-    makeBoundPlot(ax, phi1, r[ind1]*rho[ind1]*vr1, scale=scale, 
+    makeBoundPlot(ax, phi1, r[ind1]*rho[ind1]*vr1, scale="linear", 
                     label=r'$\dot{M}$', ls='', marker='+', color='k')
     fig.suptitle(title, fontsize=24)
     fig.savefig("bound_primary_mdot_{0:010.2f}.png".format(t))
@@ -244,7 +244,7 @@ def plotBoundaryExtract(filename, pars):
     plt.close(fig)
 
     fig, ax = plt.subplots(figsize=(12,9))
-    makeBoundPlot(ax, phi2, r[ind2]*rho[ind2]*vr2, scale=scale, 
+    makeBoundPlot(ax, phi2, r[ind2]*rho[ind2]*vr2, scale="linear", 
                     label=r'$\dot{M}$', ls='', marker='+', color='k')
     fig.suptitle(title, fontsize=24)
     fig.savefig("bound_secondary_mdot_{0:010.2f}.png".format(t))
