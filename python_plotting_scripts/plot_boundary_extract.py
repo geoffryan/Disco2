@@ -154,7 +154,7 @@ def plotQuiver(ax, r, phi, vr, vp, Vmax=-1.0, **kwargs):
 
     ax.quiver(*quiver, scale=scale, scale_units='width', color=blue)
 
-def plotBoundaryExtract(filename, pars):
+def plotBoundaryExtract(filename, pars, axMdotPrimAll, axMdotSecAll):
    
     q = pars['MassRatio']
     M = 1.0
@@ -234,6 +234,10 @@ def plotBoundaryExtract(filename, pars):
     fig.suptitle(title, fontsize=24)
     fig.savefig("bound_primary_mdot_{0:010.2f}.png".format(t))
     plt.close(fig)
+    
+    makeBoundPlot(axMdotPrimAll, phi1, r[ind1]*rho[ind1]*vr1, scale="linear", 
+                    label=r'$\dot{M}$', ls='', marker='+', color='k',
+                    alpha=0.1)
 
     # Secondary Plot
     fig, ax = plt.subplots(2,2, figsize=(12,9))
@@ -256,6 +260,10 @@ def plotBoundaryExtract(filename, pars):
     fig.savefig("bound_secondary_mdot_{0:010.2f}.png".format(t))
     plt.close(fig)
 
+    makeBoundPlot(axMdotSecAll, phi2, r[ind2]*rho[ind2]*vr2, scale="linear", 
+                    label=r'$\dot{M}$', ls='', marker='+', color='k', 
+                    alpha=0.1)
+
 
 
 if __name__ == "__main__":
@@ -266,8 +274,13 @@ if __name__ == "__main__":
     
     pars = dp.readParfile(sys.argv[1])
 
+    fig, ax = plt.subplots(figsize=(12,9))
+
     for filename in sys.argv[2:]:
         print("Plotting {0:s}...".format(filename))
-        plotBoundaryExtract(filename, pars)
+        plotBoundaryExtract(filename, pars, ax)
+
+    fig.savefig("bound_secondary_mdot_all.png")
+    plt.close(fig)
 
 
