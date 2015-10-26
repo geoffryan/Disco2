@@ -164,7 +164,7 @@ def plotBoundaryExtract(filename, pars):
     a1 = a / (1.0 + 1.0/q) 
     a2 = a / (1.0 + q)
 
-    OMK = sqrt(M/(a*a*a))
+    OMK = math.sqrt(M/(a*a*a))
 
     t, r, phi, rho, P, vr, vp, vz, w, dV = dp.readDiagEquat(filename)
 
