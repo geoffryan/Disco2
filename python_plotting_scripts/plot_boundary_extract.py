@@ -274,13 +274,16 @@ if __name__ == "__main__":
     
     pars = dp.readParfile(sys.argv[1])
 
-    fig, ax = plt.subplots(figsize=(12,9))
+    fig1, ax1 = plt.subplots(figsize=(12,9))
+    fig2, ax2 = plt.subplots(figsize=(12,9))
 
     for filename in sys.argv[2:]:
         print("Plotting {0:s}...".format(filename))
-        plotBoundaryExtract(filename, pars, ax)
+        plotBoundaryExtract(filename, pars, ax1, ax2)
 
-    fig.savefig("bound_secondary_mdot_all.png")
-    plt.close(fig)
+    fig1.savefig("bound_primary_mdot_all.png")
+    plt.close(fig1)
+    fig2.savefig("bound_secondary_mdot_all.png")
+    plt.close(fig2)
 
 
