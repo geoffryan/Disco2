@@ -157,16 +157,22 @@ def plotQuiver(ax, r, phi, vr, vp, Vmax=-1.0, **kwargs):
 def plotBoundaryExtract(filename, pars):
    
     q = pars['MassRatio']
-    M1 = 1.0 / (1.0 + q)
-    M2 = 1.0 / (1.0 + 1.0/q)
-    a1 = 1.0 / (1.0 + 1.0/q) 
-    a2 = 1.0 / (1.0 + q)
+    M = 1.0
+    a = 1.0
+    M1 = M / (1.0 + q)
+    M2 = M / (1.0 + 1.0/q)
+    a1 = a / (1.0 + 1.0/q) 
+    a2 = a / (1.0 + q)
+
+    OMK = sqrt(M/(a*a*a))
 
     t, r, phi, rho, P, vr, vp, vz, w, dV = dp.readDiagEquat(filename)
 
     phi -= t
     x = r * np.cos(phi)
     y = r * np.sin(phi)
+    vp0 = vp
+    vp -= r*OMK
 
     title = r"$t = {0:.2e}$".format(t)
 
