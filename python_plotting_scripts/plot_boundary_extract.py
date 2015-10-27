@@ -221,8 +221,8 @@ def plotBoundaryExtract(filename, pars, axPrimAll, axSecAll):
     vr2 =  vr[ind2] * np.cos(al2) + vp[ind2] * np.sin(al2)
     vp2 = -vr[ind2] * np.sin(al2) + vp[ind2] * np.cos(al2)
 
-    mdot1 = r[ind1] * rho[ind1] * vr1
-    mdot2 = r[ind2] * rho[ind2] * vr2
+    mdot1 = d1[ind1] * rho[ind1] * vr1
+    mdot2 = d2[ind2] * rho[ind2] * vr2
 
     e1 = 0.5*(vr1*vr1+(vp1+d1[ind1]*OMK)*(vp1+d1[ind1]*OMK)) - M1/d1[ind1]
     e2 = 0.5*(vr2*vr2+(vp2+d2[ind2]*OMK)*(vp2+d2[ind2]*OMK)) - M2/d2[ind2]
