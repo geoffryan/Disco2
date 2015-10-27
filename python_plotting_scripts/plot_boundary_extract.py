@@ -112,22 +112,23 @@ def buildQuiver(r, phi, vr, vp, N=20):
 
     print("Building Quiver")
 
-    rmax = r.max()
+    x = r*np.cos(phi)
+    y = r*np.sin(phi)
+    vx = vr*np.cos(phi) - vp*np.sin(phi)
+    vy = vr*np.sin(phi) + vp*np.cos(phi)
 
-    xlim = (-rmax, rmax)
-    ylim = (-rmax, rmax)
+    xlim = (x.min(), x.max())
+    ylim = (y.min(), y.max())
     xq = np.linspace(xlim[0], xlim[1], N)
     yq = np.linspace(ylim[0], ylim[1], N)
 
     XQ,YQ = np.meshgrid(xq, yq)
 
-    R2 = XQ*XQ+YQ*YQ
-    ind = R2 < rmax
+    rmax = 0.5*(xlim[1]-xlim[0])
+    x0 = 0.5*(xlim[0]+xlim[1])
+    y0 = 0.5*(ylim[0]+ylim[1])
 
-    x = r*np.cos(phi)
-    y = r*np.sin(phi)
-    vx = vr*np.cos(phi) - vp*np.sin(phi)
-    vy = vr*np.sin(phi) + vp*np.cos(phi)
+    ind = (XQ-x0)**2 + (YQ-y0)**2 < rmax*rmax
 
     try:
         VX = mlab.griddata(x, y, vx, XQ, YQ)
@@ -151,7 +152,7 @@ def plotQuiver(ax, r, phi, vr, vp, Vmax=-1.0, **kwargs):
 
     if Vmax <= 0.0:
         Vmax = math.sqrt((vr*vr+vp*vp).max())
-    scale = Vmax*(N-1)/2
+    scale = Vmax*(N-1)/4
     blue = (31.0/255, 119.0/255, 180.0/255)
 
     quiver = buildQuiver(r, phi, vr, vp, N)
@@ -202,8 +203,8 @@ def plotBoundaryExtract(filename, pars, axPrim1, axOrb1, axPrim2, axOrb2):
     #Extract boundary
     d1 = np.sqrt((x-a1)*(x-a1)+y*y)
     d2 = np.sqrt((x+a2)*(x+a2)+y*y)
-    ind1 = np.fabs(d1 - R1) < DR1
-    ind2 = np.fabs(d2 - R2) < DR2
+    ind1 = np.fabs(d1 - r1) < DR1
+    ind2 = np.fabs(d2 - r2) < DR2
 
     x1 = x[ind1]-a1
     y1 = y[ind1]
@@ -236,6 +237,19 @@ def plotBoundaryExtract(filename, pars, axPrim1, axOrb1, axPrim2, axOrb2):
                         * (rho[ind2]/(GAM*P[ind2])))
 
     # Primary plot
+    fig, ax = plt.subplots()
+    inds = d1 < r1+DR1
+    mesh = tri.Triangulation(x[inds], y[inds])
+    makeEquatPlot(fig, ax, mesh, rho[inds], scale=scale, title=title,    
+                label=r"$\Sigma$", cmap=plt.cm.afmhot)
+    l1x = plot_roche(ax, mesh, q)
+    #ax.add_collection(patches)
+    plotQuiver(ax, r[inds], phi[inds], vr[inds], vp[inds])
+    ax.set_xlim(x[inds].min(), x[inds].max())
+    ax.set_ylim(y[inds].min(), y[inds].max())
+    fig.savefig("bound_primary_equat_rho_{0:010.2f}.png".format(t))
+    plt.close(fig)
+
     fig, ax = plt.subplots(2,2, figsize=(12,9))
     makeBoundPlot(ax[0,0], phi1, rho[ind1], scale=scale, label=r'$\Sigma$',
                 ls='', marker='+', color='k')
@@ -262,6 +276,18 @@ def plotBoundaryExtract(filename, pars, axPrim1, axOrb1, axPrim2, axOrb2):
     fig.savefig("bound_primary_orb_{0:010.2f}.png".format(t))
     plt.close(fig)
     
+    makeBoundPlot(axPrim1[0,0], phi1, rho[ind1], scale=scale, 
+                label=r'$\Sigma$', ls='', marker='+', color='k', 
+                alpha=0.1)
+    makeBoundPlot(axPrim1[0,1], phi1, P[ind1]/rho[ind1], scale=scale, 
+                label=r'$T$', ls='', marker='+', color='k', 
+                alpha=0.1)
+    makeBoundPlot(axPrim1[1,0], phi1, vr1, scale='linear', 
+                label=r'$v^\hat{r}$', ls='', marker='+', color='k', 
+                alpha=0.1)
+    makeBoundPlot(axPrim1[1,1], phi1, vp1, scale='linear', 
+                label=r'$v^\hat{\phi}$', ls='', marker='+', color='k', 
+                alpha=0.1)
     makeBoundPlot(axOrb1[0,0], phi1, mdot1, scale="linear", 
                     label=r'$\dot{M}$', ls='', marker='+', color='k',
                     alpha=0.1)
@@ -276,6 +302,20 @@ def plotBoundaryExtract(filename, pars, axPrim1, axOrb1, axPrim2, axOrb2):
                     alpha=0.1)
 
     # Secondary Plot
+
+    fig, ax = plt.subplots()
+    inds = d2 < r2+DR2
+    mesh = tri.Triangulation(x[inds], y[inds])
+    makeEquatPlot(fig, ax, mesh, rho[inds], scale=scale, title=title,    
+                label=r"$\Sigma$", cmap=plt.cm.afmhot)
+    l1x = plot_roche(ax, mesh, q)
+    #ax.add_collection(patches)
+    plotQuiver(ax, r[inds], phi[inds], vr[inds], vp[inds])
+    ax.set_xlim(x[inds].min(), x[inds].max())
+    ax.set_ylim(y[inds].min(), y[inds].max())
+    fig.savefig("bound_secondary_equat_rho_{0:010.2f}.png".format(t))
+    plt.close(fig)
+
     fig, ax = plt.subplots(2,2, figsize=(12,9))
     makeBoundPlot(ax[0,0], phi2, rho[ind2], scale=scale, label=r'$\Sigma$',
                 ls='', marker='+', color='k')
@@ -302,6 +342,18 @@ def plotBoundaryExtract(filename, pars, axPrim1, axOrb1, axPrim2, axOrb2):
     fig.savefig("bound_secondary_orb_{0:010.2f}.png".format(t))
     plt.close(fig)
     
+    makeBoundPlot(axPrim2[0,0], phi2, rho[ind2], scale=scale, 
+                label=r'$\Sigma$', ls='', marker='+', color='k', 
+                alpha=0.1)
+    makeBoundPlot(axPrim2[0,1], phi2, P[ind2]/rho[ind2], scale=scale, 
+                label=r'$T$', ls='', marker='+', color='k', 
+                alpha=0.1)
+    makeBoundPlot(axPrim2[1,0], phi2, vr2, scale='linear', 
+                label=r'$v^\hat{r}$', ls='', marker='+', color='k', 
+                alpha=0.1)
+    makeBoundPlot(axPrim2[1,1], phi2, vp2, scale='linear', 
+                label=r'$v^\hat{\phi}$', ls='', marker='+', color='k', 
+                alpha=0.1)
     makeBoundPlot(axOrb2[0,0], phi2, mdot2, scale="linear", 
                     label=r'$\dot{M}$', ls='', marker='+', color='k',
                     alpha=0.1)
@@ -332,7 +384,7 @@ if __name__ == "__main__":
 
     for filename in sys.argv[2:]:
         print("Plotting {0:s}...".format(filename))
-        plotBoundaryExtract(filename, pars, prim_ax1, prim_ax2, orb_ax1, 
+        plotBoundaryExtract(filename, pars, prim_ax1, orb_ax1, prim_ax2,
                                 orb_ax2)
 
     prim_fig1.savefig("bound_primary_all.png")
