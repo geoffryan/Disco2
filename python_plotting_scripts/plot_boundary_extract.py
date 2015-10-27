@@ -252,7 +252,7 @@ def plotBoundaryExtract(filename, pars, axPrimAll, axSecAll):
     fig, ax = plt.subplots(2,2,figsize=(12,9))
     makeBoundPlot(ax[0,0], phi1, mdot1, scale="linear", 
                     label=r'$\dot{M}$', ls='', marker='+', color='k')
-    makeBoundPlot(ax[0,1], phi1, mach1, scale="linear", 
+    makeBoundPlot(ax[0,1], phi1, mach1, scale="log", 
                     label=r'$\mathcal{M}$', ls='', marker='+', color='k')
     makeBoundPlot(ax[1,0], phi1, e1, scale="linear", 
                     label=r'$e$', ls='', marker='+', color='k')
@@ -265,7 +265,7 @@ def plotBoundaryExtract(filename, pars, axPrimAll, axSecAll):
     makeBoundPlot(axPrimAll[0,0], phi1, mdot1, scale="linear", 
                     label=r'$\dot{M}$', ls='', marker='+', color='k',
                     alpha=0.1)
-    makeBoundPlot(axPrimAll[0,1], phi1, mach1, scale="linear", 
+    makeBoundPlot(axPrimAll[0,1], phi1, mach1, scale="log", 
                     label=r'$\mathcal{M}$', ls='', marker='+', color='k',
                     alpha=0.1)
     makeBoundPlot(axPrimAll[1,0], phi1, e1, scale="linear", 
@@ -292,7 +292,7 @@ def plotBoundaryExtract(filename, pars, axPrimAll, axSecAll):
     fig, ax = plt.subplots(2,2,figsize=(12,9))
     makeBoundPlot(ax[0,0], phi2, mdot2, scale="linear", 
                     label=r'$\dot{M}$', ls='', marker='+', color='k')
-    makeBoundPlot(ax[0,1], phi2, mach2, scale="linear", 
+    makeBoundPlot(ax[0,1], phi2, mach2, scale="log", 
                     label=r'$\mathcal{M}$', ls='', marker='+', color='k')
     makeBoundPlot(ax[1,0], phi2, e2, scale="linear", 
                     label=r'$e$', ls='', marker='+', color='k')
@@ -305,7 +305,7 @@ def plotBoundaryExtract(filename, pars, axPrimAll, axSecAll):
     makeBoundPlot(axSecAll[0,0], phi2, mdot2, scale="linear", 
                     label=r'$\dot{M}$', ls='', marker='+', color='k',
                     alpha=0.1)
-    makeBoundPlot(axSecAll[0,1], phi2, mach2, scale="linear", 
+    makeBoundPlot(axSecAll[0,1], phi2, mach2, scale="log", 
                     label=r'$\mathcal{M}$', ls='', marker='+', color='k',
                     alpha=0.1)
     makeBoundPlot(axSecAll[1,0], phi2, e2, scale="linear", 
