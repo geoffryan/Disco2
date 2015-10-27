@@ -158,7 +158,7 @@ def plotQuiver(ax, r, phi, vr, vp, Vmax=-1.0, **kwargs):
 
     ax.quiver(*quiver, scale=scale, scale_units='width', color=blue)
 
-def plotBoundaryExtract(filename, pars, axPrimAll, axSecAll):
+def plotBoundaryExtract(filename, pars, axPrim1, axOrb1, axPrim2, axOrb2):
    
     q = pars['MassRatio']
     M = 1.0
@@ -262,16 +262,16 @@ def plotBoundaryExtract(filename, pars, axPrimAll, axSecAll):
     fig.savefig("bound_primary_orb_{0:010.2f}.png".format(t))
     plt.close(fig)
     
-    makeBoundPlot(axPrimAll[0,0], phi1, mdot1, scale="linear", 
+    makeBoundPlot(axOrb1[0,0], phi1, mdot1, scale="linear", 
                     label=r'$\dot{M}$', ls='', marker='+', color='k',
                     alpha=0.1)
-    makeBoundPlot(axPrimAll[0,1], phi1, mach1, scale="linear", 
+    makeBoundPlot(axOrb1[0,1], phi1, mach1, scale="linear", 
                     label=r'$\mathcal{M}$', ls='', marker='+', color='k',
                     alpha=0.1)
-    makeBoundPlot(axPrimAll[1,0], phi1, e1, scale="linear", 
+    makeBoundPlot(axOrb1[1,0], phi1, e1, scale="linear", 
                     label=r'$e$', ls='', marker='+', color='k',
                     alpha=0.1)
-    makeBoundPlot(axPrimAll[1,1], phi1, j1, scale="linear", 
+    makeBoundPlot(axOrb1[1,1], phi1, j1, scale="linear", 
                     label=r'$\ell$', ls='', marker='+', color='k',
                     alpha=0.1)
 
@@ -302,16 +302,16 @@ def plotBoundaryExtract(filename, pars, axPrimAll, axSecAll):
     fig.savefig("bound_secondary_orb_{0:010.2f}.png".format(t))
     plt.close(fig)
     
-    makeBoundPlot(axSecAll[0,0], phi2, mdot2, scale="linear", 
+    makeBoundPlot(axOrb2[0,0], phi2, mdot2, scale="linear", 
                     label=r'$\dot{M}$', ls='', marker='+', color='k',
                     alpha=0.1)
-    makeBoundPlot(axSecAll[0,1], phi2, mach2, scale="linear", 
+    makeBoundPlot(axOrb2[0,1], phi2, mach2, scale="linear", 
                     label=r'$\mathcal{M}$', ls='', marker='+', color='k',
                     alpha=0.1)
-    makeBoundPlot(axSecAll[1,0], phi2, e2, scale="linear", 
+    makeBoundPlot(axOrb2[1,0], phi2, e2, scale="linear", 
                     label=r'$e$', ls='', marker='+', color='k',
                     alpha=0.1)
-    makeBoundPlot(axSecAll[1,1], phi2, j2, scale="linear", 
+    makeBoundPlot(axOrb2[1,1], phi2, j2, scale="linear", 
                     label=r'$\ell$', ls='', marker='+', color='k',
                     alpha=0.1)
 
@@ -325,16 +325,23 @@ if __name__ == "__main__":
     
     pars = dp.readParfile(sys.argv[1])
 
-    fig1, ax1 = plt.subplots(2, 2, figsize=(12,9))
-    fig2, ax2 = plt.subplots(2, 2, figsize=(12,9))
+    prim_fig1, prim_ax1 = plt.subplots(2, 2, figsize=(12,9))
+    prim_fig2, prim_ax2 = plt.subplots(2, 2, figsize=(12,9))
+    orb_fig1, orb_ax1 = plt.subplots(2, 2, figsize=(12,9))
+    orb_fig2, orb_ax2 = plt.subplots(2, 2, figsize=(12,9))
 
     for filename in sys.argv[2:]:
         print("Plotting {0:s}...".format(filename))
-        plotBoundaryExtract(filename, pars, ax1, ax2)
+        plotBoundaryExtract(filename, pars, prim_ax1, prim_ax2, orb_ax1, 
+                                orb_ax2)
 
-    fig1.savefig("bound_primary_orb_all.png")
-    plt.close(fig1)
-    fig2.savefig("bound_secondary_orb_all.png")
-    plt.close(fig2)
+    prim_fig1.savefig("bound_primary_all.png")
+    plt.close(prim_fig1)
+    prim_fig2.savefig("bound_secondary_all.png")
+    plt.close(prim_fig2)
+    orb_fig1.savefig("bound_primary_orb_all.png")
+    plt.close(orb_fig1)
+    orb_fig2.savefig("bound_secondary_orb_all.png")
+    plt.close(orb_fig2)
 
 
