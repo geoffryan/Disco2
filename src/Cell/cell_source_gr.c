@@ -326,7 +326,7 @@ void cell_src_boost(double t, double r, double phi, double z, double *cons,
 
     double x = r*cos(phi);
     double y = r*sin(phi);
-    double X = -2*a;
+    double X = -a;
     double Y = 0.0;
     double R = sqrt(X*X+Y*Y);
     Fx = M2*( x*R*R - 3*(x*X+y*Y)*X) / (R*R*R*R*R) * rhoh*u[0]*u[0];

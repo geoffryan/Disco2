@@ -13,7 +13,7 @@ Background              1       // 0 Newtonian, 1 GR, 2 GRvisc, 3 GRDisc
 Metric                  5       // 0 Flat, 1 Schwarzschild-SC,
                                 // 2 Schwarzschild-KS, 4 Kerr-KS, 5 FlatADM,
                                 // 6 Schwarzschild-KS-ADM, 
-Frame                   0       // 0 Euler, 1 Keplerian, 2 Accreting
+Frame                   0       // 0 Euler, 1 Keplerian, 2 Accreting, 3 Geo
 Restart                 0       // If this=1 restart using input.h5
 
 //Computational Grid
@@ -41,7 +41,7 @@ BoundTypeROut           1       // 0 fixed, 1 outflow, 3 SS profile
 BoundTypeZTop           2       // 0 fixed, 1 outflow, 2 periodic
 BoundTypeZBot           2       // 0 fixed, 1 outflow, 2 periodic
 ZeroPsiBndry            1
-BoundTypeSource         0       // 4 Nozzle
+BoundTypeSource         0       // 6 Nozzle
 BoundPar1               0.1
 BoundPar2               50.0
 BoundPar3               1.0e3
