@@ -23,7 +23,11 @@ XROCHE = None
 YROCHE = None
 ZROCHE = None
 L1x = 0.0
+L2x = 0.0
+L3x = 0.0
 L1val = 0.0
+L2val = 0.0
+L3val = 0.0
 
 def makeBoundPlot(ax, phi, dat, scale="linear", label="", **kwargs):
 
@@ -68,7 +72,11 @@ def plot_roche(ax, mesh, q):
     global YROCHE
     global ZROCHE
     global L1x
+    global L2x
+    global L3x
     global L1val
+    global L2val
+    global L3val
 
     if XROCHE == None or YROCHE == None or ZROCHE == None:
         print("Building Roche Lobe")
@@ -98,15 +106,19 @@ def plot_roche(ax, mesh, q):
             return f1+f2+fc
 
         ZROCHE = phiRoche(XROCHE, YROCHE, M1, M2, a1, a2)
-        L1x = opt.newton(rochel1, 0.0, args=(M1,M2,a1,a2))
+        L1x = opt.newton(rochel1, 0.0,   args=(M1,M2,a1,a2))
+        L2x = opt.newton(rochel1, 2*a1,  args=(M1,M2,a1,a2))
+        L3x = opt.newton(rochel1, -2*a2, args=(M1,M2,a1,a2))
         L1val = phiRoche(L1x, 0.0, M1, M2, a1, a2)
+        L2val = phiRoche(L2x, 0.0, M1, M2, a1, a2)
+        L3val = phiRoche(L3x, 0.0, M1, M2, a1, a2)
 
-    lvl = L1val
-    ax.contour(XROCHE, YROCHE, ZROCHE, levels=[lvl], colors='m')
+    #lvl = L1val
+    ax.contour(XROCHE, YROCHE, ZROCHE, levels=[L1val,L2val,L3val], colors='m')
     #ax.contour(XROCHE, YROCHE, ZROCHE, levels=[1.4*lvl,1.35*lvl,1.3*lvl,1.25*lvl,1.2*lvl,1.15*lvl,1.1*lvl,1.05*lvl,lvl,0.95*lvl,0.9*lvl,0.85*lvl,0.8*lvl,0.75*lvl,0.7*lvl,0.65*lvl,0.6*lvl], colors='m')
     #ax.contour(XROCHE, YROCHE, ZROCHE)
 
-    return L1x
+    return L1x, L2x, L3x
 
 def buildQuiver(r, phi, vr, vp, N=20):
 
@@ -188,7 +200,7 @@ def plotBoundaryExtract(filename, pars, axPrim1, axOrb1, axPrim2, axOrb2):
     mesh = tri.Triangulation(x[inds], y[inds])
     makeEquatPlot(fig, ax, mesh, rho[inds], scale=scale, title=title,    
                 label=r"$\Sigma$", cmap=plt.cm.afmhot)
-    l1x = plot_roche(ax, mesh, q)
+    l1x, l2x, l3x = plot_roche(ax, mesh, q)
     r1 = a1-l1x
     r2 = a2+l1x
     primary_cut = pat.Wedge((a1,0), r1+DR1, 0, 360, width=2*DR1)
@@ -238,11 +250,11 @@ def plotBoundaryExtract(filename, pars, axPrim1, axOrb1, axPrim2, axOrb2):
 
     # Primary plot
     fig, ax = plt.subplots()
-    inds = d1 < r1+DR1
+    inds = d1 < l2x-a1
     mesh = tri.Triangulation(x[inds], y[inds])
     makeEquatPlot(fig, ax, mesh, rho[inds], scale=scale, title=title,    
                 label=r"$\Sigma$", cmap=plt.cm.afmhot)
-    l1x = plot_roche(ax, mesh, q)
+    l1x, l2x, l3x = plot_roche(ax, mesh, q)
     #ax.add_collection(patches)
     plotQuiver(ax, r[inds], phi[inds], vr[inds], vp[inds])
     ax.set_xlim(x[inds].min(), x[inds].max())
@@ -315,11 +327,11 @@ def plotBoundaryExtract(filename, pars, axPrim1, axOrb1, axPrim2, axOrb2):
     # Secondary Plot
 
     fig, ax = plt.subplots()
-    inds = d2 < r2+DR2
+    inds = d2 < -a2-l3x
     mesh = tri.Triangulation(x[inds], y[inds])
     makeEquatPlot(fig, ax, mesh, rho[inds], scale=scale, title=title,    
                 label=r"$\Sigma$", cmap=plt.cm.afmhot)
-    l1x = plot_roche(ax, mesh, q)
+    l1x, l2x, l3x = plot_roche(ax, mesh, q)
     #ax.add_collection(patches)
     plotQuiver(ax, r[inds], phi[inds], vr[inds], vp[inds])
     ax.set_xlim(x[inds].min(), x[inds].max())
