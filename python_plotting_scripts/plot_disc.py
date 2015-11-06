@@ -15,8 +15,10 @@ def allTheThings(filename, pars):
     dat = dp.readCheckpoint(filename)
     t = dat[0]
     r = dat[1]
+    phi = dat[2]
     vr = dat[6]
     vp = dat[7]
+    q = dat[10]
     u0, ur, up = gr.calc_u(r, vr, vp, pars)
     M = pars['GravM']
 
@@ -40,7 +42,7 @@ def allTheThings(filename, pars):
         P = pi/H
         T = pi/sig
 
-    return t, r, rho, sig, T, P, pi, H, vr, vp, u0
+    return t, r, phi, rho, sig, T, P, pi, H, vr, vp, u0, q
 
 
 def plot_data(ax, x, f, color='k', marker='+'):
@@ -117,7 +119,7 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     a = pars['GravA']
     A = a*M
 
-    t, r, rho, sig, T, P, pi, H, vr, vp, u0 = allTheThings(filename, pars)
+    t, r, phi, rho, sig, T, P, pi, H, vr, vp, u0, q = allTheThings(filename, pars)
     
     inds = np.argsort(r)
     r = r[inds]

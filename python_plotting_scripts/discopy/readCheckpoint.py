@@ -3,7 +3,7 @@ from itertools import imap, izip
 import h5py as h5
 import numpy as np
 
-def readCheckpoint(filename, nq=0):
+def readCheckpoint(filename, nq=-1):
     """
     Return the data from a checkpoint file.  Remove duplicate entries.
     """
@@ -33,6 +33,10 @@ def readCheckpoint(filename, nq=0):
     vp = np.array(Data[:,6])
     vz = np.array(Data[:,7])
     q = []
+
+    if nq < 1 or nq > Data.shape[1]:
+        nq = Data.shape[1]-3
+        
     for i in xrange(nq-5):
         try:
             q.append(np.array(Data[:,8+i]))

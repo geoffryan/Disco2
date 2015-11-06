@@ -5,5 +5,6 @@ from .readParfile import *
 from .discoGrid import *
 from .remapArchive import *
 from .plotGrid import *
+from .viridis import *
 
 

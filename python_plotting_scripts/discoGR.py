@@ -10,6 +10,9 @@ def calc_u(r, vr, vp, pars):
 
     M = pars['GravM']
     a = pars['GravA']
+    bm = pars['BinM']
+    ba = pars['BinA']
+    bw = pars['BinW']
     A = M*a
 
     u0 = np.zeros(r.shape)
@@ -31,6 +34,18 @@ def calc_u(r, vr, vp, pars):
         u0 = 1.0 / np.sqrt(1.0 - 2*M/r - 4*M/r*vr + 4*M*A/r*vp
                             - (1+2*M/r)*vr*vr + 2*(1+2*M/r)*A*vr*vp
                             - (r*r + A*A + 2*M*A*A/r)*vp*vp)
+    elif pars['Metric'] == 5:
+        if pars['BoostType'] == 0:
+            u0 = 1.0 / np.sqrt(1.0 - vr*vr - r*r*vp*vp)
+        elif pars['BoostType'] == 1:
+            u0 = 1.0 / np.sqrt(1.0 - vr*vr - r*r*(vp+bw)*(vp+bw))
+    elif pars['Metric'] == 6:
+        if pars['BoostType'] == 0:
+            u0 = 1.0 / np.sqrt(1.0 - 2*M/r - 4*M/r*vr - (1+2*M/r)*vr*vr
+                            - r*r*vp*vp)
+        elif pars['BoostType'] == 1:
+            u0 = 1.0 / np.sqrt(1.0 - 2*M/r - 4*M/r*vr - (1+2*M/r)*vr*vr
+                            - r*r*(vp+bw)*(vp+bw))
 
     return u0, u0*vr, u0*vp
 
@@ -55,6 +70,12 @@ def lapse(r, pars):
         al[:] = 1.0
 
     elif pars['Metric'] == 4:
+        al = 1.0 / np.sqrt(1.0+2.0*M/r)
+
+    elif pars['Metric'] == 5:
+        al[:] = 1.0
+
+    elif pars['Metric'] == 6:
         al = 1.0 / np.sqrt(1.0+2.0*M/r)
 
     return al

@@ -9,28 +9,19 @@ import matplotlib.ticker as tkr
 import matplotlib.mlab as mlab
 import sys
 import numpy as np
+import scipy.optimize as opt
 import discopy as dp
+import plot_disc as pd
 
-M = 1.0
-a = 0.0
-gridscale = 'linear'
-datscale = 'linear'
-plotQuiver = True
-A = a*M
-poscmap = plt.cm.afmhot
+#poscmap = plt.cm.afmhot
+poscmap = dp.viridis
 divcmap = plt.cm.RdBu
 
-BINSEP = 200.0
-ROCHE = True
-XROCHE = None
-YROCHE = None
-ZROCHE = None
-RMAX = -1.0
-QUIVER = None
+def plot_equat_single(fig, ax, mesh, dat, pars, gridbounds=None, 
+                        datscale="linear", datbounds=None, rocheData=None, 
+                        quiverData=None, Vmax=0.0, label=None, normal=False, 
+                        **kwargs):
 
-def plot_equat_single(fig, ax, mesh, dat, gridscale="linear", gridbounds=None,
-                    datscale="linear", datbounds=None, Vmax=0.0, label=None, 
-                    normal=False, **kwargs):
     N = 400
 
     #Set data bounds & scale.
@@ -38,8 +29,9 @@ def plot_equat_single(fig, ax, mesh, dat, gridscale="linear", gridbounds=None,
         datbounds = np.array([dat.min(), dat.max()])
 
     if datscale == "log":
-        v = np.logspace(math.floor(math.log10(datbounds[0])), math.ceil(math.log10(datbounds[1])), 
-                            base=10.0, num=N)
+        v = np.logspace(math.floor(math.log10(datbounds[0])), 
+                        math.ceil(math.log10(datbounds[1])), 
+                        base=10.0, num=N)
         norm = clrs.LogNorm()
         locator = tkr.LogLocator()
         formatter = tkr.LogFormatter()
@@ -58,18 +50,21 @@ def plot_equat_single(fig, ax, mesh, dat, gridscale="linear", gridbounds=None,
     colorbar = fig.colorbar(C, format=formatter, ticks=locator)
 
     #Plot Roche Equipotential
-    if ROCHE:
-        plot_roche(ax, mesh, gridbounds)
+    if rocheData is not  None:
+        plot_roche(ax, rocheData)
 
-    if plotQuiver:
-        plot_quiver(ax, Vmax=Vmax)
+    if quiverData is not None:
+        plot_quiver(ax, quiverData, Vmax=Vmax)
 
-    #Patches to highlight horizona and ergosphere
+    #Patches to highlight horizon and ergosphere
+    M = pars['GravM']
+    a = pars['GravA']
     if M > 0.0:
         ergo = pat.Circle((0,0), 2*M)
         horizon = pat.Wedge((0,0), M*(1.0+math.sqrt(1.0-a*a)), 0, 360, 
                             2*M*math.sqrt(1.0-a*a))
-        patches = coll.PatchCollection([ergo,horizon], cmap=plt.cm.Greys,alpha=0.4)
+        patches = coll.PatchCollection([ergo,horizon], cmap=plt.cm.Greys,
+                                        alpha=0.4)
         colors = np.array([0.1,0.3])
         patches.set_array(colors)
         ax.add_collection(patches)
@@ -77,8 +72,6 @@ def plot_equat_single(fig, ax, mesh, dat, gridscale="linear", gridbounds=None,
     #Formatting
     ax.set_aspect('equal')
 
-    ax.set_xscale(gridscale)
-    ax.set_yscale(gridscale)
     if gridbounds is not None:
         ax.set_xlim(gridbounds[0])
         ax.set_ylim(gridbounds[1])
@@ -89,41 +82,64 @@ def plot_equat_single(fig, ax, mesh, dat, gridscale="linear", gridbounds=None,
     ax.set_xlabel(r'$x$')
     ax.set_ylabel(r'$y$')
 
-def plot_roche(ax, mesh, gridbounds):
+def calcRoche(pars, xlim, ylim, N=256):
 
-    N = 256
+    print("Building Roche Lobe")
 
-    global XROCHE
-    global YROCHE
-    global ZROCHE
+    M2 = pars['GravM']
+    M1 = pars['BinM']
+    a = pars['BinA']
+    w = pars['BinW']
 
-    if XROCHE == None or YROCHE is None or ZROCHE is None:
-        print("Building Roche Lobe")
-        if gridbounds is None:
-            xlim = ax.get_xlim()
-            ylim = ax.get_ylim()
-        else:
-            xlim = gridbounds[0]
-            ylim = gridbounds[1]
-        x = np.linspace(xlim[0], xlim[1], N)
-        y = np.linspace(ylim[0], ylim[1], N)
+    M = M1+M2
+    q = M2/M1
+    com = (-a*M1 + 0.0*M2) / M
 
-        XROCHE,YROCHE = np.meshgrid(x, y)
-        ZROCHE = -M/np.sqrt((XROCHE)*(XROCHE)+YROCHE*YROCHE) \
-                -M/np.sqrt((XROCHE+BINSEP)*(XROCHE+BINSEP)+YROCHE*YROCHE) \
-                -M*((XROCHE+0.5*BINSEP)*(XROCHE+0.5*BINSEP)+YROCHE*YROCHE) \
-                    / (BINSEP*BINSEP*BINSEP)
+    x = np.linspace(xlim[0], xlim[1], N)
+    y = np.linspace(ylim[0], ylim[1], N)
 
-    lvl = -4*M/BINSEP
-    ax.contour(XROCHE, YROCHE, ZROCHE, levels=[lvl], colors='m')
-    #ax.contour(XROCHE, YROCHE, ZROCHE, levels=[1.4*lvl,1.35*lvl,1.3*lvl,1.25*lvl,1.2*lvl,1.15*lvl,1.1*lvl,1.05*lvl,lvl,0.95*lvl,0.9*lvl,0.85*lvl,0.8*lvl,0.75*lvl,0.7*lvl,0.65*lvl,0.6*lvl], colors='m')
-    #ax.contour(XROCHE, YROCHE, ZROCHE)
+    if 0.0 in x or 0.0 in y:
+        x = np.linspace(xlim[0], xlim[1], N-1)
+        y = np.linspace(ylim[0], ylim[1], N-1)
 
-def build_quiver(r, phi, vr, vp, gridbounds):
 
-    global QUIVER
+    X, Y = np.meshgrid(x, y)
 
-    N = 20
+    def phiRoche(x, y, M1, M2, a, w):
+        return -M2/np.sqrt(x*x+y*y) - M1/np.sqrt((x+a)*(x+a)+y*y) \
+            - 0.5 * w*w * ((x-com)*(x-com)+y*y)
+
+    def fxRoche(x, M1, M2, a, w):
+        f1 = - M1 / math.fabs((x+a)*(x+a)*(x+a)) * (x+a)
+        f2 = - M2 / math.fabs(x*x*x) * x
+        fc = w*w * (x-com)
+        return f1+f2+fc
+
+    phi = phiRoche(X, Y, M1, M2, a, w)
+
+    L1x = opt.newton(fxRoche, -0.5*a, args=(M1, M2, a, w))
+    L2x = opt.newton(fxRoche, -2*a, args=(M1, M2, a, w))
+    L3x = opt.newton(fxRoche, q*a, args=(M1, M2, a, w))
+
+    L1phi = phiRoche(L1x, 0.0, M1, M2, a, w)
+    L2phi = phiRoche(L2x, 0.0, M1, M2, a, w)
+    L3phi = phiRoche(L3x, 0.0, M1, M2, a, w)
+
+    lvls = [L1phi, L2phi, L3phi]
+    print("   L1, L2, L3: ({0:f}, {1:f}, {2:g})".format(L1x, L2x, L3x))
+
+    return X, Y, phi, lvls
+
+def plot_roche(ax, rocheData):
+
+    x = rocheData[0]
+    y = rocheData[1]
+    phi = rocheData[2]
+    lvls = rocheData[3]
+
+    ax.contour(x, y, phi, levels=lvls, colors='m', ls='--')
+
+def calcQuiver(r, phi, vr, vp, gridbounds, N=20):
 
     print("Building Quiver")
     if gridbounds is None:
@@ -154,28 +170,28 @@ def build_quiver(r, phi, vr, vp, gridbounds):
     VX = VX[ind]
     VY = VY[ind]
     
-    QUIVER = (XQ, YQ, VX, VY)
+    return XQ, YQ, VX, VY
 
-def plot_quiver(ax, Vmax=0.0, **kwargs):
-
-    global QUIVER
+def plot_quiver(ax, quiverData, Vmax=0.0, **kwargs):
 
     N = 20
     xlim = ax.get_xlim()
     scale = Vmax*(N-1)
     blue = (31.0/255, 119.0/255, 180.0/255)
 
-    ax.quiver(*QUIVER, scale=scale, scale_units='width', color=blue)
+    ax.quiver(*quiverData, scale=scale, scale_units='width', color=blue)
 
-
-def make_plot(mesh, dat, gridscale="linear", gridbounds=None, 
-                datscale="linear", datbounds=None, Vmax=0.0, label=None, 
-                title=None, filename=None, normal=False, **kwargs):
+def make_plot(mesh, dat, pars, gridbounds=None, datscale="linear", 
+                datbounds=None, rocheData=None, quiverData=None, 
+                Vmax=0.0, label=None, title=None, filename=None, normal=False,
+                **kwargs):
 
     fig = plt.figure(figsize=(12,9))
     ax = fig.add_subplot(1,1,1)
-    plot_equat_single(fig, ax, mesh, dat, gridscale, gridbounds,
-                    datscale, datbounds, Vmax, label, normal, **kwargs)
+    plot_equat_single(fig, ax, mesh, dat, pars, gridbounds,
+                    datscale, datbounds, rocheData, quiverData, Vmax, label, 
+                    normal, **kwargs)
+
     if title is not None:
         ax.set_title(title)
     if filename is not None:
@@ -183,40 +199,23 @@ def make_plot(mesh, dat, gridscale="linear", gridbounds=None,
         fig.savefig(filename)
     plt.close()
 
-def plot_all(filename, gridscale='linear', plot=True, bounds=None, Vmax=0.0):
+def plot_all(filename, pars, rmax=-1.0, plot=True, bounds=None, 
+                plotRoche=False, plotQuiver=False, Vmax=0.0):
 
     print("Reading {0:s}".format(filename))
 
-    dat = dp.readCheckpoint(filename, nq=6)
-    t = dat[0]
-    r = dat[1]
-    phi = dat[2]
-    z = dat[3]
-    rho = dat[4]
-    T = dat[5]
-    vr = dat[6]
-    vp = dat[7]
-    dV = dat[9]
-    q = dat[10][0]
+    t, r, phi, rho, sig, T, P, pi, H, vr, vp, u0, Q = pd.allTheThings(filename,
+                                                                        pars)
 
-    inds = z==z[len(z)/2]
-    r = r[inds]
-    phi = phi[inds]
-    z = z[inds]
-    rho = rho[inds]
-    T = T[inds]
-    vr = vr[inds]
-    vp = vp[inds]
-    dV = dV[inds]
-    q = q[inds]
 
     if bounds is None:
         bounds = []
-        bounds.append([rho[rho==rho].min(), rho[rho==rho].max()])
+        bounds.append([sig[sig==sig].min(), sig[sig==sig].max()])
         bounds.append([T[T==T].min(), T[T==T].max()])
         bounds.append([vr[vr==vr].min(), vr[vr==vr].max()])
         bounds.append([vp[vp==vp].min(), vp[vp==vp].max()])
-        bounds.append([q[q==q].min(), q[q==q].max()])
+        for q in Q:
+            bounds.append([q[q==q].min(), q[q==q].max()])
         bounds = np.array(bounds)
 
     Vmax = max(Vmax, math.sqrt((vr*vr+r*r*vp*vp).max()))
@@ -229,86 +228,144 @@ def plot_all(filename, gridscale='linear', plot=True, bounds=None, Vmax=0.0):
         y = r*sin(phi)
         mesh = tri.Triangulation(x, y)
 
-        if RMAX > 0.0:
-            gridbounds = np.array([[-RMAX,RMAX],[-RMAX,RMAX]])
+        if rmax > 0.0:
+            gridbounds = np.array([[-rmax,rmax],[-rmax,rmax]])
         else:
             gridbounds = np.array([[-r.max(),r.max()],[-r.max(),r.max()]])
 
+        if plotRoche:
+            rocheData = calcRoche(pars, gridbounds[0], gridbounds[1])
+        else:
+            rocheData = None
+
         if plotQuiver:
-            build_quiver(r, phi, vr, vp, gridbounds)
+            quiverData = calcQuiver(r, phi, vr, vp, gridbounds)
+        else:
+            quiverData = None
 
         outpath = filename.split("/")[:-1]
         chckname = filename.split("/")[-1]
 
         title = "t = {0:.3g}".format(t)
 
-        rhoname = "plot_disc_equat_{0}_{1}.png".format(
-                    "_".join(chckname.split(".")[0].split("_")[1:]), "rho")
+        signame = "plot_disc_equat_{0}_{1}.png".format(
+                    "_".join(chckname.split(".")[0].split("_")[1:]), "sig")
+        logsigname = "plot_disc_equat_{0}_{1}.png".format(
+                    "_".join(chckname.split(".")[0].split("_")[1:]), "logsig")
         Tname = "plot_disc_equat_{0}_{1}.png".format(
                     "_".join(chckname.split(".")[0].split("_")[1:]), "T")
+        logTname = "plot_disc_equat_{0}_{1}.png".format(
+                    "_".join(chckname.split(".")[0].split("_")[1:]), "logT")
         vrname = "plot_disc_equat_{0}_{1}.png".format(
                     "_".join(chckname.split(".")[0].split("_")[1:]), "vr")
         vpname = "plot_disc_equat_{0}_{1}.png".format(
                     "_".join(chckname.split(".")[0].split("_")[1:]), "vp")
-        qname = "plot_disc_equat_{0}_{1}.png".format(
-                    "_".join(chckname.split(".")[0].split("_")[1:]), "q")
         #Plot.
 
-        #Rho
-        make_plot(mesh, rho, gridscale="linear", gridbounds=gridbounds,
-                datscale=datscale, datbounds=bounds[0], Vmax=Vmax,
-                label=r'$\rho_0$', title=title, filename=rhoname, cmap=poscmap)
+        #Density
+        make_plot(mesh, sig, pars, gridbounds=gridbounds, datscale="linear", 
+                datbounds=bounds[0], rocheData=rocheData, 
+                quiverData=quiverData, Vmax=Vmax, label=r'$\Sigma_0$', 
+                title=title, filename=signame, cmap=poscmap)
+        make_plot(mesh, sig, pars, gridbounds=gridbounds, datscale="log", 
+                datbounds=bounds[0], rocheData=rocheData,
+                quiverData=quiverData, Vmax=Vmax, label=r'$\Sigma_0$', 
+                title=title, filename=logsigname, cmap=poscmap)
 
         #T
-        make_plot(mesh, T, gridscale="linear", gridbounds=gridbounds,
-                datscale="log", datbounds=bounds[1], Vmax=Vmax,
-                label=r'$T$', title=title, filename=Tname, cmap=poscmap)
+        make_plot(mesh, T, pars, gridbounds=gridbounds, datscale="linear", 
+                datbounds=bounds[1],  rocheData=rocheData,
+                quiverData=quiverData, Vmax=Vmax, label=r'$T$', title=title, 
+                filename=Tname, cmap=poscmap)
+        make_plot(mesh, T, pars, gridbounds=gridbounds, datscale="log", 
+                datbounds=bounds[1],  rocheData=rocheData, 
+                quiverData=quiverData, Vmax=Vmax, label=r'$T$', 
+                title=title, filename=logTname, cmap=poscmap)
 
         
         #Vr
-        make_plot(mesh, vr, gridscale="linear", gridbounds=gridbounds,
-                datscale="linear", datbounds=bounds[2], Vmax=Vmax,
-                label=r'$v^r$', title=title, filename=vrname, normal=True,
-                cmap=divcmap)
+        make_plot(mesh, vr, pars, gridbounds=gridbounds, datscale="linear", 
+                datbounds=bounds[2], rocheData=rocheData, 
+                quiverData=quiverData, Vmax=Vmax, label=r'$v^r$', title=title, 
+                filename=vrname, normal=True, cmap=divcmap)
 
         #Vp
-        make_plot(mesh, vp, gridscale="linear", gridbounds=gridbounds,
-                datscale="linear", datbounds=bounds[3], Vmax=Vmax,
-                label=r'$v^\phi$', title=title, filename=vpname, normal=True,
-                cmap=divcmap)
+        make_plot(mesh, vp, pars, gridbounds=gridbounds, datscale="linear", 
+                datbounds=bounds[3], rocheData=rocheData,
+                quiverData=quiverData, Vmax=Vmax, label=r'$v^\phi$', 
+                title=title, filename=vpname, normal=True, cmap=divcmap)
         
         #q
-        make_plot(mesh, q, gridscale="linear", gridbounds=gridbounds,
-                datscale="linear", datbounds=bounds[4], Vmax=Vmax,
-                label=r'$q$', title=title, filename=qname, cmap=poscmap)
+        for i,q in enumerate(Q):
+            qname = "plot_disc_equat_{0}_{1}{2:01d}.png".format(
+                        "_".join(chckname.split(".")[0].split("_")[1:]), "q",
+                        i)
+            make_plot(mesh, q, gridbounds=gridbounds, datscale="linear", 
+                        datbounds=bounds[4], rocheData=rocheData, 
+                        quiverData=quiverData, Vmax=Vmax, 
+                        label=r'$q_{0:d}$'.format(i), title=title, 
+                        filename=qname, cmap=poscmap)
 
     return bounds, Vmax
 
 
 if __name__ == "__main__":
 
-    if len(sys.argv) < 2:
-        print("\nGive me a checkpoint (.h5) file.\n")
+    #Parse Arguments
+
+    if 'roche' in sys.argv:
+        plotRoche = True
+        sys.argv.remove('roche')
+    else:
+        plotRoche = False
+
+    if 'quiver' in sys.argv:
+        plotQuiver = True
+        sys.argv.remove('quiver')
+    else:
+        plotQuiver = False
+
+    if 'rmax' in sys.argv:
+        i = sys.argv.index('rmax')
+        rmax = float(sys.argv[i+1])
+        sys.argv.pop(i)
+        sys.argv.pop(i)
+    else:
+        rmax = -1.0
+
+    # Run
+
+    if len(sys.argv) < 3:
+        print("\nusage: python plot_disc_equat.py <parfile> <checkpoints...> [roche] [quiver] [rmax RMAX]")
+        print("   Creates equatorial plots of data in checkpoint(s) created by Disco run with parfile.")
+        print("      roche:     Plot roche lobe of system.")
+        print("      quiver:    Plot velocity field as quiver of arrows.")
+        print("      rmax RMAX: Plot only r < RMAX.\n")
         sys.exit()
 
-    elif len(sys.argv) == 2:
-        filename = sys.argv[1]
-        plot_all(filename, gridscale=gridscale)
+    elif len(sys.argv) == 3:
+        pars = dp.readParfile(sys.argv[1])
+        filename = sys.argv[2]
+        plot_all(filename, pars, rmax=rmax, plotRoche=plotRoche, 
+                    plotQuiver=plotQuiver)
         plt.show()
 
     else:
-        bounds = np.zeros((5,2))
-        bounds[:,0] = np.inf
-        bounds[:,1] = -np.inf
+        pars = dp.readParfile(sys.argv[1])
+        bounds = None
         Vmax = 0.0
-        for filename in sys.argv[1:]:
-            b, Vmax = plot_all(filename, gridscale=gridscale, plot=False, 
+        for filename in sys.argv[2:]:
+            b, Vmax = plot_all(filename, pars, rmax=rmax, plot=False, 
                                 Vmax=Vmax)
-            lower = b[:,0]<bounds[:,0]
-            upper = b[:,1]>bounds[:,1]
-            bounds[lower,0] = b[lower,0]
-            bounds[upper,1] = b[upper,1]
+            if bounds == None:
+                bounds = b.copy()
+            else:
+                lower = b[:,0]<bounds[:,0]
+                upper = b[:,1]>bounds[:,1]
+                bounds[lower,0] = b[lower,0]
+                bounds[upper,1] = b[upper,1]
 
-        for filename in sys.argv[1:]:
-            plot_all(filename, gridscale=gridscale, plot=True, bounds=bounds)
+        for filename in sys.argv[2:]:
+            plot_all(filename, pars, rmax=rmax, plot=True, bounds=bounds, 
+                        plotRoche=plotRoche, plotQuiver=plotQuiver)
 
