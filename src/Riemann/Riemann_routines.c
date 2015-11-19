@@ -120,8 +120,6 @@ void riemann_setup_rz(struct Riemann * theRiemann,struct Face * theFaces,struct 
   while( dpL < -M_PI ) dpL += 2.*M_PI;
   while( dpR >  M_PI ) dpR -= 2.*M_PI;
   while( dpR < -M_PI ) dpR += 2.*M_PI;
-  dpL = dpL;
-  dpR = dpR;
   theRiemann->pos[R_DIR] = face_r(theFaces,FaceNumber);
   theRiemann->pos[Z_DIR] = face_z(theFaces,FaceNumber);
   theRiemann->pos[P_DIR] = face_phi(theFaces,FaceNumber);
