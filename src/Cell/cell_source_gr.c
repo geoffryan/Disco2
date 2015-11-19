@@ -183,8 +183,6 @@ void cell_add_src_gr( struct Cell *** theCells ,struct Sim * theSim, struct Grav
                             T[4*mu+nu] += visc[4*mu+nu];
                             Tm[4*mu+nu] += viscm[4*mu+nu];
                         }
-                  
-                    cool = eos_cool(c->prim, height, theSim);
                 }
 
                 //Momentum sources and contribution to energy source
@@ -198,26 +196,14 @@ void cell_add_src_gr( struct Cell *** theCells ,struct Sim * theSim, struct Grav
                     {
                         sk = 0;
                         for(mu=0; mu<max_dim; mu++)
-                        {
                             for(nu=0; nu<max_dim; nu++)
                                 sk += 0.5*T[4*mu+nu]*metric_dg_dd(g,la,mu,nu);
-
-                            /*
-                            sk += 0.5*(rhoh*u[mu]*u[mu]+Pp*metric_g_uu(g,mu,mu)+visc[4*mu+mu]) * metric_dg_dd(g,la,mu,mu);
-                            for(nu=mu+1; nu<max_dim; nu++)
-                                sk += (rhoh*u[mu]*u[nu]+Pp*metric_g_uu(g,mu,nu)+visc[4*mu+nu]) * metric_dg_dd(g,la,mu,nu);
-                            */
-                            
-                        }
                         if(la == 1)
                         {
                             c->cons[SRR] += dt*dV*sqrtg*a * sk;
                             if(PRINTTOOMUCH)
                             {
                                 printf("SRR source: (%d,%d,%d): r=%.12g, dV=%.12g, s = %.12g, S = %.12g\n",i,j,k,r,dV,a*sqrtg*sk,dt*dV*sqrtg*a * sk);
-                                //fprintf(sourcefile, "(%d,%d,%d): r=%.12g, Fg=%.12g, Fc=%.12g, P/r=%.12g, F=%.12g\n", 
-                                //        i,j,k,r,0.5*rhoh*u[0]*u[0]*metric_dg_dd(g,1,0,0), 0.5*rhoh*u[2]*u[2]*metric_dg_dd(g,1,2,2), 
-                                //        0.5*metric_g_uu(g,2,2)*Pp*metric_dg_dd(g,1,2,2), sk);
                             }
                         }
                         else if(la == 2)
@@ -239,17 +225,7 @@ void cell_add_src_gr( struct Cell *** theCells ,struct Sim * theSim, struct Grav
                 
                 for(mu=0; mu<max_dim; mu++)
                     for(nu=0; nu<max_dim; nu++)
-                    {
                         s -= Tm[4*mu+nu] * metric_frame_dU_du(g,mu,nu,theSim);
-                        
-                        /*
-                        if(mu == nu)
-                            s -= (rhoh*u[mu]*u_d[nu] + Pp + viscm[4*mu+nu]) * metric_frame_dU_du(g,mu,nu,theSim);
-                        else
-                            s -= (rhoh*u[mu]*u_d[nu] + viscm[4*mu+nu]) * metric_frame_dU_du(g,mu,nu,theSim);
-                        */
-                        
-                    }
                 
                 if(PRINTTOOMUCH)
                 {
@@ -259,23 +235,6 @@ void cell_add_src_gr( struct Cell *** theCells ,struct Sim * theSim, struct Grav
                 c->cons[TAU] += dt*dV*sqrtg*a * s;
 
                 //Cooling
-                //Cooling should never (?) change the sign of the momenta,
-                //if it will, instead reduce the momenta by 0.9.  These lines
-                //should be irrelevant because of the luminosity-limited timestep.
-                /*
-                c->cons[SRR] -= dt*dV*sqrtg*a* cool*u_d[1];
-                c->cons[LLL] -= dt*dV*sqrtg*a* cool*u_d[2];
-                c->cons[SZZ] -= dt*dV*sqrtg*a* cool*u_d[3];
-                c->cons[TAU] += dt*dV*sqrtg*a* cool * (u_d[0]*U[0]+u_d[1]*U[1]+u_d[2]*U[2]+u_d[3]*U[3]); 
-                if(PRINTTOOMUCH)
-                {
-                    printf("SRR cooling: (%d,%d,%d): r=%.12g, dV=%.12g, q = %.12g, Q = %.12g\n",i,j,k,r,dV,-a*sqrtg* cool*u_d[1],-dt*dV*sqrtg*a *cool*u_d[1]);
-                    printf("LLL cooling: (%d,%d,%d): r=%.12g, dV=%.12g, q = %.12g, Q = %.12g\n",i,j,k,r,dV,-a*sqrtg* cool*u_d[2],-dt*dV*sqrtg*a *cool*u_d[2]);
-                    printf("TAU cooling: (%d,%d,%d): r=%.12g, dV=%.12g, q = %.12g, Q = %.12g\n",i,j,k,r,dV,a*sqrtg* cool * (u_d[0]*U[0]+u_d[1]*U[1]+u_d[2]*U[2]+u_d[3]*U[3]),dt*dV*sqrtg*a *cool * (u_d[0]*U[0]+u_d[1]*U[1]+u_d[2]*U[2]+u_d[3]*U[3]));
-                }
-                */
-               
-
                 double pos[3];
                 pos[R_DIR] = r;
                 pos[P_DIR] = phi;
@@ -289,10 +248,13 @@ void cell_add_src_gr( struct Cell *** theCells ,struct Sim * theSim, struct Grav
                     cell_cool_integrateT_gr_num(c->prim, dcons_cool, dt, u[0], 
                                                 GAMMALAW, pos, M, theSim);
 
-                c->cons[SRR] += dcons_cool[SRR] * dV;
-                c->cons[LLL] += dcons_cool[LLL] * dV;
-                c->cons[SZZ] += dcons_cool[SZZ] * dV;
-                c->cons[TAU] += dcons_cool[TAU] * dV;
+                if(coolType != COOL_NONE)
+                {
+                    c->cons[SRR] += dcons_cool[SRR] * dV;
+                    c->cons[LLL] += dcons_cool[LLL] * dV;
+                    c->cons[SZZ] += dcons_cool[SZZ] * dV;
+                    c->cons[TAU] += dcons_cool[TAU] * dV;
+                }
                 
                 if(sim_BoostType(theSim) != BOOST_NONE)
                 {
