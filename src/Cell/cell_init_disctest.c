@@ -234,25 +234,6 @@ void cell_init_disctest_geodesic(struct Cell *c, double r, double phi, double z,
 
     vr = ur/u0;
     vp = up/u0;
-/*
-    if(r < 6*M)
-    {
-        double x = 6*M/r-1.0;
-        double ur = -sqrt(x*x*x)/3.0;
-        double up = 2.0*sqrt(3.0)*M / (r*r);
-        double u0 = 2.0 * (sqrt(2.0)*r - M*sqrt(x*x*x)) / (3.0*(r-2.0*M));
-        vr = ur/u0;
-        vp = up/u0;
-    }
-    else
-    {
-        double ur = 0.0;
-        double up = sqrt(M/(r*r*(r-3.0*M)));
-        double u0 = sqrt(r/(r-3.0*M));
-        vr = ur/u0;
-        vp = up/u0;
-    }
-*/
 
     c->prim[RHO] = rho;
     c->prim[PPP] = P;
