@@ -55,27 +55,45 @@ def floor_sig(x, sig):
     if x == 0.0:
         return 0.0
     exp = int(math.floor(math.log10(math.fabs(x))))
-    y = np.around(x, -exp+sig)
-    if y > x:
-        y -= math.pow(10, sig-sig)
-    return y
+    y = math.floor(x * 10.0**(-exp+sig))
+    return y * 10.0**(exp-sig)
+    #y = np.around(x, -exp+sig)
+    #if y > x:
+    #    y -= math.pow(10, sig-sig)
+    #return y
 
 def ceil_sig(x, sig):
     if x == 0.0:
         return 0.0
     exp = int(math.floor(math.log10(math.fabs(x))))
-    y = np.around(x, -exp+sig)
-    if y < x:
-        y += math.pow(10, sig-sig)
-    return y
+    y = math.ceil(x * 10.0**(-exp+sig))
+    return y * 10.0**(exp-sig)
+    #exp = int(math.floor(math.log10(math.fabs(x))))
+    #y = np.around(x, -exp+sig)
+    #if y < x:
+    #    y += math.pow(10, sig-sig)
+    #return y
 
 def pretty_axis(ax, pars, xscale="linear", yscale="linear", 
                 xlabel=None, ylabel=None, xlim=None, ylim=None, twin=False):
 
     if ylim is None:
-        ylim = list(ax.get_ylim())
-        ylim[0] = floor_sig(ylim[0], 1)
-        ylim[1] = ceil_sig(ylim[1], 1)
+        ylim0 = list(ax.get_ylim())
+        ylim = [0.0,1.0]
+        if yscale is "log":
+            if ylim0[0] <= 0.0:
+                ylim[0] = 0.0
+            else:
+                exp0 = math.floor(math.log10(ylim0[0]))
+                ylim[0] = math.pow(10.0,exp0)
+            if ylim0[1] <= 0.0:
+                ylim[1] = 1.0
+            else:
+                exp1 = math.ceil(math.log10(ylim0[1]))
+                ylim[1] = math.pow(10.0,exp1)
+        else:
+            ylim[0] = floor_sig(ylim0[0], 1)
+            ylim[1] = ceil_sig(ylim0[1], 1)
 
     if ylim[0] > ylim[1]:
         print ylim
@@ -98,18 +116,18 @@ def pretty_axis(ax, pars, xscale="linear", yscale="linear",
             xlim[1] = ceil_sig(xlim[1], 1)
         if xlim[0] > xlim[1]:
             print xlim
-        ax.set_xscale(xscale)
-        ax.set_xlim(xlim)
 
         if xlabel != None:
             ax.set_xlabel(xlabel)
 
         #Horizon
-        plt.axvspan(max(Rsm,xlim[0]), min(Rsp,xlim[1]), color='grey', 
-                                                        zorder=-10)
+        ax.axvspan(max(Rsm,xlim[0]), min(Rsp,xlim[1]), color='grey', 
+                                        zorder=1, alpha=0.5)
         #Ergosphere
-        plt.axvspan(max(0,xlim[0]), min(Rer,xlim[1]), color='lightgrey', 
-                                                        zorder=-11)
+        ax.axvspan(max(0,xlim[0]), min(Rer,xlim[1]), color='lightgrey', 
+                                        zorder=1, alpha=0.5)
+        ax.set_xscale(xscale)
+        ax.set_xlim(xlim)
 
 def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
@@ -204,7 +222,7 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
         # Azimuthal Velocity
         plot_data(ax[1,1], r, vp)
-        pretty_axis(ax[1,0], pars, xscale="log", yscale="log", 
+        pretty_axis(ax[1,1], pars, xscale="log", yscale="log", 
                     ylabel=r"$v^\phi$")
 
         # Lorentz Factor and Mach Number
@@ -214,28 +232,28 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         pretty_axis(ax[1,2], pars, xscale="log", yscale="log", 
                     ylabel=r"$\mathcal{M}$")
         pretty_axis(ax2, pars, xscale="log", yscale="linear", 
-                    ylabel=r"$W$")
+                    ylabel=r"$W$", twin=True)
 
         # Scale Height
         plot_data(ax[2,0], r, H)
         pretty_axis(ax[2,0], pars, xscale="log", yscale="log", 
                     xlabel=r"$r$ ($G M_\odot / c^2)$", 
-                    ylabel=r"$H ($G M_\odot / c^2)$")
+                    ylabel=r"$H$ ($G M_\odot / c^2$)")
 
         # Accretion rate
         plot_data(ax[2,1], r, Mdot)
-        pretty_axis(ax[2,1], pars, xscale="linear", yscale="linear", 
+        pretty_axis(ax[2,1], pars, xscale="log", yscale="linear", 
                     xlabel=r"$r$ ($G M_\odot / c^2)$", 
                     ylabel=r"$\dot{M}$ ($M_\odot/y$)")
 
         # Sound Speed
         plot_data(ax[2,2], r, cs)
-        pretty_axis(ax[2,2], pars, xscale="linear", yscale="linear", 
+        pretty_axis(ax[2,2], pars, xscale="log", yscale="log", 
                     xlabel=r"$r$ ($G M_\odot / c^2)$", ylabel=r"$c_s$")
 
-        fig.suptitle(r"DISCO $M = {0:.1g}M_\odot$ a_* = {1:.2f}".format(M,a))
+        fig.suptitle(r"DISCO $M = {0:.1g}M_\odot$ $a_* = {1:.2f}$".format(M,a))
 
-        plt.tight_layout()
+        #plt.tight_layout()
 
         outpath = filename.split("/")[:-1]
         chckname = filename.split("/")[-1]

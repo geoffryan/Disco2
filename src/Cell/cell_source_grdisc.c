@@ -394,7 +394,7 @@ void cell_cool_integrateT_grdisc_num(double *prim, double *dcons, double dt,
     for(i=5; i<NUMQ; i++)
         dcons[i] = 0.0;
 
-    if(dcons[TAU]/cons0[TAU] > 1.0e-14)
+    if(dcons[TAU]/cons0[TAU] > 1.0e-10)
         printf("WAT WAT %.12lg\n", dcons[TAU]/cons0[TAU]);
 
     free(cons0);
