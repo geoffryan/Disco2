@@ -10,6 +10,8 @@ OBJDIR   = obj
 BINDIR   = bin
 VISDIR   = python_plotting_scripts
 PARDIR   = parfiles
+#INSDIR   = $(patsubst %/,%,$(INSTALL_DIR))
+INSDIR   = $(strip $(INSTALL_DIR))
 
 SRCS    := $(shell find $(SRCDIR) -name '*.$(SRCEXT)')
 SRCDIRS := $(shell find . -name '*.$(SRCEXT)' -exec dirname {} \; | uniq)
@@ -39,19 +41,19 @@ install: $(BINDIR)/$(APP)
 ifndef INSTALL_DIR
 	$(error INSTALL_DIR has not been set in Makefile.in $(INSTALL_DIR))
 endif
-	@echo "Installing into $(INSTALL_DIR)..."
+	@echo "Installing into $(INSDIR)..."
 
 	@echo "   Installing bin/"
-	@mkdir -p $(INSTALL_DIR)/$(BINDIR)
-	@cp $(BINDIR)/$(APP) $(INSTALL_DIR)/$(BINDIR)/$(APP)
+	@mkdir -p $(INSDIR)/$(BINDIR)
+	@cp $(BINDIR)/$(APP) $(INSDIR)/$(BINDIR)/$(APP)
 
 	@echo "   Installing parfiles/"
-	@mkdir -p $(INSTALL_DIR)/$(PARDIR)
-	@cp -r $(PARDIR)/* $(INSTALL_DIR)/$(PARDIR)/
+	@mkdir -p $(INSDIR)/$(PARDIR)
+	@cp -r $(PARDIR)/* $(INSDIR)/$(PARDIR)/
 
 	@echo "   Installing pyscripts/"
-	@mkdir -p $(INSTALL_DIR)/$(VISDIR)
-	@cp -r $(VISDIR)/* $(INSTALL_DIR)/$(VISDIR)/
+	@mkdir -p $(INSDIR)/$(VISDIR)
+	@cp -r $(VISDIR)/* $(INSDIR)/$(VISDIR)/
 
 $(BINDIR)/$(APP): buildrepo $(OBJS)
 	@mkdir -p `dirname $@`
