@@ -120,9 +120,7 @@ void cell_add_src_gr( struct Cell *** theCells ,struct Sim * theSim, struct Grav
                 }
                
                 //Viscous Terms
-                double cool;
                 double M = sim_GravM(theSim);
-                cool = 0.0;
 
                 double visc[16], viscm[16];
                 for(mu = 0; mu < 16; mu++)

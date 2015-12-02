@@ -40,12 +40,18 @@ ifndef INSTALL_DIR
 	$(error INSTALL_DIR has not been set in Makefile.in $(INSTALL_DIR))
 endif
 	@echo "Installing into $(INSTALL_DIR)..."
+
+	@echo "   Installing bin/"
 	@mkdir -p $(INSTALL_DIR)/$(BINDIR)
-	@mkdir -p $(INSTALL_DIR)/$(VISDIR)
-	@mkdir -p $(INSTALL_DIR)/$(PARDIR)
 	@cp $(BINDIR)/$(APP) $(INSTALL_DIR)/$(BINDIR)/$(APP)
-	@cp -r $(VISDIR)/* $(INSTALL_DIR)/$(VISDIR)/
+
+	@echo "   Installing parfiles/"
+	@mkdir -p $(INSTALL_DIR)/$(PARDIR)
 	@cp -r $(PARDIR)/* $(INSTALL_DIR)/$(PARDIR)/
+
+	@echo "   Installing pyscripts/"
+	@mkdir -p $(INSTALL_DIR)/$(VISDIR)
+	@cp -r $(VISDIR)/* $(INSTALL_DIR)/$(VISDIR)/
 
 $(BINDIR)/$(APP): buildrepo $(OBJS)
 	@mkdir -p `dirname $@`
