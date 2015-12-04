@@ -244,9 +244,11 @@ void calc_NT(double r, double Mdot, double rs, double GAM, double M, double A,
 
     double Pi = Mdot / (3.0*M_PI*alpha*sqrt(GAM)) * omk * sqrt(C)*P/(D*D);
     double Qdot = 3.0*Mdot / (4.0*M_PI) * omk*omk * P/C;
-    double Sig = pow(8*eos_sb/(3*kappa*Qdot)
-                            * pow(eos_mp*Pi*eos_rho_scale*eos_c*eos_c,4), 0.2)
-                        / (eos_rho_scale*eos_r_scale);
+    double PiCGS = Pi * eos_rho_scale * eos_r_scale * eos_c * eos_c;
+    double QdotCGS = Qdot * eos_rho_scale*eos_c*eos_c*eos_c;
+    double SigCGS = pow(8*eos_sb/(3*kappa*QdotCGS)
+                            * pow(eos_mp*PiCGS,4), 0.2);
+    double Sig = SigCGS / (eos_rho_scale * eos_r_scale);
     double ur = - Mdot / (2*M_PI*r*Sig);
     double up = omk / sqrt(C);
     double u0 = B / sqrt(C);
