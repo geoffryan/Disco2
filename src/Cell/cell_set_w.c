@@ -6,6 +6,7 @@
 #include "../Headers/Sim.h"
 #include "../Headers/Face.h"
 #include "../Headers/GravMass.h"
+#include "../Headers/Metric.h"
 #include "../Headers/header.h"
 
 
@@ -88,6 +89,24 @@ void cell_set_w(struct Cell ***theCells,struct Sim *theSim){
         }
       }
     }
+  } else if (sim_MOVE_CELLS(theSim) == C_FRAME ) {
+    for( k=0 ; k<sim_N(theSim,Z_DIR) ; ++k ){
+      double zp = sim_FacePos(theSim,k,Z_DIR);
+      double zm = sim_FacePos(theSim,k-1,Z_DIR);
+      double z = 0.5*(zm+zp);
+      for( i=0 ; i<sim_N(theSim,R_DIR) ; ++i ){
+        double rp = sim_FacePos(theSim,i,R_DIR);
+        double rm = sim_FacePos(theSim,i-1,R_DIR);
+        double r = 0.5*(rm+rp);
+        for( j=0 ; j<sim_N_p(theSim,i) ; ++j ){
+            double phi = theCells[k][i][j].tiph - 0.5*theCells[k][i][j].dphi;
+            struct Metric *g = metric_create(time_global, r, phi, z, theSim);
+            double U0 = metric_frame_U_u(g, 0, theSim);
+            double UP = metric_frame_U_u(g, 2, theSim);
+            metric_destroy(g);
+            theCells[k][i][j].wiph = r*UP/U0;
+        }
+      }
+    }
   }
-
 }

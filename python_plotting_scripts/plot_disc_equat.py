@@ -377,7 +377,7 @@ def plot_all(filename, pars, rmax=-1.0, plot=True, bounds=None,
             qname = "plot_disc_equat_{0}_{1}{2:01d}.png".format(
                         "_".join(chckname.split(".")[0].split("_")[1:]), "q",
                         i)
-            make_plot(mesh, q, gridbounds=gridbounds, datscale="linear", 
+            make_plot(mesh, q, pars, gridbounds=gridbounds, datscale="linear", 
                         datbounds=bounds[4], rocheData=rocheData, 
                         quiverData=quiverData, Vmax=Vmax, 
                         orbitData=localOrbit, label=r'$q_{0:d}$'.format(i), 

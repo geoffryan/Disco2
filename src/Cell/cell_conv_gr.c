@@ -153,7 +153,7 @@ static int cons2prim_prep(double *cons, double *prim, double *pos, double dV,
     if(S2 + D*D >= E*E || E < D)
     {
     //    if(pos[R_DIR] >= metric_horizon(theSim))
-            printf("2 fast 2 cold. r = %.12lg\n", pos[R_DIR]);
+    //        printf("2 fast 2 cold. r = %.12lg\n", pos[R_DIR]);
         err = 1;
         E = (1.0 + 1.0e-10) * D * (sqrt(1.0+S2/(D*D)));
         cons[TAU] = (W*E - SU - D) * dV;

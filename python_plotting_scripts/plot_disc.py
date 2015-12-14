@@ -102,6 +102,15 @@ def pretty_axis(ax, pars, xscale="linear", yscale="linear",
     if ylabel != None:
         ax.set_ylabel(ylabel)
 
+    if xlim is None:
+        xlim = list(ax.get_xlim())
+        xlim[0] = floor_sig(xlim[0], 1)
+        xlim[1] = ceil_sig(xlim[1], 1)
+    if xlim[0] > xlim[1]:
+        print xlim
+    ax.set_xscale(xscale)
+    ax.set_xlim(xlim)
+
     if not twin:
         M = pars['GravM']
         a = pars['GravA']
@@ -109,13 +118,6 @@ def pretty_axis(ax, pars, xscale="linear", yscale="linear",
         Rsp = M*(1.0+math.sqrt(1.0-a*a))
         Rsm = M*(1.0-math.sqrt(1.0-a*a))
         Rer = 2*M
-
-        if xlim is None:
-            xlim = list(ax.get_xlim())
-            xlim[0] = floor_sig(xlim[0], 1)
-            xlim[1] = ceil_sig(xlim[1], 1)
-        if xlim[0] > xlim[1]:
-            print xlim
 
         if xlabel != None:
             ax.set_xlabel(xlabel)
@@ -126,8 +128,6 @@ def pretty_axis(ax, pars, xscale="linear", yscale="linear",
         #Ergosphere
         ax.axvspan(max(0,xlim[0]), min(Rer,xlim[1]), color='lightgrey', 
                                         zorder=1, alpha=0.5)
-        ax.set_xscale(xscale)
-        ax.set_xlim(xlim)
 
 def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
