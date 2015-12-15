@@ -88,9 +88,9 @@ InitPar0        0        //0 Thompson Cooling
 InitPar1        1.0e0    // Accretion Rate (solar masses per year)
 InitPar2        3.0e1    // R0 (radius to transition)
 InitPar3        1.0e1     // DR (transition width)
-InitPar4        -1
-InitPar5        -1
-InitPar6        -1
+InitPar4        -1       // Outer disc radius (set negative for infinite disc)
+InitPar5        -1      // Atmosphere surface density (g/cm^2)
+InitPar6        -1      // Atmospher temperature (mp c^2)
 
 PHI_ORDER               2
 

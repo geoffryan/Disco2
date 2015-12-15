@@ -288,9 +288,12 @@ void cell_src_boost(double t, double r, double phi, double z, double *cons,
     double y = r*sin(phi);
     double X = -a;
     double Y = 0.0;
-    double R = sqrt(X*X+Y*Y);
-    Fx = M2*( x*R*R - 3*(x*X+y*Y)*X) / (R*R*R*R*R) * rhoh*u[0]*u[0];
-    Fy = M2*( y*R*R - 3*(x*X+y*Y)*Y) / (R*R*R*R*R) * rhoh*u[0]*u[0];
+    double A = sqrt(X*X+Y*Y);
+    double r2 = sqrt((x-X)*(x-X)+(y-Y)*(y-Y));
+    //Fx = M2*( x*R*R - 3*(x*X+y*Y)*X) / (R*R*R*R*R) * rhoh*u[0]*u[0];
+    //Fy = M2*( y*R*R - 3*(x*X+y*Y)*Y) / (R*R*R*R*R) * rhoh*u[0]*u[0];
+    Fx = M2*( -(x-X)/(r2*r2*r2) - X/(A*A*A) ) * rhoh*u[0]*u[0];
+    Fy = M2*( -(y-Y)/(r2*r2*r2) - Y/(A*A*A) ) * rhoh*u[0]*u[0];
     Fr = Fx*cos(phi) + Fy*sin(phi);
     Fp = (-Fx*sin(phi) + Fy*cos(phi))*r;
 

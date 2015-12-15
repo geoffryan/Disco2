@@ -846,8 +846,8 @@ void cell_boundary_nozzle(struct Cell ***theCells, struct Sim *theSim,
                         theCells[k][i][j].prim[TTT] = fac*T0;
                         theCells[k][i][j].prim[URR] = fac*vr;
                         theCells[k][i][j].prim[UPP] = fac*vp;
-                        if(sim_NUM_Q(theSim) > sim_NUM_C(theSim))
-                            theCells[k][i][j].prim[sim_NUM_C(theSim)] = fac;
+                        if(sim_NUM_Q(theSim) >= sim_NUM_C(theSim) + 2)
+                            theCells[k][i][j].prim[sim_NUM_C(theSim)+1] = fac;
                     }
                 }
             }

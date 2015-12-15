@@ -31,6 +31,9 @@ void cell_init_ntdisc_thompson(struct Cell *c, double r, double phi, double z, s
     double Mdot = sim_InitPar1(theSim); // Solar Masses per year
     double r0 = sim_InitPar2(theSim);   // radius to transition to geodesic
     double DR = sim_InitPar3(theSim);   // width of transition region
+    double R1 = sim_InitPar4(theSim);   // Outer radius of disc
+    double sigAtmo = sim_InitPar5(theSim);// Atmosphere surface density (g/cm2)
+    double TAtmo = sim_InitPar6(theSim);   // Atmosphere temperature (mp c^2)
     double GAM = sim_GAMMALAW(theSim);
     double M = sim_GravM(theSim);
     double a = M*sim_GravA(theSim);
@@ -44,6 +47,7 @@ void cell_init_ntdisc_thompson(struct Cell *c, double r, double phi, double z, s
 
     Mdot *= eos_Msolar/eos_year;                         // Msolar/year -> g/s
     Mdot /= eos_rho_scale*eos_r_scale*eos_r_scale*eos_c; // g/s -> code units
+    sigAtmo /= eos_rho_scale*eos_r_scale;                // g/cm2 -> code units
     double rs = isco(M, a/M);
 
     double SigOut, PiOut, TOut, HOut, vrOut, vpOut;
@@ -64,7 +68,22 @@ void cell_init_ntdisc_thompson(struct Cell *c, double r, double phi, double z, s
 
     double rho, T, sig, pi, vr, vp;
 
-    if(r >= r0 + DR)
+    if(R1 > 0.0 && r > R1)
+    {
+        sig = sigAtmo;
+        T = TAtmo;
+        rho = rho_solve_NT(sigAtmo, TAtmo, r, M, U0, theSim);
+        double p[5];
+        p[RHO] = rho;
+        p[TTT] = TAtmo;
+        p[URR] = UR/U0;
+        p[UPP] = UP/U0;
+        p[UZZ] = 0.0;
+        pi = eos_ppp(p, theSim) * sig/rho;
+        vr = UR/U0;
+        vp = UP/U0;
+    }
+    else if(r >= r0 + DR)
     {
         rho = SigOut/HOut;
         T = TOut;
@@ -128,12 +147,17 @@ void cell_init_ntdisc_thompson(struct Cell *c, double r, double phi, double z, s
     {
         int i;
 
-        for(i=sim_NUM_C(theSim); i<sim_NUM_Q(theSim); i++)
+        if(R1 > 0.0 && r <= R1)
+            c->prim[sim_NUM_C(theSim)] = 1.0;
+        for(i=sim_NUM_C(theSim)+1; i<sim_NUM_Q(theSim); i++)
+            c->prim[i] = 0.0;
+
+        if(sim_NUM_Q(theSim) >= sim_NUM_C(theSim) + 3)
         {
             if(r*cos(phi) < 0)
-                c->prim[i] = 0.0;
+                c->prim[sim_NUM_C(theSim)+2] = 0.0;
             else
-                c->prim[i] = 1.0;
+                c->prim[sim_NUM_C(theSim)+2] = 1.0;
         }
     }
 }
