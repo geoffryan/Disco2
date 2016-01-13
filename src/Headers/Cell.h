@@ -21,6 +21,7 @@ struct Cell{
   double wiph;
   double divB;
   double GradPsi[3];
+  int real;
 };
 #endif
 //create and destroy
@@ -90,6 +91,7 @@ struct Cell *cell_single(struct Cell ***,int,int,int);
 double cell_tiph(struct Cell *);
 double cell_dphi(struct Cell *);
 double cell_wiph(struct Cell *);
+int    cell_real(struct Cell *);
 //modify cell data
 void cell_add_cons(struct Cell *, int, double);
 void cell_add_wiph(struct Cell *, double);

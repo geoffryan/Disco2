@@ -162,8 +162,8 @@ def calcQuiver(r, phi, vr, vp, gridbounds, N=20):
     R2 = XQ*XQ+YQ*YQ
     ind = R2 < rm*rm
 
-    x = r*cos(phi)
-    y = r*sin(phi)
+    x = r*np.cos(phi)
+    y = r*np.sin(phi)
     vx = vr*np.cos(phi) - r*vp*np.sin(phi)
     vy = vr*np.sin(phi) + r*vp*np.cos(phi)
 

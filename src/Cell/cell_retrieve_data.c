@@ -35,3 +35,6 @@ double cell_wiph(struct Cell *oneCell){
 double cell_GradPsi(struct Cell ***theCells,int i,int j,int k,int n){
   return(theCells[k][i][j].GradPsi[n]);
 }
+int cell_real(struct Cell *oneCell){
+  return(oneCell->real);
+}

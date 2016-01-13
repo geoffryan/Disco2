@@ -45,6 +45,8 @@ void cell_add_src_gr( struct Cell *** theCells ,struct Sim * theSim, struct Grav
             for( j=0 ; j<sim_N_p(theSim,i) ; ++j )
             {
                 struct Cell * c = &(theCells[k][i][j]);
+                if(!(c->real))
+                    continue;
                 double phi = c->tiph-.5*c->dphi;
                 double dphi = c->dphi;
 

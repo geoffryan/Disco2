@@ -80,6 +80,8 @@ def get_mdot(filename):
     reh = horizon()
 
     i = len(rs[rs < reh]) - 1
+    if i == -1:
+        i = 2
 
     return t, mdot[i]
 

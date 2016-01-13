@@ -63,6 +63,13 @@ struct Cell ***cell_create(struct Sim *theSim,struct MPIsetup * theMPIsetup){
 
   //  initialize
   srand(666+mpisetup_MyProc(theMPIsetup));
+
+  // ghost indices
+  int iNmg = sim_N(theSim,R_DIR)-sim_Nghost_max(theSim,R_DIR);
+  int ig = sim_Nghost_min(theSim,R_DIR);
+  int kNmg = sim_N(theSim,Z_DIR)-sim_Nghost_max(theSim,Z_DIR);
+  int kg = sim_Nghost_min(theSim,Z_DIR);
+
   for(k = 0; k < sim_N(theSim,Z_DIR); k++){
     for(i = 0; i < sim_N(theSim,R_DIR); i++){
       //double tiph_0 = 0.0;
@@ -83,6 +90,14 @@ struct Cell ***cell_create(struct Sim *theSim,struct MPIsetup * theMPIsetup){
         theCells[k][i][j].tiph = tiph;
         theCells[k][i][j].RKtiph = tiph;
         theCells[k][i][j].dphi = dphi;
+        //Is this a ghost zone
+        if((i<ig && !(mpisetup_dim_MyProc(theMPIsetup,0)==0
+                        && sim_NoInnerBC(theSim)==1))
+                || i>=iNmg 
+                || k<kg || k>=kNmg)
+            theCells[k][i][j].real = 0;
+        else
+            theCells[k][i][j].real = 1;
       }
     }
   }

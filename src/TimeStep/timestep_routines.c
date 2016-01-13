@@ -85,6 +85,8 @@ void timestep_substep(struct TimeStep * theTimeStep, struct Cell *** theCells,
   //Phi Flux
   for( k=0 ; k<sim_N(theSim,Z_DIR) ; ++k ){
     for( i=0 ; i<sim_N(theSim,R_DIR) ; ++i ){
+      if( !cell_real(&(theCells[k][i][0])) )
+          continue;
       for( j=0 ; j<sim_N_p(theSim,i) ; ++j ){
         struct Riemann * theRiemann = riemann_create(theSim); // struct to contain everything we need to solve Riemann problem 
         riemann_setup_p(theRiemann,theCells,theSim,i,j,k,PDIRECTION); // set various quantities in theRiemann
@@ -116,6 +118,9 @@ void timestep_substep(struct TimeStep * theTimeStep, struct Cell *** theCells,
   //R Flux
   int n;
   for( n=0 ; n<timestep_n(theTimeStep,sim_N(theSim,R_DIR)-1,R_DIR) ; ++n ){
+    if(!(cell_real(face_L_pointer(theFaces_r,n))
+            || cell_real(face_R_pointer(theFaces_r,n))))
+        continue;
     struct Riemann * theRiemann = riemann_create(theSim); //struct to contain everything we need to solve Riemann problem
     riemann_setup_rz(theRiemann,theFaces_r,theSim,n,RDIRECTION);  //set various quantities in theRiemann
     riemann_AddFlux(theRiemann,theSim,dt); // solve Riemann problem and update RHS
@@ -143,6 +148,9 @@ void timestep_substep(struct TimeStep * theTimeStep, struct Cell *** theCells,
       if(PRINTTOOMUCH)
           printf("WHOA, Z FLUX HAPPENING!\n");
     for( n=0 ; n<timestep_n(theTimeStep,sim_N(theSim,Z_DIR)-1,Z_DIR); ++n ){
+      if(!(cell_real(face_L_pointer(theFaces_z,n))
+          || cell_real(face_R_pointer(theFaces_z,n))))
+        continue;
       struct Riemann * theRiemann = riemann_create(theSim); // struct to contain everything we need to solve Riemann problem
       riemann_setup_rz(theRiemann,theFaces_z,theSim,n,ZDIRECTION); // set various quantities in theRiemann
       riemann_AddFlux(theRiemann,theSim,dt); // solve Riemann problem and update RHS 
