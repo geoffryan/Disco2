@@ -196,6 +196,8 @@ double cell_mindt_gr(struct Cell ***theCells, struct Sim *theSim)
 
             for(j = 0; j < sim_N_p(theSim,i); ++j)
             {
+                if(!(theCells[k][i][j].real))
+                    continue;
                 int jm = j-1;
                 if(j == 0) 
                     jm = sim_N_p(theSim,i)-1;
