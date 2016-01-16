@@ -23,8 +23,8 @@ void cell_boundary_outflow_r_inner( struct Cell *** theCells , struct Face * the
   if( mpisetup_check_rin_bndry(theMPIsetup) ){
 
     if (sim_NoInnerBC(theSim)!=1){ // if the global inner radius is set negative, we don't apply an inner BC
-      for( i=0; i>=0 ; --i ){
-      //for( i=sim_Nghost_min(theSim,R_DIR)-1 ; i>=0 ; --i ){   //TODO: Good idea/bad idea?
+      //for( i=0; i>=0 ; --i ){
+      for( i=sim_Nghost_min(theSim,R_DIR)-1 ; i>=0 ; --i ){
         r_face=sim_FacePos(theSim,i,R_DIR);
         r_face_m1=sim_FacePos(theSim,i-1,R_DIR);
         r_cell = 0.5*(r_face+r_face_m1);
@@ -65,45 +65,55 @@ void cell_boundary_outflow_r_inner( struct Cell *** theCells , struct Face * the
 }
 
 void cell_boundary_outflow_r_outer( struct Cell *** theCells , struct Face * theFaces ,struct Sim * theSim,struct MPIsetup * theMPIsetup, struct TimeStep * theTimeStep ){
+
+  int iN = sim_N(theSim,R_DIR);
+  int iNmg = sim_N(theSim,R_DIR) - sim_Nghost_max(theSim,R_DIR);
   int Nf = timestep_n(theTimeStep,sim_N(theSim,R_DIR)-1,R_DIR);
   int NUM_Q = sim_NUM_Q(theSim);
   int n1 = timestep_n(theTimeStep,sim_N(theSim,R_DIR)-2,R_DIR);
 
   int n,q;
-  int j,k;
+  int i,j,k;
   double r_face,r_face_p1,r_cell;
 
   if( mpisetup_check_rout_bndry(theMPIsetup) ){
-    for( n=n1 ; n<Nf ; ++n ){
-      for( q=0 ; q<NUM_Q ; ++q ){
-        face_R_pointer(theFaces,n)->prim[q] = 0.0;
-      }
-    }
-    for( n=n1 ; n<Nf ; ++n ){
-      struct Cell * cL = face_L_pointer(theFaces,n);
-      struct Cell * cR = face_R_pointer(theFaces,n);
-      for( q=0 ; q<NUM_Q ; ++q ){
-        cR->prim[q] += cL->prim[q]*face_dA(theFaces,n);
-      }
-    }
-    r_face = sim_FacePos(theSim,sim_N(theSim,R_DIR)-2,R_DIR);
-    r_face_p1 = sim_FacePos(theSim,sim_N(theSim,R_DIR)-1,R_DIR);
-    r_cell = 0.5*(r_face+r_face_p1);
-    //printf("r_cell outer: %e\n",r_cell);
-    for( k=0 ; k<sim_N(theSim,Z_DIR) ; ++k ){
-      double zp = sim_FacePos(theSim,k,Z_DIR);
-      double zm = sim_FacePos(theSim,k-1,Z_DIR);
-      double dz = zp-zm;
-      for( j=0 ; j<sim_N_p(theSim,sim_N(theSim,R_DIR)-1) ; ++j ){
-        double dA = dz*r_face*theCells[k][sim_N(theSim,R_DIR)-1][j].dphi;
+    for(i=iNmg-1; i<iN-1; i++){
+        printf("Boundary outflow r outer %d\n", i);
+      n1 = timestep_n(theTimeStep,i,R_DIR);
+      Nf = timestep_n(theTimeStep,i+1,R_DIR);
+      for( n=n1 ; n<Nf ; ++n ){
         for( q=0 ; q<NUM_Q ; ++q ){
-          theCells[k][sim_N(theSim,R_DIR)-1][j].prim[q] /= dA;
+          face_R_pointer(theFaces,n)->prim[q] = 0.0;
         }
-        //theCells[k][sim_N(theSim,R_DIR)-1][j].prim[URR] *= -1.;
-        if( theCells[k][sim_N(theSim,R_DIR)-1][j].prim[URR] < 0.0 )
-            theCells[k][sim_N(theSim,R_DIR)-1][j].prim[URR] = 0.0;
-        if (KEP_BNDRY==1){
-          theCells[k][sim_N(theSim,R_DIR)-1][j].prim[UPP] = pow(r_cell,-1.5);
+      }
+      for( n=n1 ; n<Nf ; ++n ){
+        struct Cell * cL = face_L_pointer(theFaces,n);
+        struct Cell * cR = face_R_pointer(theFaces,n);
+        for( q=0 ; q<NUM_Q ; ++q ){
+          cR->prim[q] += cL->prim[q]*face_dA(theFaces,n);
+        }
+      }
+      //r_face = sim_FacePos(theSim,sim_N(theSim,R_DIR)-2,R_DIR);
+      //r_face_p1 = sim_FacePos(theSim,sim_N(theSim,R_DIR)-1,R_DIR);
+      r_face = sim_FacePos(theSim,i,R_DIR);
+      r_face_p1 = sim_FacePos(theSim,i+1,R_DIR);
+      r_cell = 0.5*(r_face+r_face_p1);
+      //printf("r_cell outer: %e\n",r_cell);
+      for( k=0 ; k<sim_N(theSim,Z_DIR) ; ++k ){
+        double zp = sim_FacePos(theSim,k,Z_DIR);
+        double zm = sim_FacePos(theSim,k-1,Z_DIR);
+        double dz = zp-zm;
+        for( j=0 ; j<sim_N_p(theSim,i+1) ; ++j ){
+          double dA = dz*r_face*theCells[k][i+1][j].dphi;
+          for( q=0 ; q<NUM_Q ; ++q ){
+            theCells[k][i+1][j].prim[q] /= dA;
+          }
+          //theCells[k][sim_N(theSim,R_DIR)-1][j].prim[URR] *= -1.;
+          if( theCells[k][i+1][j].prim[URR] < 0.0 )
+            theCells[k][i+1][j].prim[URR] = 0.0;
+          if (KEP_BNDRY==1){
+            theCells[k][i+1][j].prim[UPP] = pow(r_cell,-1.5);
+          }
         }
       }
     }
