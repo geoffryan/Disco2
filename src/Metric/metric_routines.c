@@ -378,7 +378,38 @@ double metric_frame_U_u_geo(struct Metric *g, int mu, struct Sim *theSim)
     double M = sim_GravM(theSim);
     double r = g->x[1];
 
-    if(sim_Metric(theSim) == SCHWARZSCHILD_KS)
+    if(sim_Metric(theSim) == SCHWARZSCHILD_SC)
+    {
+        double Risco = 6*M;
+        if(mu == 0)
+        {
+            if(r > Risco)
+                return sqrt(r/(r-3*M));
+            else
+            {
+                double u0d = -2.0*sqrt(2.0)/3.0;
+                return u0d / (-1 + 2*M/r);
+            }
+        }
+        if(mu == 1)
+        {
+            if(r > Risco)
+                return 0.0;
+            else
+            {
+                double x = Risco/r - 1.0;
+                return -sqrt(x*x*x) / 3.0;
+            }
+        }
+        if(mu == 2)
+        {
+            if(r > Risco)
+                return sqrt(M/(r*r*(r-3*M)));
+            else
+                return 2.0*sqrt(3.0)*M/(r*r);
+        }
+    }
+    else if(sim_Metric(theSim) == SCHWARZSCHILD_KS)
     {
         double Risco = 6*M;
         if(mu == 0)
@@ -517,7 +548,51 @@ double metric_frame_dU_du_geo(struct Metric *g, int mu, int nu,
     double M = sim_GravM(theSim);
     double r = g->x[1];
 
-    if(sim_Metric(theSim) == SCHWARZSCHILD_KS)
+    if(sim_Metric(theSim) == SCHWARZSCHILD_SC)
+    {
+        double Risco = 6*M;
+
+        if(mu != 1)
+            return 0.0;
+
+        if(nu == 0)
+        {
+            if(r > Risco)
+            {
+                double x = 1.0 - 3.0*M/r;
+                return -1.5*M / (sqrt(x*x*x) * r*r);
+            }
+            else
+            {
+                double u0d = -2.0*sqrt(2.0)/3.0;
+                double x = 1.0 / (-1 + 2*M/r);
+
+                return -u0d * x*x * (-2*M/(r*r));
+            }
+        }
+        if(nu == 1)
+        {
+            if(r > Risco)
+                return 0.0;
+            else
+            {
+                double x = Risco/r - 1.0;
+                double dx = -Risco/(r*r);
+                return -0.5 * sqrt(x) * dx;
+            }
+        }
+        if(nu == 2)
+        {
+            if(r > Risco)
+            {
+                double x = r-3.0*M;
+                return -1.5 * (r-2.0*M) * sqrt(M/(x*x*x)) / (r*r);
+            }
+            else
+                return -4.0*sqrt(3.0) * M / (r*r*r);
+        }
+    }
+    else if(sim_Metric(theSim) == SCHWARZSCHILD_KS)
     {
         double Risco = 6*M;
 
