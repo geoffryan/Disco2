@@ -189,14 +189,14 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         ax2 = ax[0,0].twinx()
         plot_data(ax[0,0], r, rho)
         plot_data(ax2, r, sig * eos.rg_solar, color='b')
-        pretty_axis(ax[0,0], pars, xscale="log", yscale="log", 
+        pretty_axis(ax[0,0], pars, xscale=scale, yscale=scale, 
                     ylabel=r"$\rho_0$ ($g/cm^3$)")
-        pretty_axis(ax2, pars, xscale="log", yscale="log", 
+        pretty_axis(ax2, pars, xscale=scale, yscale=scale, 
                     ylabel=r"$\Sigma_0$ ($g/cm^2$)", twin=True)
 
         # Temperature
         plot_data(ax[0,1], r, T)
-        pretty_axis(ax[0,1], pars, xscale="log", yscale="log", 
+        pretty_axis(ax[0,1], pars, xscale=scale, yscale=scale, 
                     ylabel=r"$T$ ($m_p c^2$)")
 
         # Pressure
@@ -210,45 +210,45 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
             plot_data(ax[0,2], r, eos.P_deg(rho,T,pars), color='y')
         plot_data(ax[0,2], r, P)
         plot_data(ax2, r, pi * eos.rg_solar, color='b')
-        pretty_axis(ax[0,2], pars, xscale="log", yscale="log", 
+        pretty_axis(ax[0,2], pars, xscale=scale, yscale=scale, 
                     ylabel=r"$P$ ($g\ c^2 / cm^3$)")
-        pretty_axis(ax2, pars, xscale="log", yscale="log", 
+        pretty_axis(ax2, pars, xscale=scale, yscale=scale, 
                     ylabel=r"$\Pi$ ($g\ c^2 / cm^2$)", twin=True)
 
         # Radial Velocity
         plot_data(ax[1,0], r, vr)
-        pretty_axis(ax[1,0], pars, xscale="log", yscale="linear", 
+        pretty_axis(ax[1,0], pars, xscale=scale, yscale="linear", 
                     ylabel=r"$v^r$")
 
         # Azimuthal Velocity
         plot_data(ax[1,1], r, vp)
-        pretty_axis(ax[1,1], pars, xscale="log", yscale="log", 
+        pretty_axis(ax[1,1], pars, xscale=scale, yscale=scale, 
                     ylabel=r"$v^\phi$")
 
         # Lorentz Factor and Mach Number
         ax2 = ax[1,2].twinx()
         plot_data(ax[1,2], r, mach)
         plot_data(ax2, r, W, color='b')
-        pretty_axis(ax[1,2], pars, xscale="log", yscale="log", 
+        pretty_axis(ax[1,2], pars, xscale=scale, yscale=scale, 
                     ylabel=r"$\mathcal{M}$")
-        pretty_axis(ax2, pars, xscale="log", yscale="linear", 
+        pretty_axis(ax2, pars, xscale=scale, yscale="linear", 
                     ylabel=r"$W$", twin=True)
 
         # Scale Height
         plot_data(ax[2,0], r, H)
-        pretty_axis(ax[2,0], pars, xscale="log", yscale="log", 
+        pretty_axis(ax[2,0], pars, xscale=scale, yscale=scale, 
                     xlabel=r"$r$ ($G M_\odot / c^2)$", 
                     ylabel=r"$H$ ($G M_\odot / c^2$)")
 
         # Accretion rate
         plot_data(ax[2,1], r, Mdot)
-        pretty_axis(ax[2,1], pars, xscale="log", yscale="linear", 
+        pretty_axis(ax[2,1], pars, xscale=scale, yscale="linear", 
                     xlabel=r"$r$ ($G M_\odot / c^2)$", 
                     ylabel=r"$\dot{M}$ ($M_\odot/y$)")
 
         # Sound Speed
         plot_data(ax[2,2], r, cs)
-        pretty_axis(ax[2,2], pars, xscale="log", yscale="log", 
+        pretty_axis(ax[2,2], pars, xscale=scale, yscale=scale, 
                     xlabel=r"$r$ ($G M_\odot / c^2)$", ylabel=r"$c_s$")
 
         fig.suptitle(r"DISCO $M = {0:.1g}M_\odot$ $a_* = {1:.2f}$".format(M,a))

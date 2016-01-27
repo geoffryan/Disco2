@@ -7,8 +7,8 @@ import numpy as np
 import discopy as dp
 
 GAM = 5.0/3.0
-M = 0.95
-scale = 'log'
+M = 1.0
+scale = 'linear'
 
 def plot_r_profile_single(r, f, sca, ylabel, R=None, F=None):
 
@@ -107,7 +107,7 @@ def plot_r_profile(filename, sca='linear'):
     plt.plot(R, 0.5/(R*np.sqrt(1+2*M/R)), 'b--')
 
     plt.subplot(336)
-    plot_r_profile_single(r, mach, "log", r"$\mathcal{M}$")
+    plot_r_profile_single(r, mach, sca, r"$\mathcal{M}$")
     plt.plot(r, W, 'b+')
 
     plt.subplot(337)
