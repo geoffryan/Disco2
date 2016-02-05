@@ -53,8 +53,9 @@ double metric_sqrtgamma(struct Metric *g)
 double metric_sqrtg(struct Metric *g)
 {
     double det = 0.0;
+    double sqrtgam = metric_sqrtgamma(g);
 
-    det = g->g_dd[0] * metric_sqrtgamma(g);
+    det = g->g_dd[0] * sqrtgam*sqrtgam;
     if(g->g_dd[1] != 0.0)
         det -= g->g_dd[1]*(g->g_dd[1]*(g->g_dd[7]*g->g_dd[9] - g->g_dd[8]*g->g_dd[8])
                         + g->g_dd[5]*(g->g_dd[8]*g->g_dd[3] - g->g_dd[2]*g->g_dd[9])

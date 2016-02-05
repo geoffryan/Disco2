@@ -1,4 +1,5 @@
 #define CELL_PRIVATE_DEFS
+#define EOS_PRIVATE_DEFS
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -78,7 +79,7 @@ void cell_boundary_outflow_r_outer( struct Cell *** theCells , struct Face * the
 
   if( mpisetup_check_rout_bndry(theMPIsetup) ){
     for(i=iNmg-1; i<iN-1; i++){
-        printf("Boundary outflow r outer %d\n", i);
+        //printf("Boundary outflow r outer %d\n", i);
       n1 = timestep_n(theTimeStep,i,R_DIR);
       Nf = timestep_n(theTimeStep,i+1,R_DIR);
       for( n=n1 ; n<Nf ; ++n ){
@@ -821,10 +822,23 @@ void cell_boundary_nozzle(struct Cell ***theCells, struct Sim *theSim,
     int i,j,k;
     if(mpisetup_check_rout_bndry(theMPIsetup))
     {
+        /*
         double V = sim_BoundPar1(theSim);
         double b = sim_BoundPar2(theSim);
         double rho0 = sim_BoundPar3(theSim);
         double T0 = sim_BoundPar4(theSim);
+        */
+
+        double phi0 = sim_BoundPar1(theSim);
+        double Mdot = sim_BoundPar2(theSim); // in M_solar/year
+        double sig0 = sim_BoundPar3(theSim); // in g/cm^2
+        double T = sim_BoundPar4(theSim);
+        double dphi = 0.2; // Nozzle extends from phi0-dphi to phi0+dphi
+        double f = M_PI / (2*dphi);
+
+        Mdot *= eos_Msolar/eos_year; // Msolar/year --> g/s
+        Mdot /= eos_rho_scale * eos_r_scale*eos_r_scale*eos_c; // g/s --> C.U.
+        sig0 /= eos_rho_scale * eos_r_scale; // g/cm^2 --> C.U.
 
         for(i = sim_N(theSim,R_DIR) - sim_Nghost_max(theSim,R_DIR); 
                 i < sim_N(theSim,R_DIR); i++)
@@ -832,7 +846,9 @@ void cell_boundary_nozzle(struct Cell ***theCells, struct Sim *theSim,
             double rp = sim_FacePos(theSim,i,R_DIR);
             double rm = sim_FacePos(theSim,i-1,R_DIR);
             double r = 0.5*(rp+rm);
-            double width = r/10.0;
+
+            double vr = -Mdot / (sig0*r*dphi);
+
             for( k=0 ; k<sim_N(theSim,Z_DIR) ; ++k )
             {
                 double zp = sim_FacePos(theSim,k,Z_DIR);
@@ -841,23 +857,41 @@ void cell_boundary_nozzle(struct Cell ***theCells, struct Sim *theSim,
 
                 for( j=0 ; j<sim_N_p(theSim,i) ; ++j )
                 {
-                    double phi = theCells[k][i][j].tiph
-                                - 0.5*theCells[k][i][j].dphi;
-                    double x = r * cos(phi);
-                    double y = r * sin(phi);
-                    if(x > 0.0 && fabs(sin(phi)) < 2*width/r)
+                    double phip = theCells[k][i][j].tiph - phi0;
+                    double phim = theCells[k][i][j].tiph
+                                    - theCells[k][i][j].dphi - phi0;
+                    while(phip < -M_PI)
                     {
-                        double fac = exp(-(y*y+z*z)/(2*width*width));
-                        double sina = b/r;
-                        double vr = -V * sqrt(1.0-sina*sina);
-                        double vp = V * sina/r;
+                        phip += 2*M_PI;
+                        phim += 2*M_PI;
+                    }
+                    while(phim > M_PI)
+                    {
+                        phip -= 2*M_PI;
+                        phim -= 2*M_PI;
+                    }
+                    if(phim < dphi && phip > -dphi)
+                    {
+                        double xp = f * phip;
+                        double xm = f * phim;
 
-                        theCells[k][i][j].prim[RHO] = fac*rho0;
-                        theCells[k][i][j].prim[TTT] = fac*T0;
-                        theCells[k][i][j].prim[URR] = fac*vr;
-                        theCells[k][i][j].prim[UPP] = fac*vp;
+                        xp = xp>0.5*M_PI ? 0.5*M_PI : xp;
+                        xm = xm<-0.5*M_PI ? -0.5*M_PI : xm;
+                        // sig(phi) = sig0 * cos^2(pi/(2*dphi) * (phi-phi0))
+                        // sig = <sig(phi)> over the cell
+                        double sig = 0.5 * sig0
+                                        * (1 + cos(xp+xm)*sin(xp-xm)/(xp-xm));
+                        double pi = sig*T;
+
+                        theCells[k][i][j].prim[RHO] = sig;
+                        theCells[k][i][j].prim[PPP] = pi;
+                        theCells[k][i][j].prim[URR] = vr;
+                        theCells[k][i][j].prim[UPP] = 0.0;
+                        theCells[k][i][j].prim[UZZ] = 0.0;
+                        if(sim_Background(theSim) == GRDISC)
+                            theCells[k][i][j].prim[TTT] = T;
                         if(sim_NUM_Q(theSim) >= sim_NUM_C(theSim) + 2)
-                            theCells[k][i][j].prim[sim_NUM_C(theSim)+1] = fac;
+                            theCells[k][i][j].prim[sim_NUM_C(theSim)+1] = 1.0;
                     }
                 }
             }
