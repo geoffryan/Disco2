@@ -79,5 +79,5 @@ def readCheckpoint(filename, nq=-1):
         phi[inds] = piph[inds] - 0.5*dp
         dV[inds] *= r[inds] * dphi[inds]
 
-    return t, r, phi, z, rho, P, vr, vp, vz, dV, q, piph, gravMass
+    return t, r, phi, z, rho, P, vr, vp, vz, dV, q, piph, dphi, gravMass
 

@@ -5,6 +5,65 @@ import numpy as np
 # 2: Schwarzschild, Kerr-Schild coords
 # 3: Flat, cartesian coords
 # 4: Kerr, Kerr-Schild coords
+# 5: Flat, cyl coords, ADM
+# 6: Schw, Kerr-Schild coords, ADM
+
+
+def calc_g(r, pars):
+    M = pars['GravM']
+    a = pars['GravA']
+    bw = pars['BinW']
+    A = M*a
+
+    g00 = np.zeros(r.shape)
+    g0r = np.zeros(r.shape)
+    g0p = np.zeros(r.shape)
+    grr = np.zeros(r.shape)
+    grp = np.zeros(r.shape)
+    gpp = np.zeros(r.shape)
+
+    if pars['Metric'] == 0:
+        g00 = -1.0
+        g0r = 0.0
+        g0p = 0.0
+        grr = 1.0
+        grp = 0.0
+        gpp = r*r
+
+    elif pars['Metric'] == 1:
+        g00 = -1.0 + 2*M/r
+        g0r = 0.0
+        g0p = 0.0
+        grr = 1.0/(1.0 - 2*M/r)
+        grp = 0.0
+        gpp = r*r
+
+    elif pars['Metric'] == 2:
+        g00 = -1.0 + 2*M/r
+        g0r = 2*M/r
+        g0p = 0.0
+        grr = 1.0 + 2*M/r
+        grp = 0.0
+        gpp = r*r
+
+    elif pars['Metric'] == 3:
+        g00 = -1.0
+        g0r = 0.0
+        g0p = 0.0
+        grr = 1.0
+        grp = 0.0
+        gpp = 1.0
+
+    elif pars['Metric'] == 6:
+        g00 = -1.0 + 2*M/r + r*r*bw*bw
+        g0r = 2*M/r
+        g0p = r*r*bw
+        grr = 1.0 + 2*M/r
+        grp = 0.0
+        gpp = r*r
+
+    return g00, g0r, g0p, grr, grp, gpp
+
 
 def calc_u(r, vr, vp, pars):
 

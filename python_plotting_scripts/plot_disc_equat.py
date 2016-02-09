@@ -1,4 +1,5 @@
 import math
+import pickle
 import h5py as h5
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
@@ -442,16 +443,26 @@ if __name__ == "__main__":
         pars = dp.readParfile(sys.argv[1])
         bounds = None
         Vmax = 0.0
-        for filename in sys.argv[2:]:
-            b, Vmax = plot_all(filename, pars, rmax=rmax, plot=False, 
-                                Vmax=Vmax)
-            if bounds == None:
-                bounds = b.copy()
-            else:
-                lower = b[:,0]<bounds[:,0]
-                upper = b[:,1]>bounds[:,1]
-                bounds[lower,0] = b[lower,0]
-                bounds[upper,1] = b[upper,1]
+        try:
+            f = open("bounds.dat", "r")
+            print("Trying to unpickle bounds...")
+            bounds, Vmax = pickle.load(f)
+            f.close()
+        except:
+            print("Making bounds from scratch...")
+            for filename in sys.argv[2:]:
+                b, Vmax = plot_all(filename, pars, rmax=rmax, plot=False, 
+                                    Vmax=Vmax)
+                if bounds is None:
+                    bounds = b.copy()
+                else:
+                    lower = b[:,0]<bounds[:,0]
+                    upper = b[:,1]>bounds[:,1]
+                    bounds[lower,0] = b[lower,0]
+                    bounds[upper,1] = b[upper,1]
+            f = open("bounds.dat", "w")
+            pickle.dump((bounds, Vmax), f, protocol=-1)
+            f.close()
         
         if plotOrbit:
             orbitData = calcOrbit(pars, sys.argv[-1])

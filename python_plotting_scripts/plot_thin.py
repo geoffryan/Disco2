@@ -195,6 +195,7 @@ def calcNT(g, r, rs, Mdot):
     B = 1.0 + A*OMK
     C = 1.0 - 3.0*M/r + 2*A*OMK
     D = 1.0 - 2.0*M/r + A*A/(r*r)
+    f = 1.0 - np.sqrt(rs/r)
     if A == 0:
         P = 1.0 - np.sqrt(rs/r) + np.sqrt(3*M/r)*(np.arctanh(np.sqrt(3*M/r))
                                             - np.arctanh(np.sqrt(3*M/rs)))
@@ -227,10 +228,10 @@ def calcNT(g, r, rs, Mdot):
 
     U0 = B/np.sqrt(C)
 
-    pi = Mdot / (3*np.pi*AL*math.sqrt(GAM)) * OMK
+    pi = Mdot / (3*np.pi*AL*math.sqrt(GAM)) * OMK * f
     PI = Mdot / (3*np.pi*AL*math.sqrt(GAM)) * OMK * np.sqrt(C) * P / (D*D)
 
-    Qdot = 3*Mdot/(4*np.pi) * OMK*OMK
+    Qdot = 3*Mdot/(4*np.pi) * OMK*OMK * f
     QDOT = 3*Mdot/(4*np.pi) * OMK*OMK * P / C
 
     sig = np.power(8.0*sb/(3*ka_bbes*Qdot) * (pi*mp*c*c)**4
