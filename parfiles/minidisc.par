@@ -43,7 +43,7 @@ ZeroPsiBndry            1
 BoundTypeSource         6       // 0 None, 6 Nozzle
 BoundPar1               0.0     // phi0
 BoundPar2               1.0e-6  // Mdot (Msolar/year == 10^5 code units)
-BoundPar3               1.5e6   // Sig0 (Peak surface density, g/cm^2)
+BoundPar3               1.0e-2   // Sig0 (Nozzle radial velocity, c)
 BoundPar4               1.0e-4  // T0 (Temperature, mp*c^2)
 
 Move_Cells              7       // 0 None, 4 Keplerian, 7 Frame
