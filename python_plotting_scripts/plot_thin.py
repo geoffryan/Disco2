@@ -309,6 +309,108 @@ def calcGEO(g, r, Mdot, K):
 
     return sig, pi, vr, vp, qdot
 
+def plotEpsNice(g):
+
+    r, prim = gToArr1D(g)
+
+    rho, sig, p, pi, H, T, vr, vp, mdot, qdot = allTheThings(g, r, prim)
+
+    M = g._pars['GravM']
+    a = g._pars['GravA']
+    EOSType = g._pars['EOSType']
+    EOSPar2 = g._pars['EOSPar2']
+    gam = g._pars['Adiabatic_Index']
+
+    rad = False
+    if EOSType == 1 and EOSPar2 == 1.0:
+        rad = True
+
+    Risco = ISCO(M,a)
+    Reh = EH(M,a)
+
+    R = np.logspace(math.log10(Risco)+0.01, math.log10(r.max()), base=10.0, num=200)
+    R2 = np.logspace(math.log10(r.min()), math.log10(Risco)-0.05, base=10.0, num=200)
+
+    RS = Risco
+    MDOT = 209
+    K = 3.5e-5
+
+    labelsize = 24
+    ticksize = 18
+    titlesize = 36
+    legendsize = 24
+
+    if rad:
+        SSdat, NTdat, NTraddat = calcNT(g, R, RS, MDOT)
+    else:
+        SSdat, NTdat = calcNT(g, R, RS, MDOT)
+
+    GEOdat = calcGEO(g, R2, MDOT, K)
+
+    fig, ax = plt.subplots(1,1, figsize=(12,9))
+
+    xlim = (1.0, 1.0e2)
+
+    sige = pi/(gam-1.0)
+
+    u0 = 1.0/np.sqrt(1-2*M/r-4*M*vr/r-(1+2*M/r)*vr*vr-r*r*vp*vp)
+    ur = u0*vr
+    up = u0*vp
+
+    U0 = np.zeros(r.shape)
+    UR = np.zeros(r.shape)
+    UP = np.zeros(r.shape)
+
+    ri = r[r<6*M]
+    ro = r[r>=6*M]
+
+    U0[r<6*M] = 2.0/3.0 * (np.sqrt(2.0) - M/ri*np.power(6*M/ri-1.0, 1.5)) \
+                    / (1.0 - 2*M/ri)
+    UR[r<6*M] = -np.power(6*M/ri-1.0, 1.5) / 3.0
+    UP[r<6*M] = 2*np.sqrt(3.0)*M/(ri*ri)
+    U0[r>=6*M] = 1.0/np.sqrt(1-3*M/ro)
+    UR[r>=6*M] = 0.0
+    UP[r>=6*M] = np.sqrt((M/(ro*ro*ro)) / (1-3*M/ro))
+
+    uU = (-1+2*M/r)*u0*U0 + 2*M/r*(u0*UR+ur*U0) + (1+2*M/r)*ur*UR + r*r*up*UP
+    
+
+    al = 1.0/np.sqrt(1.0+2*M/r)
+    w = al*u0
+    W = al*U0
+
+    tau = sige*w*w + pi*(w-1.0)*(w+1.0) + sig*w*(w-1.0)
+    tauU = sige*(-uU)*w + pi*(-uU*w-W) + sig*w*(-uU-1.0)
+    tauu = sige*w
+
+    real_units = rho_scale*r_scale
+
+    ax.axvspan(xlim[0], 2*M, color='lightgrey', alpha=0.5, 
+                label='Event Horizon')
+    #ax.axvspan(xlim[0], Reh, color='grey', alpha=0.5, 
+    #            label='Ergosphere')
+    ax.axvline(Risco, ls='--', lw=5.0, color='lightgrey',
+                label='ISCO')
+
+    ax.plot(r[2:], tau[2:], ls='-', lw=5.0, color=blue, 
+            label=r'$\tau = -n_\mu T^{\mu 0} - D$')
+    ax.plot(r[2:], tauU[2:], ls='-', lw=5.0, color=orange, 
+            label=r'$\tau_U = -U_\mu T^{\mu 0} - D$')
+    ax.plot(r[2:], tauu[2:], 'k+', ms=10, label=r'$\rho_0 \epsilon w = -u_\mu T^{\mu 0} - D$')
+    ax.set_xlabel(r"$r$ $(GM_\odot / c^2)$", fontsize=labelsize)
+    ax.set_ylabel(r"Internal Energy", fontsize=labelsize)
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.tick_params(labelsize=ticksize)
+    ax.set_xlim(xlim)
+    plt.legend(loc="lower right", fontsize=legendsize)
+
+    title = ax.set_title(r"$M=M_\odot$   $a=0.0$   $\mathcal{M}_{ISCO}=80$", 
+            fontsize=titlesize)
+    title.set_position((0.5,1.02))
+
+    return fig, ax
+
 def plotSigNice(g):
 
     r, prim = gToArr1D(g)
@@ -785,18 +887,21 @@ if __name__ == "__main__":
         nameSig = "plot_thin_Sig_{0:04d}.png".format(num)
         nameQdot = "plot_thin_Qdot_{0:04d}.png".format(num)
         nameShear = "plot_thin_shear_{0:04d}.png".format(num)
+        nameEps = "plot_thin_eps_{0:04d}.png".format(num)
 
         print("   Plotting {0:s}".format(checkpoint))
         fig, ax = plotNT(g)
         fig2, ax2 = plotSigNice(g)
         fig3, ax3 = plotQdotNice(g)
         fig4, ax4 = plot_shear(g)
+        fig5, ax5 = plotEpsNice(g)
         
         print("   Saving {0:s}".format(name))
         fig.savefig(name)
         fig2.savefig(nameSig)
         fig3.savefig(nameQdot)
         fig4.savefig(nameShear)
+        fig5.savefig(nameEps)
 
         plt.show()
 

@@ -64,6 +64,74 @@ def calc_g(r, pars):
 
     return g00, g0r, g0p, grr, grp, gpp
 
+def calc_shift(r, pars):
+    M = pars['GravM']
+    a = pars['GravA']
+    bw = pars['BinW']
+    A = M*a
+
+    br = np.zeros(r.shape)
+    bp = np.zeros(r.shape)
+
+    if pars['Metric'] == 0:
+        br = 0.0
+        bp = 0.0
+
+    elif pars['Metric'] == 1:
+        br = 0.0
+        bp = 0.0
+
+    elif pars['Metric'] == 2:
+        br = 2*M/(r + 2*M)
+        bp = 0.0
+
+    elif pars['Metric'] == 3:
+        br = 0.0
+        bp = 0.0
+
+    elif pars['Metric'] == 6:
+        br = 2*M/(r+2*M)
+        bp = bw
+
+    return br, bp
+
+def calc_igam(r, pars):
+    M = pars['GravM']
+    a = pars['GravA']
+    bw = pars['BinW']
+    A = M*a
+
+    igamrr = np.zeros(r.shape)
+    igamrp = np.zeros(r.shape)
+    igampp = np.zeros(r.shape)
+
+    if pars['Metric'] == 0:
+        igamrr = 1.0
+        igamrp = 0.0
+        igampp = 1.0/(r*r)
+
+    elif pars['Metric'] == 1:
+        igamrr = 1.0 - 2*M/r
+        igamrp = 0.0
+        igampp = 1.0/(r*r)
+
+
+    elif pars['Metric'] == 2:
+        igamrr = 1.0/(1.0+2*M/r)
+        igamrp = 0.0
+        igampp = 1.0/(r*r)
+
+    elif pars['Metric'] == 3:
+        igamrr = 1.0
+        igamrp = 0.0
+        igampp = 1.0
+
+    elif pars['Metric'] == 6:
+        igamrr = 1.0/(1.0+2*M/r)
+        igamrp = 0.0
+        igampp = 1.0/(r*r)
+
+    return igamrr, igamrp, igampp
 
 def calc_u(r, vr, vp, pars):
 

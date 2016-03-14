@@ -9,7 +9,8 @@ import discoEOS as eos
 import discoGR as gr
 
 scale = 'log'
-RMAX = 60
+RMAX = 100.0
+RMIN = 6.0
 
 def allTheThings(filename, pars):
 
@@ -133,6 +134,30 @@ def pretty_axis(ax, pars, xscale="linear", yscale="linear",
             ax.axvspan(max(0,xlim[0]), min(Rer,xlim[1]), color='lightgrey', 
                                             zorder=1, alpha=0.5)
 
+def wavespeeds(r, u0, ur, up, cs, pars):
+    g00, g0r, g0p, grr, grp, gpp = gr.calc_g(r, pars)
+    igamrr, igamrp, igampp = gr.calc_igam(r, pars)
+    br, bp = gr.calc_shift(r, pars)
+    a = gr.lapse(r, pars)
+
+    w = a*u0
+    Ur = ur + br*u0
+    Up = up + bp*u0
+    Vr = Ur/w
+    Vp = Up/w
+    V2 = grr*Vr*Vr + 2*grp*Vr*Vp + gpp*Vp*Vp
+
+    dvr = cs*np.sqrt(igamrr*(1-cs*cs*V2) - (1-cs*cs)*Vr*Vr) / w
+    vrp = a * (Vr*(1-cs*cs) + dvr) / (1-cs*cs*V2) - br
+    vrm = a * (Vr*(1-cs*cs) - dvr) / (1-cs*cs*V2) - br
+
+    dvp = cs*np.sqrt(igampp*(1-cs*cs*V2) - (1-cs*cs)*Vp*Vp) / w
+    vpp = a * (Vp*(1-cs*cs) + dvp) / (1-cs*cs*V2) - bp
+    vpm = a * (Vp*(1-cs*cs) - dvp) / (1-cs*cs*V2) - bp
+
+    return (vrp, vrm), (vpp, vpm)
+
+
 def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
     print("Reading {0:s}".format(filename))
@@ -140,11 +165,12 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     M = pars['GravM']
     a = pars['GravA']
     gam = pars['Adiabatic_Index']
+    bw = pars['BinW']
     A = a*M
 
     t, r, phi, rho, sig, T, P, pi, H, vr, vp, u0, q, dphi = allTheThings(
                                                                 filename, pars)
-    inds = r < RMAX
+    inds = (r < RMAX) * (r > RMIN)
     r = r[inds]
     phi = phi[inds]
     rho = rho[inds]
@@ -184,6 +210,12 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     urd = g0r*u0 + grr*ur + grp*up
     upd = g0p*u0 + grp*ur + gpp*up
 
+    up_lab = up + bw*u0
+
+    u0sc = np.sqrt((1.0 + ur*ur/(1-2*M/r) + up_lab*up_lab*r*r) / (1.0-2*M/r))
+    u0dsc = -(1-2*M/r) * u0sc
+    updsc = r*r*up_lab
+
     #Mdot = - r*sig*u0*vr * (eos.c * eos.rg_solar**2 * eos.year
     #                                    / eos.M_solar)
     #Mdot = - r*sig*ur
@@ -206,6 +238,7 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     Ldot = np.zeros(Rs.shape)
     Edot = np.zeros(Rs.shape)
     Lindot = np.zeros(Rs.shape)
+    avVflux = np.zeros(Rs.shape)
 
     gam = pars['Adiabatic_Index']
     sigh = sig + gam/(gam-1.0)*pi
@@ -215,6 +248,13 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     A0 = np.zeros(Rs.shape[0])
     An = np.zeros((Rs.shape[0], nmodes))
     PhiN = np.zeros((Rs.shape[0], nmodes))
+
+    deltaRho = np.zeros(Rs.shape[0])
+    deltaSig = np.zeros(Rs.shape[0])
+    deltaPi = np.zeros(Rs.shape[0])
+    Rho0 = np.zeros(Rs.shape[0])
+    Sig0 = np.zeros(Rs.shape[0])
+    Pi0 = np.zeros(Rs.shape[0])
 
     for i,R in enumerate(Rs):
 
@@ -230,11 +270,19 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         Lflux = (sigh[inds]*ur[inds]*upd[inds] * R*dphi[inds]).sum()
         Eflux = -(sigh[inds]*ur[inds]*u0d[inds] * R*dphi[inds]).sum()
         Dfluxp = (sig[inds]*up[inds] * R*dphi[inds]).sum() #this is weird
+        Vflux = (sig[inds]*cs2[inds] * R*dphi[inds]).sum()
 
         avupd = (upd[inds] * R*dphi[inds]).sum() / A
         avsigEflux = ((sig[inds]+pi[inds]/(gam-1.0))*ur[inds] * R*dphi[inds]
                         ).sum() / A
         avsigflux = -(sig[inds]*ur[inds] * R*dphi[inds]).sum() / A
+
+        deltaRho[i] = rho[inds].max() - rho[inds].min()
+        deltaSig[i] = sig[inds].max() - sig[inds].min()
+        deltaPi[i] = pi[inds].max() - pi[inds].min()
+        Pi0[i] = pi[inds].min()
+        Sig0[i] = sig[inds].min()
+        Rho0[i] = rho[inds].min()
 
         avsig[i] = sigtot / A
         avD[i] = Dtot / A
@@ -247,6 +295,7 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         Ldot[i] = -Lflux
         Edot[i] = -Eflux
         Lindot[i] = avsigEflux * avupd / avsigflux
+        avVflux[i] = Vflux * R / A
 
         ph = phi[inds]
         a0 = (D*dphi[inds]).sum()/(2*np.pi)
@@ -262,6 +311,39 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     e = Edot/Mdot
     jin = Lindot/Mdot
     jout = j - jin
+
+    #Rafikov-Analysis
+    djdr = (j[2:]-j[:-2]) / (Rs[2:]-Rs[:-2])
+    pi_raf_sig = (2+(gam+1)*deltaSig/Sig0) / (2-(gam-1)*deltaSig/Sig0)
+    pi_raf_rho = (2+(gam+1)*deltaRho/Rho0) / (2-(gam-1)*deltaRho/Rho0)
+
+    psi_Q_sig = (pi_raf_sig * np.power((gam+1+(gam-1)*pi_raf_sig)
+                    /(gam-1+(gam+1)*pi_raf_sig), gam) - 1) / (gam-1)
+    psi_Q_rho = (pi_raf_rho * np.power((gam+1+(gam-1)*pi_raf_rho)
+                    /(gam-1+(gam+1)*pi_raf_rho), gam) - 1) / (gam-1)
+
+    Mdot_raf_sig = 2 * avD[1:-1] * Rs[1:-1] * Pi0[1:-1]/Sig0[1:-1] \
+                        * psi_Q_sig[1:-1] / djdr
+    Mdot_raf_rho = 2 * avD[1:-1] * Rs[1:-1] * Pi0[1:-1]/Sig0[1:-1] \
+                        * psi_Q_rho[1:-1] / djdr
+
+    fig, ax = plt.subplots(1,1, figsize=(10,10))
+    ax.plot(Rs, Mdot, 'k+')
+    ax.plot(Rs[1:-1], Mdot_raf_sig, 'b+')
+    #ax.plot(Rs[1:-1], Mdot_raf_rho, 'r+')
+    ax.set_xlabel(r"$r$")
+    ax.set_ylabel(r"$\dot{M}$")
+    ax.set_xlim(Rs.min(), Rs.max())
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+
+    outpath = filename.split("/")[:-1]
+    chckname = filename.split("/")[-1]
+    outname = "plot_minidisc_rafikov_{0}.png".format(
+                "_".join(chckname.split(".")[0].split("_")[1:]))
+    print("Saving {0:s}...".format(outname))
+    fig.savefig(outname)
+    plt.close(fig)
 
     fig, ax = plt.subplots(1,1, figsize=(10,10))
     ax.plot(Rs*np.cos(PhiN[:,0]), Rs*np.sin(PhiN[:,0]), 'k+')
@@ -282,10 +364,25 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     ax.plot(Rs*np.cos(PhiN[:,3]+3*np.pi/2), Rs*np.sin(PhiN[:,3]+3*np.pi/2), 
             'r+')
     """
+    ax.set_xlim(-RMAX, RMAX)
+    ax.set_ylim(-RMAX, RMAX)
 
-    outpath = filename.split("/")[:-1]
-    chckname = filename.split("/")[-1]
     outname = "plot_minidisc_phases_{0}.png".format(
+                "_".join(chckname.split(".")[0].split("_")[1:]))
+    print("Saving {0:s}...".format(outname))
+    fig.savefig(outname)
+    plt.close(fig)
+
+    UPDSC_circ = np.sqrt(M*Rs/(1-3*M/Rs))
+    U0DSC_circ = -(1-2*M/Rs) / np.sqrt(1-3*M/Rs)
+
+    fig, ax = plt.subplots(2,2, figsize=(12,9))
+    plot_data(ax[0,0], updsc, u0dsc)
+    plot_data(ax[0,0], UPDSC_circ, U0DSC_circ, 'r')
+    pretty_axis(ax[0,0], pars, xlabel=r"$u_\phi$", ylabel=r"$u_0$")
+    plot_data(ax[0,1], Rs, 2.0/3.0 * Ldot / avVflux)
+    pretty_axis(ax[0,1], pars, xlabel=r"$R$", ylabel=r"$\alpha$", yscale='log')
+    outname = "plot_minidisc_orbit_{0}.png".format(
                 "_".join(chckname.split(".")[0].split("_")[1:]))
     print("Saving {0:s}...".format(outname))
     fig.savefig(outname)
@@ -328,6 +425,69 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     plt.tight_layout()
     
     outname = "plot_minidisc_amplitudes_{0}.png".format(
+                "_".join(chckname.split(".")[0].split("_")[1:]))
+    print("Saving {0:s}...".format(outname))
+    fig.savefig(outname)
+    plt.close(fig)
+
+
+    fig, ax = plt.subplots(4, 4, figsize=(14,9))
+
+    i = len(Rs)/4
+    plot_data(ax[0,0], phi[r==Rs[i]], sig[r==Rs[i]])
+    pretty_axis(ax[0,0], pars, xlabel=r"$\phi$", 
+            ylabel=r"$\Sigma_0$ ($r={0:.2g}$)".format(Rs[i]))
+    plot_data(ax[1,0], phi[r==Rs[i]], pi[r==Rs[i]])
+    pretty_axis(ax[1,0], pars, xlabel=r"$\phi$", ylabel=r"$\Pi_0$")
+    plot_data(ax[2,0], phi[r==Rs[i]], vr[r==Rs[i]])
+    pretty_axis(ax[2,0], pars, xlabel=r"$\phi$", ylabel=r"$v^r$")
+    plot_data(ax[3,0], phi[r==Rs[i]], vp[r==Rs[i]])
+    plot_data(ax[3,0], phi[r==Rs[i]], np.sqrt(M/(r[r==Rs[i]]**3)-bw),
+                color='r')
+    pretty_axis(ax[3,0], pars, xlabel=r"$\phi$", ylabel=r"$v^\phi$")
+
+    i = len(Rs)/2
+    plot_data(ax[0,1], phi[r==Rs[i]], sig[r==Rs[i]])
+    pretty_axis(ax[0,1], pars, xlabel=r"$\phi$", 
+            ylabel=r"$\Sigma_0$ ($r={0:.2g}$)".format(Rs[i]))
+    plot_data(ax[1,1], phi[r==Rs[i]], pi[r==Rs[i]])
+    pretty_axis(ax[1,1], pars, xlabel=r"$\phi$", ylabel=r"$\Pi_0$")
+    plot_data(ax[2,1], phi[r==Rs[i]], vr[r==Rs[i]])
+    pretty_axis(ax[2,1], pars, xlabel=r"$\phi$", ylabel=r"$v^r$")
+    plot_data(ax[3,1], phi[r==Rs[i]], vp[r==Rs[i]])
+    plot_data(ax[3,1], phi[r==Rs[i]], np.sqrt(M/(r[r==Rs[i]]**3))-bw, 
+                color='r')
+    pretty_axis(ax[3,1], pars, xlabel=r"$\phi$", ylabel=r"$v^\phi$")
+
+    i = 3*len(Rs)/4
+    plot_data(ax[0,2], phi[r==Rs[i]], sig[r==Rs[i]])
+    pretty_axis(ax[0,2], pars, xlabel=r"$\phi$", 
+            ylabel=r"$\Sigma_0$ ($r={0:.2g}$)".format(Rs[i]))
+    plot_data(ax[1,2], phi[r==Rs[i]], pi[r==Rs[i]])
+    pretty_axis(ax[1,2], pars, xlabel=r"$\phi$", ylabel=r"$\Pi_0$")
+    plot_data(ax[2,2], phi[r==Rs[i]], vr[r==Rs[i]])
+    pretty_axis(ax[2,2], pars, xlabel=r"$\phi$", ylabel=r"$v^r$")
+    plot_data(ax[3,2], phi[r==Rs[i]], vp[r==Rs[i]])
+    plot_data(ax[3,2], phi[r==Rs[i]], np.sqrt(M/(r[r==Rs[i]]**3))-bw, 
+                color='r')
+    pretty_axis(ax[3,2], pars, xlabel=r"$\phi$", ylabel=r"$v^\phi$")
+
+    i = len(Rs)-1
+    plot_data(ax[0,3], phi[r==Rs[i]], sig[r==Rs[i]])
+    pretty_axis(ax[0,3], pars, xlabel=r"$\phi$", 
+            ylabel=r"$\Sigma_0$ ($r={0:.2g}$)".format(Rs[i]))
+    plot_data(ax[1,3], phi[r==Rs[i]], pi[r==Rs[i]])
+    pretty_axis(ax[1,3], pars, xlabel=r"$\phi$", ylabel=r"$\Pi_0$")
+    plot_data(ax[2,3], phi[r==Rs[i]], vr[r==Rs[i]])
+    pretty_axis(ax[2,3], pars, xlabel=r"$\phi$", ylabel=r"$v^r$")
+    plot_data(ax[3,3], phi[r==Rs[i]], vp[r==Rs[i]])
+    plot_data(ax[3,3], phi[r==Rs[i]], np.sqrt(M/(r[r==Rs[i]]**3))-bw, 
+                color='r')
+    pretty_axis(ax[3,3], pars, xlabel=r"$\phi$", ylabel=r"$v^\phi$")
+
+    plt.tight_layout()
+
+    outname = "plot_minidisc_azimuth_{0}.png".format(
                 "_".join(chckname.split(".")[0].split("_")[1:]))
     print("Saving {0:s}...".format(outname))
     fig.savefig(outname)
