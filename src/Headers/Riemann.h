@@ -51,6 +51,12 @@ void riemann_set_vel_newt(struct Riemann *, struct Sim *, double, double);
 void riemann_set_vel_gr(struct Riemann *, struct Sim *, double, double);
 void riemann_set_vel_grdisc(struct Riemann *, struct Sim *, double, double);
   
+void (*riemann_set_star_hllc)(struct Riemann *, struct Sim *, double);
+void riemann_set_star_hllc_newt(struct Riemann *theRiemann, struct Sim *theSim,
+        double GAMMALAW);
+void riemann_set_star_hllc_gr(struct Riemann *theRiemann, struct Sim *theSim,
+        double GAMMALAW);
+
 void riemann_visc_flux_gr(struct Riemann *, struct Sim *);
 void riemann_visc_flux_grdisc(struct Riemann *, struct Sim *);
 void riemann_visc_flux_LR_gr(struct Riemann *, struct Sim *, int, double *);

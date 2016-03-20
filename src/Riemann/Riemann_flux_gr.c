@@ -19,32 +19,60 @@
 // this routine is only called by riemann_set_vel.
 // It is used to find various L/R quantities. 
 // TODO: remove GAMMALAW
-void LR_speed_gr(double *prim, double r, int *n ,double GAMMALAW, double *p_vn, double *p_cf2, double *Fm, double *p_mn)
+void LR_speed_gr(double *prim, int *n, double GAMMALAW, double *p_vn,
+                double *p_cf2, double *m, double *Fm, double *p_e, 
+                double *p_Fe, double *p_w, struct Metric *g)
 {
     double P   = prim[PPP];
     double rho = prim[RHO];
-    double vr  = prim[URR];
-    double vp  = prim[UPP];
-    double vz  = prim[UZZ];
-    double vn  = vr*n[0] + vp*n[1] + vz*n[2];
-    double cf2  = GAMMALAW*P/(rho + GAMMALAW*P/(GAMMALAW-1.0));
+    double v[3]  = {prim[URR], prim[UPP], prim[UZZ]};
+    double vn  = v[0]*n[0] + v[1]*n[1] + v[2]*n[2];
+    double rhoh = rho + GAMMALAW/(GAMMALAW-1.0)*P;
+    double cf2  = GAMMALAW*P/rhoh;
+
+    int i,j;
+    double al = metric_lapse(g);
+    double be[3];
+    for(i=0; i<3; i++)
+        be[i] = metric_shift_u(g, i);
+    double bn = be[0]*n[0] + be[1]*n[1] + be[2]*n[2];
+
+    double u0 = 1.0 / sqrt(-metric_g_dd(g,0,0) - 2.0*metric_dot3_u(g,be,v)
+                    - metric_square3_u(g,v));
+    double w = al * u0;
+    double u[4] = {u0, u0*v[0], u0*v[1], u0*v[2]};
+    double l[3];
+    for(i=0; i<3; i++)
+    {
+        l[i] = 0.0;
+        for(j=0; j<4; j++)
+            l[i] += metric_g_dd(g,i+1,j)*u[j];
+    }
 
     *p_vn = vn;
     *p_cf2 = cf2;
+    *p_w = w;
+
+    m[0] = rhoh*w*l[0];
+    m[1] = rhoh*w*l[1];
+    m[2] = rhoh*w*l[2];
+    Fm[0] = m[0]*vn + n[0]*al*P;
+    Fm[1] = m[1]*vn + n[1]*al*P;
+    Fm[2] = m[2]*vn + n[2]*al*P;
+
+    double e = rhoh*w*w-P;
+    double Fe = e*vn + P*(vn+bn);
     
-    //TODO: These are only used for HLLC and are WRONG.
-    *p_mn = 0;
-    Fm[0] = 0;
-    Fm[1] = 0;
-    Fm[2] = 0;
+    *p_e = e;
+    *p_Fe = Fe;
 }
 
 // Find velocities needed for the Riemann problem
 void riemann_set_vel_gr(struct Riemann *theRiemann, struct Sim *theSim, double r, double GAMMALAW)
 {
-    int i, dir;
-    double Sl, Sr, Sl1, Sr1, Sl2, Sr2;
-    double a, b[3], bn, sig, gam, w, v[3], dv;
+    int i, j, dir;
+    double Sl, Sr, Sl1, Sr1, Sl2, Sr2, Ss;
+    double al, be[3], bn, sig, ign, w, v[3], dv;
     struct Metric *g;
 
     g = metric_create(time_global, theRiemann->pos[R_DIR], theRiemann->pos[P_DIR], theRiemann->pos[Z_DIR], theSim);
@@ -52,55 +80,33 @@ void riemann_set_vel_gr(struct Riemann *theRiemann, struct Sim *theSim, double r
     dir = -1;
     for(i=0; i<3; i++)
     {
-        b[i] = metric_shift_u(g,i);
+        be[i] = metric_shift_u(g,i);
         if(theRiemann->n[i] != 0)
             dir = i;
     }
-    a = metric_lapse(g);
-    bn = b[dir];
-    gam = metric_gamma_uu(g, dir, dir);
+    al = metric_lapse(g);
+    bn = be[dir];
+    ign = metric_gamma_uu(g, dir, dir);
 
-    double vnL, cf21, mnL;
-    double FmL[3];
-    LR_speed_gr(theRiemann->primL, r, theRiemann->n, GAMMALAW, &vnL, &cf21, FmL, &mnL);
+    double vnL, cf2L, mL[3], FmL[3], eL, FeL;
+    LR_speed_gr(theRiemann->primL, theRiemann->n, GAMMALAW, &vnL, &cf2L, 
+                mL, FmL, &eL, &FeL, &w, g);
 
-    v[0] = theRiemann->primL[URR];
-    v[1] = theRiemann->primL[UPP];
-    v[2] = theRiemann->primL[UZZ];
-    w = a / sqrt(-metric_g_dd(g,0,0)-2.0*metric_dot3_u(g,b,v)-metric_square3_u(g,v));
-    sig = cf21/(w*w*(1.0-cf21));
-    dv = sqrt(sig*(1.0+sig)*a*a*gam - sig*(vnL+bn)*(vnL+bn));
+    sig = cf2L/(w*w*(1.0-cf2L));
+    dv = sqrt(sig*(1.0+sig)*al*al*ign - sig*(vnL+bn)*(vnL+bn));
     
     Sl1 = (vnL - sig*bn - dv) / (1.0+sig);
     Sr1 = (vnL - sig*bn + dv) / (1.0+sig);
 
-    //TODO: Remove: Lax-Friedrichs
-//    Sl1 = -a*sqrt(gam) - bn;
-//    Sr1 = a*sqrt(gam) - bn;
-//    Sl1 = -1.0;
-//    Sr1 = 1.0;
+    double vnR, cf2R, mR[3], FmR[3], eR, FeR;
+    LR_speed_gr(theRiemann->primR, theRiemann->n, GAMMALAW, &vnR, &cf2R, 
+                mR, FmR, &eR, &FeR, &w, g);
 
-    double vnR,cf22,mnR;
-    double FmR[3];
-    LR_speed_gr(theRiemann->primR, r, theRiemann->n, GAMMALAW, &vnR, &cf22, FmR, &mnR);
-
-    v[0] = theRiemann->primR[URR];
-    v[1] = theRiemann->primR[UPP];
-    v[2] = theRiemann->primR[UZZ];
-    w = a / sqrt(-metric_g_dd(g,0,0)-2.0*metric_dot3_u(g,b,v)-metric_square3_u(g,v));
-    sig = cf22/(w*w*(1.0-cf22));
-
-    //TODO: typo????????
-    dv = sqrt(sig*(1.0+sig)*a*a*gam - sig*(vnR+bn)*(vnR+bn));
+    sig = cf2R/(w*w*(1.0-cf2R));
+    dv = sqrt(sig*(1.0+sig)*al*al*ign - sig*(vnR+bn)*(vnR+bn));
 
     Sl2 = (vnR - sig*bn - dv) / (1.0+sig);
     Sr2 = (vnR - sig*bn + dv) / (1.0+sig);
-
-    //Lax-Friedrichs
-//    Sl2 = -a*sqrt(gam) - bn;
-//    Sr2 = a*sqrt(gam) - bn;
-//    Sl2 = -1.0;
-//    Sr2 = 1.0;
 
     if(Sl1 > Sl2)
         Sl = Sl2;
@@ -125,18 +131,52 @@ void riemann_set_vel_gr(struct Riemann *theRiemann, struct Sim *theSim, double r
     }
     */
 
+    // Contact Wave Speed
+    double UE = (Sr*eR - Sl*eL - FeR + FeL) / (Sr - Sl);
+    double FE = ((Sr*FeL - Sl*FeR + Sl*Sr*(eR-eL)) / (Sr - Sl) - bn*UE) / al;
+
+    double UM_hll[3], FM_hll[3];
+    for(i=0; i<3; i++)
+    {
+        UM_hll[i] = (Sr*mR[i]-Sl*mL[i]-FmR[i]+FmL[i]) / (Sr-Sl);
+        FM_hll[i] = ((Sr*FmL[i] - Sl*FmR[i] + Sl*Sr*(mR[i]-mL[i])) / (Sr - Sl)
+                         - bn*UM_hll[i]) / al;
+    }
+    double UM = 0.0;
+    double FM = 0.0;
+    for(i=0; i<3; i++)
+    {
+        double igi = theRiemann->n[0] * metric_gamma_uu(g,i,0)
+                    + theRiemann->n[1] * metric_gamma_uu(g,i,1)
+                    + theRiemann->n[2] * metric_gamma_uu(g,i,2);
+        UM += igi * UM_hll[i];
+        FM += igi * FM_hll[i];
+    }
+
+    double A = FE;
+    double B =-FM-ign*UE;
+    double C = ign*UM;
+
+    double SsS;
+
+    if(fabs(4*A*C/(B*B)) < 1.0e-7)
+        SsS = -C/B * (1.0 + A*C/(B*B) + 2*A*A*C*C/(B*B*B*B));
+    else
+        SsS = (-B - sqrt(B*B-4*A*C)) / (2*A);
+
+    Ss = al*SsS-bn;
+
     //Fluxes in orthonormal basis
     if(dir == PDIRECTION)
     {
         Sl *= r;
         Sr *= r;
+        Ss *= r;
     }
 
   theRiemann->Sl = Sl;
   theRiemann->Sr = Sr;
-
-  //TODO: This is only used for HLLC and is WRONG.
-  theRiemann->Ss = (Sl+Sr)/2;
+  theRiemann->Ss = Ss;
 
   metric_destroy(g);
 }
@@ -270,3 +310,109 @@ void riemann_set_flux_gr(struct Riemann *theRiemann, struct Sim *theSim, double 
     metric_destroy(g);
 }
 
+void riemann_set_star_hllc_gr(struct Riemann *theRiemann, struct Sim *theSim,
+                                double GAMMALAW)
+{
+    int i,j;
+    double r = theRiemann->pos[R_DIR];
+    int *n = theRiemann->n;
+    double *prim;
+    double Sk;
+    double *Uk;
+    double *Fk;
+    if (theRiemann->state==LEFTSTAR)
+    {
+        prim = theRiemann->primL;
+        Sk = theRiemann->Sl;
+        Uk = theRiemann->UL;
+        Fk = theRiemann->FL;
+    }
+    else
+    {
+        prim = theRiemann->primR;
+        Sk = theRiemann->Sr;
+        Uk = theRiemann->UR;
+        Fk = theRiemann->FR;
+    }
+    double Ss=theRiemann->Ss;
+    double rho = prim[RHO];
+    double v[3]  = {prim[URR], prim[UPP], prim[UZZ]};
+    double Pp  = prim[PPP];
+
+    struct Metric *g = metric_create(time_global, theRiemann->pos[R_DIR], 
+                                    theRiemann->pos[P_DIR], 
+                                    theRiemann->pos[Z_DIR], theSim);
+    double al, be[3], sqrtg, U[4];
+    al = metric_lapse(g);
+    for(i=0; i<3; i++)
+        be[i] = metric_shift_u(g, i);
+    sqrtg = metric_sqrtgamma(g)/r;
+    for(i=0; i<4; i++)
+        U[i] = metric_frame_U_u(g,i,theSim);
+    
+    double u0 = 1.0 / sqrt(-metric_g_dd(g,0,0) - 2*metric_dot3_u(g, be, v)
+                             - metric_square3_u(g, v));
+    double u[4] = {u0, u0*v[0], u0*v[1], u0*v[2]};
+    double uU = metric_dot4_u(g, u, U);
+    double w = al*u0;
+
+    double l[3]; // l[i] = u_i
+    for(i=0; i<3; i++)
+    {
+        l[i] = 0.0;
+        for(j=0; j<4; j++)
+            l[i] += metric_g_dd(g,i+1,j)*u[j];
+    }
+
+    int dir = -1;
+    for(i=0; i<3; i++)
+        if(n[i] == 1)
+            dir = i;
+    
+    double hn = 1.0*n[0] + r*n[1] + 1.0*n[2];
+    double bn = be[dir];
+    double vn = v[dir];
+    double Un = U[dir+1];
+    double ign = metric_gamma_uu(g, dir, dir);
+    double uSn = u0*(vn + bn);
+
+    double rhoh = rho + GAMMALAW/(GAMMALAW-1.0) * Pp;
+    double mn = rhoh*w*uSn;
+
+    double ss = Ss/hn;
+    double sk = Sk/hn;
+
+    // Q == F - s * U
+    double qE = rhoh*w*w*(vn-sk) + Pp*(sk+bn);
+    double qMn = mn*(vn-sk) + al*Pp*ign;
+
+    double ssS = (ss+bn)/al;
+    double skS = (sk+bn)/al;
+
+    // P star!
+    double Pstar = (qMn - ssS*qE) / (al*(ign - ssS*skS));
+
+    double kappa = (vn - sk) / (ss - sk);
+    double alpha1 = (Pp - Pstar) / (ss - sk);
+    double alpha2 = (vn*Pp - ss*Pstar) / (ss - sk);
+
+    double rhoe = Pp / (GAMMALAW - 1.0);
+    double tau = -rhoe*uU*u0 - Pp*(u0*uU+U[0]) - rho*(uU+1.0)*u0;
+
+    theRiemann->Ustar[DDD] = al*sqrtg * rho*u0 * kappa;
+    theRiemann->Ustar[SRR] = al*sqrtg * (rhoh*u0*l[0] * kappa + alpha1 * n[0]);
+    theRiemann->Ustar[LLL] = al*sqrtg * (rhoh*u0*l[1] * kappa + alpha1 * n[1]);
+    theRiemann->Ustar[SZZ] = al*sqrtg * (rhoh*u0*l[2] * kappa + alpha1 * n[2]);
+    theRiemann->Ustar[TAU] = al*sqrtg * (tau * kappa - Un * alpha1
+                                            + U[0] * alpha2);
+
+    int q;
+    for(q = sim_NUM_C(theSim); q < sim_NUM_Q(theSim); q++)
+        theRiemann->Ustar[q] = prim[q] * theRiemann->Ustar[DDD];
+
+    //Now set Fstar
+    for(q = 0; q < sim_NUM_Q(theSim); q++)
+        theRiemann->Fstar[q] = Fk[q] + Sk * (theRiemann->Ustar[q] - Uk[q]);
+
+    metric_destroy(g);
+}

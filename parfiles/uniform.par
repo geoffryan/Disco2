@@ -9,7 +9,7 @@ InitialDataType         3       // 0 Torus, 1 Bondi, 2 Vortex, 3 Uniform,
                                 // 16 Cartesian-Shear, 17 Disc Tests
 GravMassType            0       // 0 none, 1 single, 2 binary
 Background              1       // 0 Newtonian, 1 GR
-Metric                  1       // 0 Flat, 1 Schwarzschild-SC,
+Metric                  0       // 0 Flat, 1 Schwarzschild-SC,
                                 // 2 Schwarzschild-KS, 3 Flat-Cartesian
 Frame                   0       // 0 Euler, 1 Keplerian
 Restart                 0       // If this=1 restart using input.h5
@@ -46,7 +46,7 @@ BoundPar3               0.0
 BoundPar4               0.0
 
 Move_Cells       `       0
-RiemannSolver           1           // 0 hllc, 1 hll
+RiemannSolver           0           // 0 hllc, 1 hll
 Adiabatic_Index		1.4
 
 //Numerical Parameters
@@ -59,7 +59,7 @@ GravM           0.0
 GravA           0.0
 AlphaVisc       0.0
 
-BoostType   2       // 0 None, 1 Rigid, 2 Binary
+BoostType   0       // 0 None, 1 Rigid, 2 Binary
 BinA        2.0
 BinW        0.2
 BinM        0.0

@@ -20,6 +20,7 @@ void metric_init_background(struct Sim *theSim)
         cell_mindt = &cell_mindt_newt;
         riemann_set_flux = &riemann_set_flux_newt;
         riemann_set_vel = &riemann_set_vel_newt;
+        riemann_set_star_hllc = &riemann_set_star_hllc_newt;
     }
     else if(sim_Background(theSim) == GR)
     {
@@ -29,6 +30,7 @@ void metric_init_background(struct Sim *theSim)
         cell_mindt = &cell_mindt_gr;
         riemann_set_flux = &riemann_set_flux_gr;
         riemann_set_vel = &riemann_set_vel_gr;
+        riemann_set_star_hllc = &riemann_set_star_hllc_gr;
     }
     else if(sim_Background(theSim) == GRVISC1)
     {
@@ -38,6 +40,7 @@ void metric_init_background(struct Sim *theSim)
         cell_mindt = &cell_mindt_gr;
         riemann_set_flux = &riemann_set_flux_gr;
         riemann_set_vel = &riemann_set_vel_gr;
+        riemann_set_star_hllc = &riemann_set_star_hllc_gr;
     }
     else if(sim_Background(theSim) == GRDISC)
     {

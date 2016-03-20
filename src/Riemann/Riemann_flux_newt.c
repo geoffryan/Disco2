@@ -111,3 +111,65 @@ void riemann_set_flux_newt(struct Riemann * theRiemann, struct Sim * theSim,doub
 
 }
 
+void riemann_set_star_hllc_newt(struct Riemann * theRiemann,struct Sim * theSim,double GAMMALAW){
+  double r = theRiemann->pos[R_DIR];
+  double *prim;
+  double Sk;
+  double *Uk;
+  double *Fk;
+  if (theRiemann->state==LEFTSTAR){
+    prim = theRiemann->primL;
+    Sk = theRiemann->Sl;
+    Uk = theRiemann->UL;
+    Fk = theRiemann->FL;
+  }else{
+    prim = theRiemann->primR;
+    Sk = theRiemann->Sr;
+    Uk = theRiemann->UR;
+    Fk = theRiemann->FR;
+  }
+  double Ss=theRiemann->Ss;
+
+  double rho = prim[RHO];
+  double vr  = prim[URR];
+  double vp  = prim[UPP]*r;
+  double vz  = prim[UZZ];
+  double Pp  = prim[PPP];
+  double v2 = vr*vr+vp*vp+vz*vz;
+  double vn = vr*theRiemann->n[0] + vp*theRiemann->n[1] + vz*theRiemann->n[2];
+  double rhoe = Pp/(GAMMALAW-1.);
+  double D  = rho;
+  double mr = rho*vr;
+  double mp = rho*vp;
+  double mz = rho*vz;
+  double E_hydro  = .5*rho*v2 + rhoe;
+  double Ps  = rho*( Sk - vn )*( Ss - vn ) + Pp;
+  double Dstar = ( Sk - vn )*D/( Sk - Ss );
+  double Msn = Dstar*Ss;
+  double Msr   = ( Sk - vn )*mr / ( Sk - Ss );
+  double Msp   = ( Sk - vn )*mp / ( Sk - Ss );
+  double Msz   = ( Sk - vn )*mz / ( Sk - Ss );
+  double Estar = ( ( Sk - vn )*E_hydro + Ps*Ss - Pp*vn ) / ( Sk - Ss );
+  
+  double mn  = Msr*theRiemann->n[0] + Msp*theRiemann->n[1] + Msz*theRiemann->n[2];
+
+  Msr += theRiemann->n[0]*( Msn - mn );
+  Msp += theRiemann->n[1]*( Msn - mn );
+  Msz += theRiemann->n[2]*( Msn - mn );
+
+  theRiemann->Ustar[DDD] = Dstar;
+  theRiemann->Ustar[SRR] = Msr;
+  theRiemann->Ustar[LLL] = r*Msp;
+  theRiemann->Ustar[SZZ] = Msz;
+  theRiemann->Ustar[TAU] = Estar;
+
+  int q;
+  for( q=sim_NUM_C(theSim) ; q<sim_NUM_Q(theSim) ; ++q){
+    theRiemann->Ustar[q] = prim[q]*theRiemann->Ustar[DDD];
+  }
+
+  //Now set Fstar
+  for (q=0;q<sim_NUM_Q(theSim);++q){
+    theRiemann->Fstar[q] = Fk[q] + Sk*( theRiemann->Ustar[q] - Uk[q] ) ;
+  }
+}
