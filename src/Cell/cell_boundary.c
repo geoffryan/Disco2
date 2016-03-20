@@ -831,14 +831,14 @@ void cell_boundary_nozzle(struct Cell ***theCells, struct Sim *theSim,
 
         double phi0 = sim_BoundPar1(theSim);
         double Mdot = sim_BoundPar2(theSim); // in M_solar/year
-        double sig0 = sim_BoundPar3(theSim); // in g/cm^2
+        double vr0 = sim_BoundPar3(theSim); // in c
         double T = sim_BoundPar4(theSim);
         double dphi = 0.2; // Nozzle extends from phi0-dphi to phi0+dphi
         double f = M_PI / (2*dphi);
 
         Mdot *= eos_Msolar/eos_year; // Msolar/year --> g/s
         Mdot /= eos_rho_scale * eos_r_scale*eos_r_scale*eos_c; // g/s --> C.U.
-        sig0 /= eos_rho_scale * eos_r_scale; // g/cm^2 --> C.U.
+        //sig0 /= eos_rho_scale * eos_r_scale; // g/cm^2 --> C.U.
 
         for(i = sim_N(theSim,R_DIR) - sim_Nghost_max(theSim,R_DIR); 
                 i < sim_N(theSim,R_DIR); i++)
@@ -847,7 +847,8 @@ void cell_boundary_nozzle(struct Cell ***theCells, struct Sim *theSim,
             double rm = sim_FacePos(theSim,i-1,R_DIR);
             double r = 0.5*(rp+rm);
 
-            double vr = -Mdot / (sig0*r*dphi);
+            double vr = -vr0;
+            double sig0 = -Mdot / (vr*r*dphi);
 
             for( k=0 ; k<sim_N(theSim,Z_DIR) ; ++k )
             {
