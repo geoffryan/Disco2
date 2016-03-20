@@ -11,11 +11,11 @@ if __name__ == "__main__":
 
     M = 1.0e1
     a = 100 * M
-    q = 0.11
+    q = 1.0
     rs = 6*M
     rmin = rs*1.1
     rmax = 10000*rs
-    Mdot = 2.0e-6
+    Mdot = 2.0e0
     N = 200
 
     alpha = 0.1

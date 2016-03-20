@@ -274,6 +274,8 @@ def plot_all(filename, pars, rmax=-1.0, plot=True, bounds=None,
     t, r, phi, rho, sig, T, P, pi, H, vr, vp, u0, Q = pd.allTheThings(filename,
                                                                         pars)
 
+    gam = pars['Adiabatic_Index']
+    S = np.log(pi * np.power(sig, -gam))/(gam-1.0)
 
     if bounds is None:
         bounds = []
@@ -281,6 +283,7 @@ def plot_all(filename, pars, rmax=-1.0, plot=True, bounds=None,
         bounds.append([T[T==T].min(), T[T==T].max()])
         bounds.append([vr[vr==vr].min(), vr[vr==vr].max()])
         bounds.append([vp[vp==vp].min(), vp[vp==vp].max()])
+        bounds.append([S[S==S].min(), S[S==S].max()])
         for q in Q:
             bounds.append([q[q==q].min(), q[q==q].max()])
         bounds = np.array(bounds)
@@ -327,6 +330,8 @@ def plot_all(filename, pars, rmax=-1.0, plot=True, bounds=None,
                     "_".join(chckname.split(".")[0].split("_")[1:]), "vr")
         vpname = "plot_disc_equat_{0}_{1}.png".format(
                     "_".join(chckname.split(".")[0].split("_")[1:]), "vp")
+        Sname = "plot_disc_equat_{0}_{1}.png".format(
+                    "_".join(chckname.split(".")[0].split("_")[1:]), "s")
         #Plot.
 
         localOrbit=None
@@ -372,6 +377,11 @@ def plot_all(filename, pars, rmax=-1.0, plot=True, bounds=None,
                 quiverData=quiverData, Vmax=Vmax, orbitData=localOrbit, 
                 label=r'$v^\phi$', title=title, filename=vpname, normal=True, 
                 cmap=divcmap)
+        #S
+        make_plot(mesh, S, pars, gridbounds=gridbounds, datscale="linear", 
+                datbounds=bounds[4],  rocheData=rocheData,
+                quiverData=quiverData, Vmax=Vmax, orbitData=localOrbit, 
+                label=r'$S$', title=title, filename=Sname, cmap=poscmap)
         
         #q
         for i,q in enumerate(Q):
@@ -379,7 +389,7 @@ def plot_all(filename, pars, rmax=-1.0, plot=True, bounds=None,
                         "_".join(chckname.split(".")[0].split("_")[1:]), "q",
                         i)
             make_plot(mesh, q, pars, gridbounds=gridbounds, datscale="linear", 
-                        datbounds=bounds[4], rocheData=rocheData, 
+                        datbounds=bounds[5], rocheData=rocheData, 
                         quiverData=quiverData, Vmax=Vmax, 
                         orbitData=localOrbit, label=r'$q_{0:d}$'.format(i), 
                         title=title, filename=qname, cmap=poscmap)

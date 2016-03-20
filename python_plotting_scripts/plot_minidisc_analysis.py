@@ -206,11 +206,12 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     ur = u0*vr
     up = u0*vp
 
+    up_lab = up + bw*u0
+
     u0d = g00*u0 + g0r*ur + g0p*up
     urd = g0r*u0 + grr*ur + grp*up
     upd = g0p*u0 + grp*ur + gpp*up
 
-    up_lab = up + bw*u0
 
     u0sc = np.sqrt((1.0 + ur*ur/(1-2*M/r) + up_lab*up_lab*r*r) / (1.0-2*M/r))
     u0dsc = -(1-2*M/r) * u0sc
@@ -239,9 +240,11 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     Edot = np.zeros(Rs.shape)
     Lindot = np.zeros(Rs.shape)
     avVflux = np.zeros(Rs.shape)
+    avMach = np.zeros(Rs.shape)
 
     gam = pars['Adiabatic_Index']
     sigh = sig + gam/(gam-1.0)*pi
+    S = np.log(pi * np.power(sig, -gam)) / (gam-1.0)
 
     nmodes = 16
     nm = np.arange(1, nmodes+1)
@@ -252,9 +255,11 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     deltaRho = np.zeros(Rs.shape[0])
     deltaSig = np.zeros(Rs.shape[0])
     deltaPi = np.zeros(Rs.shape[0])
+    deltaS = np.zeros(Rs.shape[0])
     Rho0 = np.zeros(Rs.shape[0])
     Sig0 = np.zeros(Rs.shape[0])
     Pi0 = np.zeros(Rs.shape[0])
+    S0 = np.zeros(Rs.shape[0])
 
     for i,R in enumerate(Rs):
 
@@ -273,16 +278,17 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         Vflux = (sig[inds]*cs2[inds] * R*dphi[inds]).sum()
 
         avupd = (upd[inds] * R*dphi[inds]).sum() / A
-        avsigEflux = ((sig[inds]+pi[inds]/(gam-1.0))*ur[inds] * R*dphi[inds]
-                        ).sum() / A
+        sighflux = (sigh[inds]*ur[inds] * R*dphi[inds]).sum()
         avsigflux = -(sig[inds]*ur[inds] * R*dphi[inds]).sum() / A
 
         deltaRho[i] = rho[inds].max() - rho[inds].min()
         deltaSig[i] = sig[inds].max() - sig[inds].min()
         deltaPi[i] = pi[inds].max() - pi[inds].min()
+        deltaS[i] = S[inds].max() - S[inds].min()
         Pi0[i] = pi[inds].min()
         Sig0[i] = sig[inds].min()
         Rho0[i] = rho[inds].min()
+        S0[i] = S[inds].min()
 
         avsig[i] = sigtot / A
         avD[i] = Dtot / A
@@ -290,12 +296,13 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         avE[i] = Etot / A
         avvr[i] = Dflux / Dtot
         avvp[i] = Dfluxp / Dtot
+        avMach[i] = (sig[inds]*mach[inds] * R*dphi[inds]).sum() / sigtot
 
         Mdot[i] = -Dflux
         Ldot[i] = -Lflux
         Edot[i] = -Eflux
-        Lindot[i] = avsigEflux * avupd / avsigflux
-        avVflux[i] = Vflux * R / A
+        Lindot[i] = sighflux * avupd
+        avVflux[i] = Vflux * R  #Not actually average, just go with it.
 
         ph = phi[inds]
         a0 = (D*dphi[inds]).sum()/(2*np.pi)
@@ -311,6 +318,8 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     e = Edot/Mdot
     jin = Lindot/Mdot
     jout = j - jin
+    
+    alpha = -2.0/3.0 * Lindot / avVflux
 
     #Rafikov-Analysis
     djdr = (j[2:]-j[:-2]) / (Rs[2:]-Rs[:-2])
@@ -375,13 +384,19 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
     UPDSC_circ = np.sqrt(M*Rs/(1-3*M/Rs))
     U0DSC_circ = -(1-2*M/Rs) / np.sqrt(1-3*M/Rs)
-
+    
     fig, ax = plt.subplots(2,2, figsize=(12,9))
     plot_data(ax[0,0], updsc, u0dsc)
     plot_data(ax[0,0], UPDSC_circ, U0DSC_circ, 'r')
     pretty_axis(ax[0,0], pars, xlabel=r"$u_\phi$", ylabel=r"$u_0$")
-    plot_data(ax[0,1], Rs, 2.0/3.0 * Ldot / avVflux)
+    plot_data(ax[0,1], Rs, alpha)
     pretty_axis(ax[0,1], pars, xlabel=r"$R$", ylabel=r"$\alpha$", yscale='log')
+    plot_data(ax[1,0], avMach, alpha)
+    pretty_axis(ax[1,0], pars, xlabel=r"$\mathcal{M}$", ylabel=r"$\alpha$", 
+            xscale='log', yscale='log')
+    plot_data(ax[1,1], Rs, avMach)
+    pretty_axis(ax[1,1], pars, xlabel=r"$R$", ylabel=r"$\mathcal{M}$", 
+            yscale='log')
     outname = "plot_minidisc_orbit_{0}.png".format(
                 "_".join(chckname.split(".")[0].split("_")[1:]))
     print("Saving {0:s}...".format(outname))
@@ -431,9 +446,9 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     plt.close(fig)
 
 
-    fig, ax = plt.subplots(4, 4, figsize=(14,9))
+    fig, ax = plt.subplots(5, 5, figsize=(14,10))
 
-    i = len(Rs)/4
+    i = len(Rs)/5
     plot_data(ax[0,0], phi[r==Rs[i]], sig[r==Rs[i]])
     pretty_axis(ax[0,0], pars, xlabel=r"$\phi$", 
             ylabel=r"$\Sigma_0$ ($r={0:.2g}$)".format(Rs[i]))
@@ -442,11 +457,13 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     plot_data(ax[2,0], phi[r==Rs[i]], vr[r==Rs[i]])
     pretty_axis(ax[2,0], pars, xlabel=r"$\phi$", ylabel=r"$v^r$")
     plot_data(ax[3,0], phi[r==Rs[i]], vp[r==Rs[i]])
-    plot_data(ax[3,0], phi[r==Rs[i]], np.sqrt(M/(r[r==Rs[i]]**3)-bw),
+    plot_data(ax[3,0], phi[r==Rs[i]], np.sqrt(M/(r[r==Rs[i]]**3))-bw,
                 color='r')
     pretty_axis(ax[3,0], pars, xlabel=r"$\phi$", ylabel=r"$v^\phi$")
+    plot_data(ax[4,0], phi[r==Rs[i]], S[r==Rs[i]])
+    pretty_axis(ax[4,0], pars, xlabel=r"$\phi$", ylabel=r"$S$")
 
-    i = len(Rs)/2
+    i = 2*len(Rs)/5
     plot_data(ax[0,1], phi[r==Rs[i]], sig[r==Rs[i]])
     pretty_axis(ax[0,1], pars, xlabel=r"$\phi$", 
             ylabel=r"$\Sigma_0$ ($r={0:.2g}$)".format(Rs[i]))
@@ -458,8 +475,10 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     plot_data(ax[3,1], phi[r==Rs[i]], np.sqrt(M/(r[r==Rs[i]]**3))-bw, 
                 color='r')
     pretty_axis(ax[3,1], pars, xlabel=r"$\phi$", ylabel=r"$v^\phi$")
+    plot_data(ax[4,1], phi[r==Rs[i]], S[r==Rs[i]])
+    pretty_axis(ax[4,1], pars, xlabel=r"$\phi$", ylabel=r"$S$")
 
-    i = 3*len(Rs)/4
+    i = 3*len(Rs)/5
     plot_data(ax[0,2], phi[r==Rs[i]], sig[r==Rs[i]])
     pretty_axis(ax[0,2], pars, xlabel=r"$\phi$", 
             ylabel=r"$\Sigma_0$ ($r={0:.2g}$)".format(Rs[i]))
@@ -471,8 +490,10 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     plot_data(ax[3,2], phi[r==Rs[i]], np.sqrt(M/(r[r==Rs[i]]**3))-bw, 
                 color='r')
     pretty_axis(ax[3,2], pars, xlabel=r"$\phi$", ylabel=r"$v^\phi$")
+    plot_data(ax[4,2], phi[r==Rs[i]], S[r==Rs[i]])
+    pretty_axis(ax[4,2], pars, xlabel=r"$\phi$", ylabel=r"$S$")
 
-    i = len(Rs)-1
+    i = 4*len(Rs)/5
     plot_data(ax[0,3], phi[r==Rs[i]], sig[r==Rs[i]])
     pretty_axis(ax[0,3], pars, xlabel=r"$\phi$", 
             ylabel=r"$\Sigma_0$ ($r={0:.2g}$)".format(Rs[i]))
@@ -484,7 +505,23 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     plot_data(ax[3,3], phi[r==Rs[i]], np.sqrt(M/(r[r==Rs[i]]**3))-bw, 
                 color='r')
     pretty_axis(ax[3,3], pars, xlabel=r"$\phi$", ylabel=r"$v^\phi$")
+    plot_data(ax[4,3], phi[r==Rs[i]], S[r==Rs[i]])
+    pretty_axis(ax[4,3], pars, xlabel=r"$\phi$", ylabel=r"$S$")
 
+    i = len(Rs)-1
+    plot_data(ax[0,4], phi[r==Rs[i]], sig[r==Rs[i]])
+    pretty_axis(ax[0,4], pars, xlabel=r"$\phi$", 
+            ylabel=r"$\Sigma_0$ ($r={0:.2g}$)".format(Rs[i]))
+    plot_data(ax[1,4], phi[r==Rs[i]], pi[r==Rs[i]])
+    pretty_axis(ax[1,4], pars, xlabel=r"$\phi$", ylabel=r"$\Pi_0$")
+    plot_data(ax[2,4], phi[r==Rs[i]], vr[r==Rs[i]])
+    pretty_axis(ax[2,4], pars, xlabel=r"$\phi$", ylabel=r"$v^r$")
+    plot_data(ax[3,4], phi[r==Rs[i]], vp[r==Rs[i]])
+    plot_data(ax[3,4], phi[r==Rs[i]], np.sqrt(M/(r[r==Rs[i]]**3))-bw,
+                color='r')
+    pretty_axis(ax[3,4], pars, xlabel=r"$\phi$", ylabel=r"$v^\phi$")
+    plot_data(ax[4,4], phi[r==Rs[i]], S[r==Rs[i]])
+    pretty_axis(ax[4,4], pars, xlabel=r"$\phi$", ylabel=r"$S$")
     plt.tight_layout()
 
     outname = "plot_minidisc_azimuth_{0}.png".format(

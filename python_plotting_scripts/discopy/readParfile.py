@@ -76,7 +76,8 @@ parnames = ['InitialDataType',
             'ZLogScale',
             'HiResSigma',
             'HiResR0',
-            'HiResFac']
+            'HiResFac',
+            'MassRatio']
 
 def readParfile(filename):
     # Read a parameter file and load the contents into a dict.
