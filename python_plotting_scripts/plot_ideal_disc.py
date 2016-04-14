@@ -77,17 +77,17 @@ def plot_r_profile(filename, sca='linear'):
 
     print("Plotting t = {0:g}".format(t))
 
-    p_shock = -1.0
-    ii = len(r[r<20])
-    iii = len(R[R<20])
+    #p_shock = -1.0
+    #ii = len(r[r<20])
+    #iii = len(R[R<20])
 
     #Plot.
     fig = plt.figure(figsize=(12,9))
 
     plt.subplot(331)
     plot_r_profile_single(r, rho, sca, r"$\Sigma$")
-    plt.plot(R, rho[ii]*np.power(R/R[iii], -0.6), 'b')
-    plt.plot(R, rho[ii]*np.power(R/R[iii], -0.6 - 0.8*p_shock), 'r')
+    #plt.plot(R, rho[ii]*np.power(R/R[iii], -0.6), 'b')
+    #plt.plot(R, rho[ii]*np.power(R/R[iii], -0.6 - 0.8*p_shock), 'r')
     #ax1 = plt.gca()
     #ax2 = ax1.twinx()
     #ax2.set_ylabel(r"$q$")
@@ -98,8 +98,8 @@ def plot_r_profile(filename, sca='linear'):
     
     plt.subplot(333)
     plot_r_profile_single(r, T, sca, r"$T = P/\rho_0$")
-    plt.plot(R, T[ii]*np.power(R/R[iii], -0.9), 'b')
-    plt.plot(R, T[ii]*np.power(R/R[iii], -0.9 - 0.2*p_shock), 'r')
+    #plt.plot(R, T[ii]*np.power(R/R[iii], -0.9), 'b')
+    #plt.plot(R, T[ii]*np.power(R/R[iii], -0.9 - 0.2*p_shock), 'r')
     
     plt.subplot(334)
     plot_r_profile_single(r, vr, "linear", r"$v^r$")
@@ -117,8 +117,8 @@ def plot_r_profile(filename, sca='linear'):
 
     plt.subplot(336)
     plot_r_profile_single(r, mach, sca, r"$\mathcal{M}$")
-    plt.plot(R, mach[ii]*np.power(R/R[iii], -0.05), 'b')
-    plt.plot(R, mach[ii]*np.power(R/R[iii], -0.05 + 0.1*p_shock), 'r')
+    #plt.plot(R, mach[ii]*np.power(R/R[iii], -0.05), 'b')
+    #plt.plot(R, mach[ii]*np.power(R/R[iii], -0.05 + 0.1*p_shock), 'r')
     plt.plot(r, W, 'b+')
 
     plt.subplot(337)

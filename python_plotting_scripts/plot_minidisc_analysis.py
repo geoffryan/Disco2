@@ -2,6 +2,7 @@ import math
 from numpy import *
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
+import scipy.signal as signal
 import sys
 import numpy as np
 import discopy as dp
@@ -9,8 +10,14 @@ import discoEOS as eos
 import discoGR as gr
 
 scale = 'log'
-RMAX = 100.0
+RMAX = 70.0
 RMIN = 6.0
+
+blue = (31.0/255, 119.0/255, 180.0/255)
+orange = (255.0/255, 127.0/255, 14.0/255)
+green = (44.0/255, 160.0/255, 44.0/255)
+red = (214.0/255, 39.0/255, 40.0/255)
+purple = (148.0/255, 103.0/255, 189.0/255)
 
 def allTheThings(filename, pars):
 
@@ -118,7 +125,7 @@ def pretty_axis(ax, pars, xscale="linear", yscale="linear",
     if not twin:
         M = pars['GravM']
         a = pars['GravA']
-
+    
         Rsp = M*(1.0+math.sqrt(1.0-a*a))
         Rsm = M*(1.0-math.sqrt(1.0-a*a))
         Rer = 2*M
@@ -170,20 +177,8 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
     t, r, phi, rho, sig, T, P, pi, H, vr, vp, u0, q, dphi = allTheThings(
                                                                 filename, pars)
-    inds = (r < RMAX) * (r > RMIN)
-    r = r[inds]
-    phi = phi[inds]
-    rho = rho[inds]
-    sig = sig[inds]
-    T = T[inds]
-    P = P[inds]
-    pi = pi[inds]
-    H = H[inds]
-    vr = vr[inds]
-    vp = vp[inds]
-    u0 = u0[inds]
-    dphi = dphi[inds]
-    inds = np.argsort(r)
+    
+    inds = (r < RMAX*M) * (r > RMIN*M)
     r = r[inds]
     phi = phi[inds]
     rho = rho[inds]
@@ -197,7 +192,7 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     u0 = u0[inds]
     dphi = dphi[inds]
 
-    R = np.logspace(np.log10(r.min()), np.log10(r.max()), 100)
+    RR = np.logspace(np.log10(r.min()), np.log10(r.max()), 100)
 
     w = u0 * gr.lapse(r, pars)
     u = np.sqrt(w*w-1)
@@ -216,16 +211,23 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     u0sc = np.sqrt((1.0 + ur*ur/(1-2*M/r) + up_lab*up_lab*r*r) / (1.0-2*M/r))
     u0dsc = -(1-2*M/r) * u0sc
     updsc = r*r*up_lab
+    vrsc = ur/u0sc
+    vpsc = up_lab/u0sc
 
     #Mdot = - r*sig*u0*vr * (eos.c * eos.rg_solar**2 * eos.year
     #                                    / eos.M_solar)
     #Mdot = - r*sig*ur
 
-    cs2 = eos.cs2(rho, T, pars)
+    #cs2 = eos.cs2(rho, T, pars)
+    gam = pars['Adiabatic_Index']
+    sigh = sig + gam/(gam-1.0)*pi
+    cs2 = gam*pi/sigh
     cs = np.sqrt(cs2)
     ucs = np.sqrt(cs2 / (1-cs2))
+    S = np.log(pi * np.power(sig, -gam)) / (gam-1.0)
 
     mach = u / ucs
+    machNorb = r*vpsc / cs
 
     Rs = np.unique(r)
 
@@ -241,10 +243,7 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     Lindot = np.zeros(Rs.shape)
     avVflux = np.zeros(Rs.shape)
     avMach = np.zeros(Rs.shape)
-
-    gam = pars['Adiabatic_Index']
-    sigh = sig + gam/(gam-1.0)*pi
-    S = np.log(pi * np.power(sig, -gam)) / (gam-1.0)
+    avMachNorb = np.zeros(Rs.shape)
 
     nmodes = 16
     nm = np.arange(1, nmodes+1)
@@ -261,9 +260,12 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     Pi0 = np.zeros(Rs.shape[0])
     S0 = np.zeros(Rs.shape[0])
 
+    shock0Phi = np.zeros(Rs.shape[0])
+    shock1Phi = np.zeros(Rs.shape[0])
+
     for i,R in enumerate(Rs):
 
-        inds = r==R
+        inds = (r==R)
         A = (R*dphi[inds]).sum()
         D = sig[inds]*u0[inds]
         sigtot = (sig[inds] * R*dphi[inds]).sum()
@@ -297,12 +299,13 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         avvr[i] = Dflux / Dtot
         avvp[i] = Dfluxp / Dtot
         avMach[i] = (sig[inds]*mach[inds] * R*dphi[inds]).sum() / sigtot
+        avMachNorb[i] = (sig[inds]*machNorb[inds] * R*dphi[inds]).sum()/sigtot
 
         Mdot[i] = -Dflux
         Ldot[i] = -Lflux
         Edot[i] = -Eflux
         Lindot[i] = sighflux * avupd
-        avVflux[i] = Vflux * R  #Not actually average, just go with it.
+        avVflux[i] = Vflux  #Not actually average, just go with it.
 
         ph = phi[inds]
         a0 = (D*dphi[inds]).sum()/(2*np.pi)
@@ -314,12 +317,70 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         An[i,:] = np.sqrt(an*an + bn*bn)
         PhiN[i,:] = np.arctan2(bn,an) / nm
 
+        #sortinds = np.argsort(phi[inds])
+        #sigi = sig[inds][sortinds]
+        #phii = phi[inds][sortinds]
+        #pii = pi[inds][sortinds]
+        sigi = sig[inds]
+        phii = phi[inds]
+        pii = pi[inds]
+        maxinds = signal.argrelmax(pii, order=20, mode='wrap')[0]
+        #print len(maxinds), phii[maxinds], pii[maxinds]
+        phimaxima = phii[maxinds]
+
+        if len(maxinds) == 0:
+            shock0Phi[i] = np.inf
+            shock1Phi[i] = np.inf
+        elif len(maxinds) == 1:
+            shock0Phi[i] = phimaxima
+            shock1Phi[i] = np.inf
+        elif i > 0:
+            last0 = shock0Phi[i-1]
+            last1 = shock1Phi[i-1]
+            if last0 == np.inf:
+                shock0Phi[i] = phimaxima[0]
+                shock1Phi[i] = phimaxima[1]
+            elif last1 == np.inf:
+                diff0 = phimaxima - last0
+                diff0[diff0>np.pi] -= 2*np.pi
+                diff0[diff0<-np.pi] += 2*np.pi
+                i0 = np.argmin(np.fabs(diff0))
+                if i0 == 1:
+                    i1 = 0
+                else:
+                    i1 = 1
+                shock0Phi[i] = phimaxima[i0]
+                shock1Phi[i] = phimaxima[i1]
+            else:
+                diff0 = phimaxima - last0
+                diff0[diff0>np.pi] -= 2*np.pi
+                diff0[diff0<-np.pi] += 2*np.pi
+                diff1 = phimaxima - last1
+                diff1[diff1>np.pi] -= 2*np.pi
+                diff1[diff1<-np.pi] += 2*np.pi
+
+                i0 = np.argmin(np.fabs(diff0))
+                i1 = np.argmin(np.fabs(diff1))
+
+                shock0Phi[i] = phimaxima[i0]
+                shock1Phi[i] = phimaxima[i1]
+        else:
+            shock0Phi[i] = phimaxima[0]
+            shock1Phi[i] = phimaxima[1]
+
+
     j = Ldot/Mdot
     e = Edot/Mdot
     jin = Lindot/Mdot
     jout = j - jin
     
-    alpha = -2.0/3.0 * Lindot / avVflux
+    alpha = -2.0/(3.0*Rs) *  Lindot / avVflux
+    alpha *= (1-3*M/Rs) / ((1-2*M/Rs)*(1-2*M/Rs)) 
+
+    dphi0dr = (shock0Phi[2:] - shock0Phi[:-2]) / (Rs[2:] - Rs[:-2])
+    dphi1dr = (shock1Phi[2:] - shock1Phi[:-2]) / (Rs[2:] - Rs[:-2])
+    tanPitch0 = -1.0 / (dphi0dr * Rs[1:-1])
+    tanPitch1 = -1.0 / (dphi1dr * Rs[1:-1])
 
     #Rafikov-Analysis
     djdr = (j[2:]-j[:-2]) / (Rs[2:]-Rs[:-2])
@@ -385,7 +446,7 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     UPDSC_circ = np.sqrt(M*Rs/(1-3*M/Rs))
     U0DSC_circ = -(1-2*M/Rs) / np.sqrt(1-3*M/Rs)
     
-    fig, ax = plt.subplots(2,2, figsize=(12,9))
+    fig, ax = plt.subplots(3,3, figsize=(12,9))
     plot_data(ax[0,0], updsc, u0dsc)
     plot_data(ax[0,0], UPDSC_circ, U0DSC_circ, 'r')
     pretty_axis(ax[0,0], pars, xlabel=r"$u_\phi$", ylabel=r"$u_0$")
@@ -396,7 +457,113 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
             xscale='log', yscale='log')
     plot_data(ax[1,1], Rs, avMach)
     pretty_axis(ax[1,1], pars, xlabel=r"$R$", ylabel=r"$\mathcal{M}$", 
-            yscale='log')
+            yscale='log', xscale='log')
+    plot_data(ax[2,0], Rs, shock0Phi)
+    plot_data(ax[2,0], Rs, shock1Phi, 'b')
+    pretty_axis(ax[2,0], pars, xlabel=r"$R$", ylabel=r"$\phi_{S}$", 
+            yscale='linear')
+    if (tanPitch0 < np.inf).any() or (tanPitch1 < np.inf).any():
+        real0 = (tanPitch0 > 0) * (tanPitch0 < np.inf)
+        real1 = (tanPitch1 > 0) * (tanPitch1 < np.inf)
+        TPmin0 = 1.0e300
+        TPmax0 = -1.0
+        TPmin1 = 1.0e300
+        TPmax1 = -1.0
+        coeff0 = None
+        coeff1 = None
+        if len(tanPitch0[real0]) > 0:
+            TPmin0 = tanPitch0[real0].min()
+            TPmax0 = tanPitch0[real0].max()
+            coeff0 = np.polyfit(np.log10(avMach[1:-1][real0]), 
+                    np.log10(tanPitch0[real0]), 1)
+            print coeff0
+        if len(tanPitch1[real1]) > 0:
+            TPmin1 = tanPitch1[real1].min()
+            TPmax1 = tanPitch1[real1].max()
+            coeff1 = np.polyfit(np.log10(avMach[1:-1][real1]), 
+                    np.log10(tanPitch1[real1]), 1)
+            print coeff1
+        TP = np.linspace(min(TPmin0,TPmin1), max(TPmax0,TPmax1), 100)
+        plot_data(ax[2,1], Rs[1:-1], tanPitch0)
+        plot_data(ax[2,1], Rs[1:-1], tanPitch1, 'b')
+        pretty_axis(ax[2,1], pars, xlabel=r"$R$", ylabel=r"$\tan \theta_S$", 
+                yscale='log', xscale='log')
+        plot_data(ax[2,2], tanPitch0, alpha[1:-1])
+        plot_data(ax[2,2], tanPitch1, alpha[1:-1], 'b')
+        pretty_axis(ax[2,2], pars, xlabel=r"$\tan \theta_S$",
+                        ylabel=r"$\alpha$", yscale='log', xscale='log')
+
+        plot_data(ax[1,2], avMach[1:-1], tanPitch0)
+        plot_data(ax[1,2], avMach[1:-1], tanPitch1, 'b')
+        #plot_line(ax[1,2], avMach[1]*np.power(TP/TP[1], -1.5), TP, color='r')
+        #plot_line(ax[1,2], avMach[1]*np.power(TP/TP[1], -1.0), TP, color='r')
+        #plot_line(ax[1,2], avMach[1]*np.power(TP/TP[1], -2.0), TP, color='r')
+        #if coeff0 is not None:
+        #    plot_line(ax[1,2], math.pow(10.0,coeff0[1])*np.power(TP,coeff0[0]),
+        #                    TP, color='g')
+        #if coeff1 is not None:
+        #    plot_line(ax[1,2], math.pow(10.0,coeff1[1])*np.power(TP,coeff1[0]),
+        #                    TP, color='g')
+        omk = np.sqrt(M/(Rs[1:-1]*Rs[1:-1]*Rs[1:-1]))
+        tpWKB = 1.0 / (avMach[1:-1] * np.sqrt((1-bw/omk)*(1-bw/omk)-0.25))
+        tpWKB1 = 1.0 / (avMach[1:-1] * np.sqrt((1-bw/omk)*(1-bw/omk)-0.6))
+        tpWKB2 = 1.0 / (avMach[1:-1] * np.sqrt((1-bw/omk)*(1-bw/omk)-0.7))
+        tpWKBrel = 1.0 / avMachNorb[1:-1] * np.sqrt(
+                (1-2*M/Rs[1:-1])*(1-3*M/Rs[1:-1])
+            / ((1-bw/omk)*(1-bw/omk)-0.25*(1-6*M/Rs[1:-1])/(1-2*M/Rs[1:-1])))
+        tpWKBrel1 = 1.0 / avMachNorb[1:-1] * np.sqrt(
+                (1-2*M/Rs[1:-1])*(1-3*M/Rs[1:-1])
+            / ((1-bw/omk)*(1-bw/omk)-0.6*(1-6*M/Rs[1:-1])/(1-2*M/Rs[1:-1])))
+        tpWKBrel2 = 1.0 / avMachNorb[1:-1] * np.sqrt(
+                (1-2*M/Rs[1:-1])*(1-3*M/Rs[1:-1])
+            / ((1-bw/omk)*(1-bw/omk)-0.7*(1-6*M/Rs[1:-1])/(1-2*M/Rs[1:-1])))
+        plot_line(ax[1,2], avMach[1:-1], tpWKB, color='r')
+        #plot_line(ax[1,2], avMach[1:-1], tpWKB1, color='r', ls='--')
+        #plot_line(ax[1,2], avMach[1:-1], tpWKB2, color='r', ls=':')
+        plot_line(ax[1,2], avMach[1:-1], tpWKBrel, color='g')
+        #plot_line(ax[1,2], avMach[1:-1], tpWKBrel1, color='g', ls='--')
+        plot_line(ax[1,2], avMach[1:-1], tpWKBrel2, color='g', ls='--')
+
+        pretty_axis(ax[1,2], pars, xlabel=r"$\mathcal{M}$",
+                        ylabel=r"$\tan \theta_S$", yscale='log', xscale='log')
+
+        figNice, axNice = plt.subplots(1,1,figsize=(12,9))
+        axNice.plot(avMachNorb[1:-1], tpWKBrel, '-', lw=4, color="grey", 
+                        label="WKB")
+        axNice.plot(avMachNorb[1:-1][tanPitch0>0], tanPitch0[tanPitch0>0], 
+                        '+', color=blue, ms=10, mew=2, label="Shock 1")
+        axNice.plot(avMachNorb[1:-1][tanPitch1>0], tanPitch1[tanPitch1>0], 
+                        '+', color=orange, ms=10, mew=2, label="Shock 2")
+        axNice.set_xlabel(r"$\mathcal{M}_N = \langle r v^\phi / c_s \rangle$",
+                            fontsize=24)
+        axNice.set_ylabel(r"$\tan \theta_S$", fontsize=24)
+        #axNice.set_xscale('log')
+        #axNice.set_yscale('log')
+        axNice.tick_params(labelsize=18)
+        plt.legend(loc="upper right", fontsize=24)
+        axNice.set_title("Dispersion Relation", fontsize=36)
+        outname = "plot_minidisc_tanq_mach_{0}.png".format(
+                    "_".join(chckname.split(".")[0].split("_")[1:]))
+        print("Saving {0:s}...".format(outname))
+        figNice.savefig(outname)
+        plt.close(figNice)
+
+
+    figNice, axNice = plt.subplots(1,1,figsize=(12,9))
+    axNice.plot(Rs, alpha, '+', ms=10, mew=2, color=blue)
+    axNice.set_xlabel(r"$r$", fontsize=24)
+    axNice.set_ylabel(r"$\alpha$", fontsize=24)
+    axNice.set_xscale('log')
+    axNice.set_yscale('log')
+    axNice.tick_params(labelsize=18)
+    axNice.set_title(r"$\alpha$ Parameter", fontsize=36)
+    outname = "plot_minidisc_alpha_r_{0}.png".format(
+                "_".join(chckname.split(".")[0].split("_")[1:]))
+    print("Saving {0:s}...".format(outname))
+    figNice.savefig(outname)
+    plt.close(figNice)
+
+
     outname = "plot_minidisc_orbit_{0}.png".format(
                 "_".join(chckname.split(".")[0].split("_")[1:]))
     print("Saving {0:s}...".format(outname))

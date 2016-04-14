@@ -2,6 +2,7 @@ import math
 import sys
 import numpy as np
 import discopy as dp
+import discoGR as gr
 
 def extrapolatePlunge(g1, g2):
     
@@ -14,8 +15,9 @@ def extrapolatePlunge(g1, g2):
     vr1 = g1.prim[0][0][:,2]
     vp1 = g1.prim[0][0][:,3]
     r1 = 0.5*(g1.rFaces[0]+g1.rFaces[1])
-    u01 = np.power(1-2*M/r1 - 4*M/r1*vr1 - (1+2*M/r1)*vr1*vr1 - r1*r1*vp1*vp1, 
-                    -0.5)
+    #u01 = np.power(1-2*M/r1 - 4*M/r1*vr1 - (1+2*M/r1)*vr1*vr1 - r1*r1*vp1*vp1, 
+    #                -0.5)
+    u01, ur1, up1 = gr.calc_u(r1, vr1, vp1, g1._pars)
     dphi1 = np.zeros(g1.pFaces[0][0].shape[0])
     dphi1[1:] = g1.pFaces[0][0][1:] - g1.pFaces[0][0][:-1]
     dphi1[0] = g1.pFaces[0][0][1] - g1.pFaces[0][0][0]
@@ -40,6 +42,10 @@ def extrapolatePlunge(g1, g2):
         u0 = (-2*M/r*ur - np.sqrt(4*M*M/(r*r)*ur*ur 
                     - (-1+2*M/r) * (1+(1+2*M/r)*ur*ur + r*r*up*up)))\
                 / (-1+2*M/r)
+        if g2._pars['BoostType'] == 1:
+            bw = g2._pars['BinW']
+            up -= bw*u0
+
         vr = ur/u0
         vp = up/u0
         sig = -Mdot / (2*np.pi*r*ur)
