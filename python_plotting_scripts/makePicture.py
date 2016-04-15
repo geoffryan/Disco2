@@ -2,8 +2,8 @@ import sys
 import math
 import numpy as np
 import matplotlib.pyplot as plt
-import colormath.color_objects as cmco
-import colormath.color_conversions as cmcc
+#import colormath.color_objects as cmco
+#import colormath.color_conversions as cmcc
 import discopy as dp
 import discoGR as gr
 
