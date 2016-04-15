@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 #import colormath.color_conversions as cmcc
 import discopy as dp
 import discoGR as gr
+import plot_thin as pt
 
 # All constants in c.g.s.
 sb = 1.56055371e59
@@ -18,6 +19,12 @@ r_scale = rg_solar
 rho_scale = 1.0
 eV = 6.24150934e11
 kpc = 3.08567758149e21
+
+blue = (31.0/255, 119.0/255, 180.0/255)
+orange = (255.0/255, 127.0/255, 14.0/255)
+green = (44.0/255, 160.0/255, 44.0/255)
+red = (214.0/255, 39.0/255, 40.0/255)
+purple = (148.0/255, 103.0/255, 189.0/255)
 
 class RayData:
 
@@ -222,12 +229,57 @@ def makeSpectrum(g, rays, nus, D=1.0, redshift='yes'):
 
     return Fnu
 
+def genNTgrid(pars, Mdot, alpha, gam):
+
+    pars2 = pars.copy()
+
+    pars2['AlphaVisc'] = alpha
+    pars2['Adiabatic_Index'] = gam
+    pars2['NumR'] = 2048
+    pars2['NP_CONST'] = 3
+    pars2['NumZ'] = 1
+
+    M = pars2['GravM']
+    rs = 6*M
+
+    pars2['R_Min'] = 1.1*rs
+    pars2['R_Max'] = 1.0e3
+
+    g = dp.Grid(pars2)
+
+    rf = g.rFaces
+    r = 0.5*(rf[1:] + rf[:-1])
+
+    SSdat, NTdat = pt.calcNT(g, r, rs, Mdot)
+
+    #These are in code units
+    sigNT = NTdat[0]
+    piNT = NTdat[1]
+    vrNT = NTdat[2]
+    vpNT = NTdat[3]
+    
+    g.prim = []
+
+    for k in g.nz_tot:
+        slice = []
+        for i in g.nr_tot:
+            annulus = np.zeros(g.np[k,i], g.nq)
+            annulus[:,0] = sigNT[i]
+            annulus[:,1] = piNT[i]
+            annulus[:,2] = vrNT[i]
+            annulus[:,3] = vpNT[i]
+            slice.append(annulus)
+
+        g.prim.append(slice)
+
+    return g
+
 
 if __name__ == "__main__":
 
     if len(sys.argv) < 6:
         print("makePicture.py: generates a ray-traced image of emission from thegiven checkpoints.")
-        print("usage: python makePicture.py mode parfile rayfile <checkpoints ...> prefix")
+        print("usage: python makePicture.py mode parfile rayfile <checkpoints ...> prefix [SS, NT]")
         print("   'mode' can be: spectrum - Compute spectrum of each chkpt")
         print("                  lightcurve - Compute lightcurve of all chkpts")
         print("                  picture - Optical rendering with colors (not implemented)")
@@ -247,13 +299,24 @@ if __name__ == "__main__":
     if mode == "spectrum":
         nus = np.logspace(2.0, 5.0, base=10.0, num=1000)
 
+        FnuNT = None
+
+        Mdot = 15.0
+        alpha = 0.01
+        gam = 5.0/3.0
+        gNT = genNTgrid(pars, Mdot, alpha, gam) 
+        FnuNT = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
+
         for i,chkpt in enumerate(chkfiles):
             g.loadCheckpoint(chkpt)
             
             Fnu = makeSpectrum(g, rays, nus, D=1.0, redshift='yes')
 
             fig, ax = plt.subplots()
+            if FnuNT is not None:
+                ax.plot(nus/1000.0, FnuNT / (h*nus), lw=2.0, color=blue)
             ax.plot(nus/1000.0, Fnu / (h*nus), 'k+')
+
             ax.set_xscale("log")
             ax.set_yscale("log")
             ax.set_xlabel(r"$\nu$ ($keV$)")
