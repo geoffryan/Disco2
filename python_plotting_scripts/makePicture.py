@@ -79,6 +79,10 @@ def getTz(g, rays):
             continue
         shift = np.argmin(g.pFaces[0][ir])
         piph = np.roll(g.pFaces[0][ir], -shift)
+        while Phi > piph.max():
+            Phi -= 2*math.pi
+        while Phi < piph.min():
+            Phi += 2*math.pi
         ip = np.searchsorted(piph, Phi)
         if ip == piph.shape[0]:
             ip = 0
