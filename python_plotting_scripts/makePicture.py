@@ -5,13 +5,14 @@ import matplotlib.pyplot as plt
 import colormath.color_objects as cmco
 import colormath.color_conversions as cmcc
 import discopy as dp
+import discoGR as gr
 
 # All constants in c.g.s.
 sb = 1.56055371e59
 c = 2.99792458e10
 mp = 1.672621777e-24
 h = 6.62606957e-27
-ka_bbes = 0.2
+ka_bbes = 0.4
 rg_solar = 1.4766250385e5
 r_scale = rg_solar
 rho_scale = 1.0
@@ -97,10 +98,16 @@ def getTz(g, rays):
         #print ir, ip
         #print Tc
 
-        u0 = 1.0/math.sqrt(1.0-2*M/R-4*M/R*vr-(1+2*M/R)*vr*vr-R*R*vp*vp)
-        ur = u0*vr
+        u0, ur, up = gr.calc_u(R, vr, vp, g._pars)
         ut = 0.0
-        up = u0*vp
+        if g._pars['BoostType'] == 1:
+            bw = g._pars['BinW']
+            up += bw*u0
+
+        #u0 = 1.0/math.sqrt(1.0-2*M/R-4*M/R*vr-(1+2*M/R)*vr*vr-R*R*vp*vp)
+        #ur = u0*vr
+        #ut = 0.0
+        #up = u0*vp
         U0 = rays.U[ind,0]
         UR = rays.U[ind,1]
         UT = rays.U[ind,2]
@@ -217,6 +224,10 @@ if __name__ == "__main__":
     if len(sys.argv) < 6:
         print("makePicture.py: generates a ray-traced image of emission from thegiven checkpoints.")
         print("usage: python makePicture.py mode parfile rayfile <checkpoints ...> prefix")
+        print("   'mode' can be: spectrum - Compute spectrum of each chkpt")
+        print("                  lightcurve - Compute lightcurve of all chkpts")
+        print("                  picture - Optical rendering with colors (not implemented)")
+        print("                  image - Specific intensity image")
         sys.exit()
 
     mode = sys.argv[1]
