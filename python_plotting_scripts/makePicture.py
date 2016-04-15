@@ -260,9 +260,9 @@ def genNTgrid(pars, Mdot, alpha, gam):
     
     g.prim = []
 
-    for k in g.nz_tot:
+    for k in xrange(g.nz_tot):
         slice = []
-        for i in g.nr_tot:
+        for i in xrange(g.nr_tot):
             annulus = np.zeros(g.np[k,i], g.nq)
             annulus[:,0] = sigNT[i]
             annulus[:,1] = piNT[i]
