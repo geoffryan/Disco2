@@ -299,13 +299,20 @@ if __name__ == "__main__":
     if mode == "spectrum":
         nus = np.logspace(2.0, 5.0, base=10.0, num=1000)
 
-        FnuNT = None
+
+        FnuNT1 = None
 
         Mdot = 15.0
         alpha = 0.01
         gam = 5.0/3.0
         gNT = genNTgrid(pars, Mdot, alpha, gam) 
-        FnuNT = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
+        FnuNT1 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
+        gNT = genNTgrid(pars, 2*Mdot, alpha, gam) 
+        FnuNT2 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
+        gNT = genNTgrid(pars, Mdot, 0.1*alpha, gam) 
+        FnuNT3 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
+        gNT = genNTgrid(pars, 2*Mdot, 0.1*alpha, gam) 
+        FnuNT4 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
 
         for i,chkpt in enumerate(chkfiles):
             g.loadCheckpoint(chkpt)
@@ -313,8 +320,15 @@ if __name__ == "__main__":
             Fnu = makeSpectrum(g, rays, nus, D=1.0, redshift='yes')
 
             fig, ax = plt.subplots()
-            if FnuNT is not None:
-                ax.plot(nus/1000.0, FnuNT / (h*nus), lw=2.0, color=blue)
+            if FnuNT1 is not None:
+                ax.plot(nus/1000.0, FnuNT1 / (h*nus), lw=10.0, color=blue,
+                            alpha=0.5)
+                ax.plot(nus/1000.0, FnuNT2 / (h*nus), lw=10.0, color=orange,
+                            alpha=0.5)
+                ax.plot(nus/1000.0, FnuNT3 / (h*nus), lw=10.0, color=green,
+                            alpha=0.5)
+                ax.plot(nus/1000.0, FnuNT4 / (h*nus), lw=10.0, color=red,
+                            alpha=0.5)
             ax.plot(nus/1000.0, Fnu / (h*nus), 'k+')
 
             ax.set_xscale("log")

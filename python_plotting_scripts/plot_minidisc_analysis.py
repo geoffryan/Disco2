@@ -194,15 +194,19 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, name, pars):
 
         maxinds = signal.argrelmax(d2s, order=10, mode='wrap')[0]
         mininds = signal.argrelmin(d2s, order=10, mode='wrap')[0]
-        maxinds = maxinds[np.argsort(d2s[maxinds])[::-1]]
-        mininds = mininds[np.argsort(d2s[mininds])]
 
         if len(maxinds) == 0:
-            maxinds = [0,0]
-            mininds = [0,0]
-        if len(maxinds) == 1:
-            maxinds = [maxinds[0], 0]
-            mininds = [mininds[0], 0]
+            maxinds = np.array([0,0], dtype=np.int)
+            mininds = np.array([0,0], dtype=np.int)
+        elif len(maxinds) == 1:
+            maxinds = np.array([maxinds[0], 0], dtype=np.int)
+            mininds = np.array([mininds[0], 0], dtype=np.int)
+        else:
+            maxinds = np.array(maxinds, dtype=np.int)
+            mininds = np.array(mininds, dtype=np.int)
+
+        maxinds = maxinds[np.argsort(d2s[maxinds])[::-1]]
+        mininds = mininds[np.argsort(d2s[mininds])]
 
         isa1 = maxinds[0]
         isb1 = maxinds[1]
