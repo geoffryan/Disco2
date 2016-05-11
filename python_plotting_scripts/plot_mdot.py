@@ -6,15 +6,20 @@ import sys
 import numpy as np
 import discopy as dp
 
-M = 1.0
-a = 0.0
-A = a*M
-yscale = "linear"
+yscale = "log"
 
-def horizon():
+def horizon(pars):
+    M = pars['GravM']
+    a = pars['GravA']
+    A = M*a
     return M*(1.0 + math.sqrt(1-a*a))
 
-def calc_u0(r, phi, vr, vp):
+def calc_u0(r, phi, vr, vp, pars):
+
+    M = pars['GravM']
+    a = pars['GravA']
+    A = M*a
+
     R = r
     SIG2 = R*R
     DEL = R*R - 2*M*R + A*A
@@ -33,7 +38,7 @@ def calc_u0(r, phi, vr, vp):
 
     return u0
 
-def calc_mdot(r, phi, z, rho, H, vr, vp):
+def calc_mdot(r, phi, z, rho, H, vr, vp, pars):
 
     inds = (z==0)
     RRR = r[inds]
@@ -44,7 +49,7 @@ def calc_mdot(r, phi, z, rho, H, vr, vp):
     VP = vp[inds]
     SIG = 2*RHO[inds]*HHH[inds]
 
-    U0 = calc_u0(r, phi, vr, vp)
+    U0 = calc_u0(r, phi, vr, vp, pars)
     UR = U0*VR
 
     Rs = np.unique(RRR)
@@ -59,7 +64,7 @@ def calc_mdot(r, phi, z, rho, H, vr, vp):
 
     return Rs, Mdot
 
-def get_mdot(filename):
+def get_mdot(filename, pars):
 
     print("Reading {0:s}".format(filename))
 
@@ -75,28 +80,32 @@ def get_mdot(filename):
 
     H = np.ones(rho.shape)
 
-    rs, mdot = calc_mdot(r, phi, z, rho, H, vr, vp)
+    rs, mdot = calc_mdot(r, phi, z, rho, H, vr, vp, pars)
 
-    reh = horizon()
+    reh = horizon(pars)
 
     i = len(rs[rs < reh]) - 1
     if i == -1:
         i = 2
 
-    return t, mdot[i]
+    return t, mdot[i], mdot[-3]
 
-def plot_mdot(filenames):
+def plot_mdot(parfile, filenames):
+
+    pars = dp.readParfile(parfile)
 
     t = np.zeros(len(filenames))
-    mdot = np.zeros(len(filenames))
+    mdot_inner = np.zeros(len(filenames))
+    mdot_outer = np.zeros(len(filenames))
 
     for i,f in enumerate(filenames):
-        t[i], mdot[i] = get_mdot(f)
+        t[i], mdot_inner[i], mdot_outer[i] = get_mdot(f, pars)
 
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
 
-    ax.plot(t, mdot, 'k+')
+    ax.plot(t, mdot_inner, 'k+')
+    ax.plot(t, mdot_outer, 'r+')
     ax.set_xlabel(r"$t$")
     ax.set_ylabel(r"$\dot{M}$")
     ax.set_yscale(yscale)
@@ -108,10 +117,10 @@ def plot_mdot(filenames):
 
 if __name__ == "__main__":
 
-    if len(sys.argv) < 2:
-        print("\nGive me checkpoint (.h5) files please.\n")
+    if len(sys.argv) < 3:
+        print("\nGive me parfile (.par) and checkpoint (.h5) files please.\n")
         sys.exit()
 
     else:
-        fig = plot_mdot(sys.argv[1:])
+        fig = plot_mdot(sys.argv[1], sys.argv[2:])
 
