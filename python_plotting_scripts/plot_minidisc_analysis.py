@@ -181,6 +181,9 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, name, pars):
     psiQ = np.zeros((N,3))
     dQdm = np.zeros((N,3))
     dQdr = np.zeros((N,3))
+    phiS = np.zeros((N,2))
+    phiSa = np.zeros((N,2))
+    phiSb = np.zeros((N,2))
 
     for i,R in enumerate(Rs):
         ind = r==R
@@ -204,11 +207,30 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, name, pars):
             maxinds = [maxinds[0], 0]
             mininds = [mininds[0], 0]
 
-        isa1 = maxinds[0]
-        isb1 = maxinds[1]
+        if i > 0:
+            diff0a = phi[ind][maxinds[0]] - phiSa[i-1,0]
+            diff1a = phi[ind][maxinds[1]] - phiSa[i-1,0]
+            if diff0a < -np.pi:
+                diff0a += 2*np.pi
+            elif diff0a > np.pi:
+                diff0a -= 2*np.pi
+            if diff1a < -np.pi:
+                diff1a += 2*np.pi
+            elif diff1a > np.pi:
+                diff1a -= 2*np.pi
+            if np.fabs(diff0a) < np.fabs(diff1a):
+                isa1 = maxinds[0]
+                isb1 = maxinds[1]
+            else:
+                isa1 = maxinds[1]
+                isb1 = maxinds[0]
 
-        diffa = phi[mininds[0]] - phi[isa1]
-        diffb = phi[mininds[1]] - phi[isa1]
+        else:
+            isa1 = maxinds[0]
+            isb1 = maxinds[1]
+
+        diffa = phi[ind][mininds[0]] - phi[ind][isa1]
+        diffb = phi[ind][mininds[1]] - phi[ind][isa1]
 
         if diffa < -np.pi:
             diffa += 2*np.pi
@@ -225,6 +247,26 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, name, pars):
         else:
             isa2 = mininds[1]
             isb2 = mininds[0]
+        
+        dphiSa = phi[ind][isa2] - phi[ind][isa1]
+        dphiSb = phi[ind][isb2] - phi[ind][isb1]
+
+        if dphiSa > np.pi:
+            dphiSa -= 2*np.pi
+        elif dphiSa < -np.pi:
+            dphiSa += 2*np.pi
+        if dphiSb > np.pi:
+            dphiSb -= 2*np.pi
+        elif dphiSb < -np.pi:
+            dphiSb += 2*np.pi
+
+        phiSa[i,0] = phi[ind][isa1]
+        phiSa[i,1] = phiSa[i,0] + dphiSa
+        phiSb[i,0] = phi[ind][isb1]
+        phiSb[i,1] = phiSb[i,0] + dphiSb
+
+        phiS[i,0] = phi[ind][isa1]+0.5*dphiSa
+        phiS[i,1] = phi[ind][isb1]+0.5*dphiSb
 
         dsa = s[isa2] - s[isa1]
         dsb = s[isb2] - s[isb1]
@@ -283,8 +325,6 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, name, pars):
     fig.savefig("plot_minidisc_psi_{0}.png".format(name))
     plt.close(fig)
 
-
-
     R1 = Rs[0]
     R2 = Rs[N/4]
     R3 = Rs[N/2]
@@ -338,10 +378,10 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, name, pars):
     ax1[5,0].set_ylabel(r"$\Pi$")
     ax1[6,0].set_ylabel(r"$\Pi / \Sigma$")
 
-    fig.savefig("plot_minidisc_diss_{0}.png".format(name))
-    plt.close(fig)
+    fig1.savefig("plot_minidisc_diss_{0}.png".format(name))
+    plt.close(fig1)
 
-    return psiQ
+    return phiS, phiSa, phiSb, psiQ
 
 
 def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
@@ -375,8 +415,8 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     chckname = filename.split("/")[-1]
     chcknum = "_".join(chckname.split(".")[0].split("_")[1:])
 
-    psiQ = dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, 
-                            chcknum, pars)
+    phiS, phiSa, phiSb, psiQ = dissipation_plot(t, r, phi, sig, pi, vr, vp, u0,
+                                                dphi, chcknum, pars)
 
     RR = np.logspace(np.log10(r.min()), np.log10(r.max()), 100)
 
@@ -754,6 +794,40 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
     outname = "plot_minidisc_orbit_{0}.png".format(
                 "_".join(chckname.split(".")[0].split("_")[1:]))
+    print("Saving {0:s}...".format(outname))
+    fig.savefig(outname)
+    plt.close(fig)
+
+    fig, ax = plt.subplots(2, 2, figsize=(12,9))
+
+    ax[0,0].plot(Rs, phiS[:,0], marker='+', color=blue, ls='')
+    ax[0,0].plot(Rs, phiS[:,1], marker='+', color=orange, ls='')
+    #ax[0,0].plot(Rs, phiSa[:,0], marker='+', color='k', ls='')
+    #ax[0,0].plot(Rs, phiSa[:,1], marker='+', color='g', ls='')
+    #ax[0,0].plot(Rs, phiSb[:,0], marker='+', color='r', ls='')
+    #ax[0,0].plot(Rs, phiSb[:,1], marker='+', color='y', ls='')
+    ax[0,0].set_xlabel(r"$r$")
+    ax[0,0].set_ylabel(r"$\phi_S$")
+    ax[0,1].plot(avMach, psiQ[:,2], marker='+', color='k', ls='')
+    ax[0,1].set_xlabel(r"$\langle \mathcal{M} \rangle$")
+    ax[0,1].set_ylabel(r"$\psi_Q$")
+    ax[0,1].set_xscale("log")
+    if (psiQ[:,2]>0).any():
+        ax[0,1].set_yscale("log")
+    ax[1,0].plot(Rs, psiQ[:,2], marker='+', color='k', ls='')
+    ax[1,0].set_xlabel(r"$r$")
+    ax[1,0].set_ylabel(r"$\psi_Q$")
+    ax[1,0].set_xscale("log")
+    if (psiQ[:,2]>0).any():
+        ax[1,0].set_yscale("log")
+    ax[1,1].plot(tanPitch0, psiQ[1:-1,0], marker='+', color=blue, ls='')
+    ax[1,1].plot(tanPitch1, psiQ[1:-1,1], marker='+', color=orange, ls='')
+    ax[1,1].set_xlabel(r"$\tan \theta_S$")
+    ax[1,1].set_ylabel(r"$\psi_Q$")
+    if (psiQ[:,0]>0).any() or (psiQ[:,1]>0).any():
+        ax[1,1].set_yscale("log")
+
+    outname = "plot_minidisc_shocks_{0}.png".format(chcknum)
     print("Saving {0:s}...".format(outname))
     fig.savefig(outname)
     plt.close(fig)
