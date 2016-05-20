@@ -3,6 +3,7 @@ from numpy import *
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 import scipy.signal as signal
+import scipy.integrate as integrate
 import sys
 import numpy as np
 import discopy as dp
@@ -163,6 +164,233 @@ def wavespeeds(r, u0, ur, up, cs, pars):
     vpm = a * (Vp*(1-cs*cs) - dvp) / (1-cs*cs*V2) - bp
 
     return (vrp, vrm), (vpp, vpm)
+
+def shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, name, pars):
+
+    v12RS, v21RS, vRS, vSS, v12 = shockVal(r, sig, pi, u0, vr, vp, pars)
+
+    fig, ax = plt.subplots(2,3, figsize=(32,20))
+
+    Rs = np.unique(r)
+    Nr = Rs.shape[0]
+
+    chi = (v12-vRS) / (vSS-vRS)
+    dvRSmax = (v12-vRS).max()
+    dvRSmin = (v12-vRS).min()
+    dvSSmax = (v12-vSS).max()
+    dvSSmin = (v12-vSS).min()
+
+    for i, R in enumerate(Rs):
+        ind = r==R
+        N = r[ind].shape[0]
+
+        if i>0:
+            rm = 0.5*(R+Rs[i-1])
+        else:
+            rm = R - 0.5*(Rs[1]-R)
+        if i<Nr-1:
+            rp = 0.5*(R+Rs[i+1])
+        else:
+            rp = R + 0.5*(R-Rs[i-1])
+
+        X = np.zeros((2, N+1))
+        Y = np.zeros((2, N+1))
+        X[:,1:] = (phi[ind] + 0.5*dphi[ind])[None,:]
+        X[:,0] = phi[ind][0] - 0.5*dphi[ind][0]
+        Y[0,:] = rm
+        Y[1,:] = rp
+
+        print("Plotting shocks: {0:d} of {1:d}".format(i+1,Rs.shape[0]))
+        #print(X.shape)
+        #print(Y.shape)
+        #print(v12RS.shape)
+        #print(v21RS.shape)
+        #print(v12.shape)
+
+        C0 = ax[0,0].pcolormesh(X, Y, np.atleast_2d(vRS[ind]), 
+                        edgecolors='none', vmin=vRS.min(), vmax=vRS.max(),
+                        cmap=dp.viridis)
+        C1 = ax[0,1].pcolormesh(X, Y, np.atleast_2d(vSS[ind]), 
+                        edgecolors='none', vmin=vSS.min(), vmax=vSS.max(),
+                        cmap=dp.viridis)
+        C2 = ax[0,2].pcolormesh(X, Y, np.atleast_2d(v12[ind]), 
+                        edgecolors='none', vmin=v12.min(), vmax=v12.max(),
+                        cmap=dp.viridis)
+        C3 = ax[1,0].pcolormesh(X, Y, np.atleast_2d(v12[ind]-vRS[ind]), 
+                        edgecolors='none', vmin=dvRSmin, vmax=dvRSmax,
+                        cmap=dp.viridis)
+        C4 = ax[1,1].pcolormesh(X, Y, np.atleast_2d(v12[ind]-vSS[ind]), 
+                        edgecolors='none', vmin=dvSSmin, vmax=dvSSmax,
+                        cmap=dp.viridis)
+        C5 = ax[1,2].pcolormesh(X, Y, np.atleast_2d(np.log10(chi[ind])), 
+                        edgecolors='none', 
+                        vmin=-0.3,
+                        vmax=0.3,
+                        #vmin=math.log10(chi.min()), 
+                        #vmax=math.log10(chi.max()),
+                        cmap=dp.viridis)
+
+    fig.colorbar(C0, ax=ax[0,0])
+    fig.colorbar(C1, ax=ax[0,1])
+    fig.colorbar(C2, ax=ax[0,2])
+    fig.colorbar(C3, ax=ax[1,0])
+    fig.colorbar(C4, ax=ax[1,1])
+    fig.colorbar(C5, ax=ax[1,2])
+
+    ax[0,0].set_xlabel(r'$\phi$')
+    ax[0,1].set_xlabel(r'$\phi$')
+    ax[0,2].set_xlabel(r'$\phi$')
+    ax[1,0].set_xlabel(r'$\phi$')
+    ax[1,1].set_xlabel(r'$\phi$')
+    ax[1,2].set_xlabel(r'$\phi$')
+    ax[0,0].set_ylabel(r'$r$')
+    ax[0,1].set_ylabel(r'$r$')
+    ax[0,2].set_ylabel(r'$r$')
+    ax[1,0].set_ylabel(r'$r$')
+    ax[1,1].set_ylabel(r'$r$')
+    ax[1,2].set_ylabel(r'$r$')
+    ax[0,0].set_title(r'$(v_{12})_\mathcal{RS}$')
+    ax[0,1].set_title(r'$(v_{12})_\mathcal{SS}$')
+    ax[0,2].set_title(r'$v_{12}$')
+    ax[1,0].set_title(r'$v_{12} - (v_{12})_\mathcal{RS}$')
+    ax[1,1].set_title(r'$v_{12} - (v_{12})_\mathcal{SS}$')
+    ax[1,2].set_title(r'$(v_{12} - (v_{12})_\mathcal{RS}) / (v_{12})_\mathcal{SS} - (v_{12})_\mathcal{RS})$')
+    ax[0,0].set_ylim(r.min(), r.max())
+    ax[0,1].set_ylim(r.min(), r.max())
+    ax[0,2].set_ylim(r.min(), r.max())
+    ax[1,0].set_ylim(r.min(), r.max())
+    ax[1,1].set_ylim(r.min(), r.max())
+    ax[1,2].set_ylim(r.min(), r.max())
+    ax[0,0].set_yscale('log')
+    ax[0,1].set_yscale('log')
+    ax[0,2].set_yscale('log')
+    ax[1,0].set_yscale('log')
+    ax[1,1].set_yscale('log')
+    ax[1,2].set_yscale('log')
+    #ax[0].plot(r, v12RS, 'k+')
+    #ax[1].plot(r, v21RS, 'k+')
+    #ax[2].plot(r, v12, 'k+')
+
+    fig.savefig("plot_minidisc_shockDet_{0}.png".format(name))
+    plt.close(fig)
+
+
+def shockVal(r, sig, pi, u0, vr, vp, pars):
+
+    Rs = np.unique(r)
+
+    v12 = np.zeros(r.shape)
+    v12RS = np.zeros(r.shape)
+    v21RS = np.zeros(r.shape)
+    vRS = np.zeros(r.shape)
+    vSS = np.zeros(r.shape)
+
+    M = pars['GravM']
+    gam = pars['Adiabatic_Index']
+    bw = pars['BinW']
+
+    lapse = 1.0/np.sqrt(1+2*M/r)
+    shiftr = 2*M/r / (1+2*M/r)
+    shiftp = bw
+
+    W = lapse * u0
+    VR = np.sqrt(1.0+2*M/r) * (vr + shiftr)/lapse
+    VP = r * (vp + shiftp)/lapse
+
+    print np.fabs(W - 1.0/np.sqrt(1-VR*VR-VP*VP)).sum() / r.shape[0]
+
+    for i,R in enumerate(Rs):
+        ind = r==R
+
+        #print W-1.0/np.sqrt(1.0-VR*VR-VP*VP)
+
+        print("Shock analysis: {0:d} of {1:d}".format(i+1,Rs.shape[0]))
+
+        N = r[ind].shape[0]
+
+        v12_s = np.zeros(N)
+        v12RS_s = np.zeros(N)
+        v21RS_s = np.zeros(N)
+        vRS_s = np.zeros(N)
+        vSS_s = np.zeros(N)
+
+        for j in xrange(N):
+            iL = j
+            iR = j+1
+            if iR >= N:
+                iR = 0
+            v12RS_s[j] = relvRS(sig[ind][iL], pi[ind][iL], VP[ind][iL], 
+                                    VR[ind][iL], sig[ind][iR], pi[ind][iR], 
+                                    VP[ind][iR], VR[ind][iR], gam)
+            v21RS_s[j] = relvRS(sig[ind][iR], pi[ind][iR], VP[ind][iR], 
+                                    VR[ind][iR], sig[ind][iL], pi[ind][iL], 
+                                    VP[ind][iL], VR[ind][iL], gam)
+            if pi[ind][iR] > pi[ind][iL]:
+                vRS_s[j] = v21RS_s[j]
+                vSS_s[j] = relvSS(sig[ind][iR], pi[ind][iR], -VP[ind][iR],
+                                    VR[ind][iR], sig[ind][iL], pi[ind][iL],
+                                    -VP[ind][iL], VR[ind][iL], gam)
+            else:
+                vRS_s[j] = v12RS_s[j]
+                vSS_s[j] = relvSS(sig[ind][iL], pi[ind][iL], VP[ind][iL],
+                                    VR[ind][iL], sig[ind][iR], pi[ind][iR],
+                                    VP[ind][iR], VR[ind][iR], gam)
+
+            v12_s[j] = (VP[ind][iL] - VP[ind][iR]) / (
+                                1.0 - VP[ind][iL]*VP[ind][iR])
+
+        v12[ind] = v12_s[:]
+        v12RS[ind] = v12RS_s[:]
+        v21RS[ind] = v21RS_s[:]
+        vRS[ind] = vRS_s[:]
+        vSS[ind] = vSS_s[:]
+
+    return v12RS, v21RS, vRS, vSS, v12
+
+
+def relvRS(sig1, pi1, v1x, v1t, sig2, pi2, v2x, v2t, gam):
+
+# One-shock limiting relative velocity
+    s1 = math.log(pi1 * np.power(sig1, -gam)) / (gam-1.0)
+    W1 = 1.0 / math.sqrt(1 - v1x*v1x - v1t*v1t)
+    A1 = -(1.0 + gam*pi1/((gam-1)*sig1)) * W1 * v1t
+
+    def func(p):
+        sig =  sig1 * math.pow(p/pi1, 1.0/gam)
+        h = 1 + gam*p/((gam-1)*sig)
+        cs = math.sqrt(gam*p/(sig*h))
+        return math.sqrt(h*h + A1*A1*(1-cs*cs) / ((h*h+A1*A1)*sig*cs))
+
+    res = integrate.quad(func, pi1, pi2)
+
+    #for i,r in enumerate(res):
+    #    print i,r
+
+    return math.tanh(res[0])
+
+def relvSS(sig1, pi1, v1x, v1t, sig2, pi2, v2x, v2t, gam):
+
+# Two-shock limiting relative velocity
+# These formula are pulled straight from Rezzolla, Zannotti, and Pons 2003.
+
+    h1 = 1.0 + gam*pi1/((gam-1.0)*sig1)
+    h2 = 1.0 + gam*pi2/((gam-1.0)*sig2)
+    W22 = 1.0 / (1.0 - v2x*v2x - v2t*v2t)
+
+    #eq B.11
+    D = 1 - 4*gam*pi1*((gam-1.0)*pi2+pi1)*(h2*(pi2-pi1)/sig2-h2*h2) / (
+                (gam-1.0)*(gam-1.0)*(pi1-pi2)*(pi1-pi2))
+    #eq B.10
+    h3p = (math.sqrt(D)-1.0)*(gam-1.0)*(pi1-pi2) / ( 2*((gam-1.0)*pi2+pi1))
+    #eq B.9
+    J23p2 = -gam*(pi1-pi2) / ((gam-1.0)*(h3p*(h3p-1.0)/pi1-h2*(h2-1.0)/pi2))
+    #eq B.8
+    Vs = (sig2*sig2*W22*v2x*v2x + math.sqrt(J23p2*(J23p2 + sig2*sig2*W22
+                * (1-v2x*v2x)))) / (sig2*sig2*W22 + J23p2)
+    #eq 4.5
+    return (pi1-pi2) * (1-v2x*Vs) \
+                / ((Vs-v2x) * (h2*sig2*W22*(1-v2x*v2x)+pi1-pi2))
+    
 
 def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, name, pars):
 
@@ -417,6 +645,7 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
     phiS, phiSa, phiSb, psiQ = dissipation_plot(t, r, phi, sig, pi, vr, vp, u0,
                                                 dphi, chcknum, pars)
+    shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, chcknum, pars)
 
     RR = np.logspace(np.log10(r.min()), np.log10(r.max()), 100)
 
