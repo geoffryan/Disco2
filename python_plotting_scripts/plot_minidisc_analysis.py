@@ -3,6 +3,7 @@ from numpy import *
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 import scipy.signal as signal
+import scipy.integrate as integrate
 import sys
 import numpy as np
 import discopy as dp
@@ -12,6 +13,8 @@ import discoGR as gr
 scale = 'log'
 RMAX = 70.0
 RMIN = 6.0
+
+shockDetPlot = False
 
 blue = (31.0/255, 119.0/255, 180.0/255)
 orange = (255.0/255, 127.0/255, 14.0/255)
@@ -164,11 +167,250 @@ def wavespeeds(r, u0, ur, up, cs, pars):
 
     return (vrp, vrm), (vpp, vpm)
 
-def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, name, pars):
+def shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, name, pars):
+
+    v12RS, v21RS, vRS, vSS, v12 = shockVal(r, sig, pi, u0, vr, vp, pars)
+
+    fig, ax = plt.subplots(2,3, figsize=(32,20))
+
+    Rs = np.unique(r)
+    Nr = Rs.shape[0]
+
+    chi = (v12-vRS) / (vSS-vRS)
+    dvRSmax = (v12-vRS).max()
+    dvRSmin = (v12-vRS).min()
+    dvSSmax = (v12-vSS).max()
+    dvSSmin = (v12-vSS).min()
+
+    for i, R in enumerate(Rs):
+        ind = r==R
+        N = r[ind].shape[0]
+
+        if i>0:
+            rm = 0.5*(R+Rs[i-1])
+        else:
+            rm = R - 0.5*(Rs[1]-R)
+        if i<Nr-1:
+            rp = 0.5*(R+Rs[i+1])
+        else:
+            rp = R + 0.5*(R-Rs[i-1])
+
+        X = np.zeros((2, N+1))
+        Y = np.zeros((2, N+1))
+        X[:,1:] = (phi[ind] + 0.5*dphi[ind])[None,:]
+        X[:,0] = phi[ind][0] - 0.5*dphi[ind][0]
+        Y[0,:] = rm
+        Y[1,:] = rp
+
+        print("Plotting shocks: {0:d} of {1:d}".format(i+1,Rs.shape[0]))
+        #print(X.shape)
+        #print(Y.shape)
+        #print(v12RS.shape)
+        #print(v21RS.shape)
+        #print(v12.shape)
+
+        C0 = ax[0,0].pcolormesh(X, Y, np.atleast_2d(vRS[ind]), 
+                        edgecolors='none', vmin=vRS.min(), vmax=vRS.max(),
+                        cmap=dp.viridis)
+        C1 = ax[0,1].pcolormesh(X, Y, np.atleast_2d(vSS[ind]), 
+                        edgecolors='none', vmin=vSS.min(), vmax=vSS.max(),
+                        cmap=dp.viridis)
+        C2 = ax[0,2].pcolormesh(X, Y, np.atleast_2d(v12[ind]), 
+                        edgecolors='none', vmin=v12.min(), vmax=v12.max(),
+                        cmap=dp.viridis)
+        C3 = ax[1,0].pcolormesh(X, Y, np.atleast_2d(v12[ind]-vRS[ind]), 
+                        edgecolors='none', vmin=dvRSmin, vmax=dvRSmax,
+                        cmap=dp.viridis)
+        C4 = ax[1,1].pcolormesh(X, Y, np.atleast_2d(v12[ind]-vSS[ind]), 
+                        edgecolors='none', vmin=dvSSmin, vmax=dvSSmax,
+                        cmap=dp.viridis)
+        C5 = ax[1,2].pcolormesh(X, Y, np.atleast_2d(np.log10(chi[ind])), 
+                        edgecolors='none', 
+                        vmin=-0.3,
+                        vmax=0.3,
+                        #vmin=math.log10(chi.min()), 
+                        #vmax=math.log10(chi.max()),
+                        cmap=dp.viridis)
+
+    fig.colorbar(C0, ax=ax[0,0])
+    fig.colorbar(C1, ax=ax[0,1])
+    fig.colorbar(C2, ax=ax[0,2])
+    fig.colorbar(C3, ax=ax[1,0])
+    fig.colorbar(C4, ax=ax[1,1])
+    fig.colorbar(C5, ax=ax[1,2])
+
+    ax[0,0].set_xlabel(r'$\phi$')
+    ax[0,1].set_xlabel(r'$\phi$')
+    ax[0,2].set_xlabel(r'$\phi$')
+    ax[1,0].set_xlabel(r'$\phi$')
+    ax[1,1].set_xlabel(r'$\phi$')
+    ax[1,2].set_xlabel(r'$\phi$')
+    ax[0,0].set_ylabel(r'$r$')
+    ax[0,1].set_ylabel(r'$r$')
+    ax[0,2].set_ylabel(r'$r$')
+    ax[1,0].set_ylabel(r'$r$')
+    ax[1,1].set_ylabel(r'$r$')
+    ax[1,2].set_ylabel(r'$r$')
+    ax[0,0].set_title(r'$(v_{12})_\mathcal{RS}$')
+    ax[0,1].set_title(r'$(v_{12})_\mathcal{SS}$')
+    ax[0,2].set_title(r'$v_{12}$')
+    ax[1,0].set_title(r'$v_{12} - (v_{12})_\mathcal{RS}$')
+    ax[1,1].set_title(r'$v_{12} - (v_{12})_\mathcal{SS}$')
+    ax[1,2].set_title(r'$(v_{12} - (v_{12})_\mathcal{RS}) / (v_{12})_\mathcal{SS} - (v_{12})_\mathcal{RS})$')
+    ax[0,0].set_ylim(r.min(), r.max())
+    ax[0,1].set_ylim(r.min(), r.max())
+    ax[0,2].set_ylim(r.min(), r.max())
+    ax[1,0].set_ylim(r.min(), r.max())
+    ax[1,1].set_ylim(r.min(), r.max())
+    ax[1,2].set_ylim(r.min(), r.max())
+    ax[0,0].set_yscale('log')
+    ax[0,1].set_yscale('log')
+    ax[0,2].set_yscale('log')
+    ax[1,0].set_yscale('log')
+    ax[1,1].set_yscale('log')
+    ax[1,2].set_yscale('log')
+    #ax[0].plot(r, v12RS, 'k+')
+    #ax[1].plot(r, v21RS, 'k+')
+    #ax[2].plot(r, v12, 'k+')
+
+    figname = "plot_minidisc_shockDet_{0}.png".format(name)
+    print("Saving {0:s}...".format(figname))
+    fig.savefig(figname)
+    plt.close(fig)
+
+    return vRS, vSS, v12
+
+
+def shockVal(r, sig, pi, u0, vr, vp, pars):
+
+    Rs = np.unique(r)
+
+    v12 = np.zeros(r.shape)
+    v12RS = np.zeros(r.shape)
+    v21RS = np.zeros(r.shape)
+    vRS = np.zeros(r.shape)
+    vSS = np.zeros(r.shape)
+
+    M = pars['GravM']
+    gam = pars['Adiabatic_Index']
+    bw = pars['BinW']
+
+    lapse = 1.0/np.sqrt(1+2*M/r)
+    shiftr = 2*M/r / (1+2*M/r)
+    shiftp = bw
+
+    W = lapse * u0
+    VR = np.sqrt(1.0+2*M/r) * (vr + shiftr)/lapse
+    VP = r * (vp + shiftp)/lapse
+
+    print np.fabs(W - 1.0/np.sqrt(1-VR*VR-VP*VP)).sum() / r.shape[0]
+
+    for i,R in enumerate(Rs):
+        ind = r==R
+
+        #print W-1.0/np.sqrt(1.0-VR*VR-VP*VP)
+
+        print("Shock analysis: {0:d} of {1:d}".format(i+1,Rs.shape[0]))
+
+        N = r[ind].shape[0]
+
+        v12_s = np.zeros(N)
+        v12RS_s = np.zeros(N)
+        v21RS_s = np.zeros(N)
+        vRS_s = np.zeros(N)
+        vSS_s = np.zeros(N)
+
+        for j in xrange(N):
+            iL = j
+            iR = j+1
+            if iR >= N:
+                iR = 0
+            v12RS_s[j] = relvRS(sig[ind][iL], pi[ind][iL], VP[ind][iL], 
+                                    VR[ind][iL], sig[ind][iR], pi[ind][iR], 
+                                    VP[ind][iR], VR[ind][iR], gam)
+            v21RS_s[j] = relvRS(sig[ind][iR], pi[ind][iR], VP[ind][iR], 
+                                    VR[ind][iR], sig[ind][iL], pi[ind][iL], 
+                                    VP[ind][iL], VR[ind][iL], gam)
+            if pi[ind][iR] > pi[ind][iL]:
+                vRS_s[j] = v21RS_s[j]
+                vSS_s[j] = relvSS(sig[ind][iR], pi[ind][iR], -VP[ind][iR],
+                                    VR[ind][iR], sig[ind][iL], pi[ind][iL],
+                                    -VP[ind][iL], VR[ind][iL], gam)
+            else:
+                vRS_s[j] = v12RS_s[j]
+                vSS_s[j] = relvSS(sig[ind][iL], pi[ind][iL], VP[ind][iL],
+                                    VR[ind][iL], sig[ind][iR], pi[ind][iR],
+                                    VP[ind][iR], VR[ind][iR], gam)
+
+            v12_s[j] = (VP[ind][iL] - VP[ind][iR]) / (
+                                1.0 - VP[ind][iL]*VP[ind][iR])
+
+        v12[ind] = v12_s[:]
+        v12RS[ind] = v12RS_s[:]
+        v21RS[ind] = v21RS_s[:]
+        vRS[ind] = vRS_s[:]
+        vSS[ind] = vSS_s[:]
+
+    return v12RS, v21RS, vRS, vSS, v12
+
+
+def relvRS(sig1, pi1, v1x, v1t, sig2, pi2, v2x, v2t, gam):
+
+# One-shock limiting relative velocity
+    s1 = math.log(pi1 * np.power(sig1, -gam)) / (gam-1.0)
+    W1 = 1.0 / math.sqrt(1 - v1x*v1x - v1t*v1t)
+    A1 = -(1.0 + gam*pi1/((gam-1)*sig1)) * W1 * v1t
+
+    def func(p):
+        sig =  sig1 * math.pow(p/pi1, 1.0/gam)
+        h = 1 + gam*p/((gam-1)*sig)
+        cs = math.sqrt(gam*p/(sig*h))
+        return math.sqrt(h*h + A1*A1*(1-cs*cs)) / ((h*h+A1*A1)*sig*cs)
+
+    res = integrate.quad(func, pi1, pi2)
+
+    #for i,r in enumerate(res):
+    #    print i,r
+
+    return math.tanh(res[0])
+
+def relvSS(sig1, pi1, v1x, v1t, sig2, pi2, v2x, v2t, gam):
+
+# Two-shock limiting relative velocity
+# These formula are pulled straight from Rezzolla, Zannotti, and Pons 2003.
+
+    h1 = 1.0 + gam*pi1/((gam-1.0)*sig1)
+    h2 = 1.0 + gam*pi2/((gam-1.0)*sig2)
+    W22 = 1.0 / (1.0 - v2x*v2x - v2t*v2t)
+
+    #eq B.11
+    D = 1 - 4*gam*pi1*((gam-1.0)*pi2+pi1)*(h2*(pi2-pi1)/sig2-h2*h2) / (
+                (gam-1.0)*(gam-1.0)*(pi1-pi2)*(pi1-pi2))
+    #eq B.10
+    h3p = (math.sqrt(D)-1.0)*(gam-1.0)*(pi1-pi2) / ( 2*((gam-1.0)*pi2+pi1))
+    #eq B.9
+    J23p2 = -gam*(pi1-pi2) / ((gam-1.0)*(h3p*(h3p-1.0)/pi1-h2*(h2-1.0)/pi2))
+    if J23p2 < 0:
+        print("Whoa: J23p2 = {0:f}".format(J23p2))
+    #eq B.8
+    Vs = (sig2*sig2*W22*v2x*v2x + math.sqrt(J23p2*(J23p2 + sig2*sig2*W22
+                * (1-v2x*v2x)))) / (sig2*sig2*W22 + J23p2)
+    #eq 4.5
+    return (pi1-pi2) * (1-v2x*Vs) / (
+                (Vs-v2x) * (h2*sig2*W22*(1-v2x*v2x)+pi1-pi2))
+    
+
+def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat, 
+                        name, pars):
 
     Rs = np.unique(r)
     M = pars['GravM']
     gam = pars['Adiabatic_Index']
+
+    if shockDat != None:
+        velRS = shockDat[0]
+        velSS = shockDat[1]
+        vel12 = shockDat[2]
 
     S = np.log(pi * np.power(sig, -gam)) / (gam-1.0)
 
@@ -197,23 +439,46 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, name, pars):
 
         maxinds = signal.argrelmax(d2s, order=10, mode='wrap')[0]
         mininds = signal.argrelmin(d2s, order=10, mode='wrap')[0]
+        #maxinds = maxinds[np.argsort(d2s[maxinds])[::-1]]
+        mininds = mininds[np.argsort(d2s[mininds])]
 
         if len(maxinds) == 0:
             maxinds = np.array([0,0], dtype=np.int)
+        if len(mininds) == 0:
             mininds = np.array([0,0], dtype=np.int)
-        elif len(maxinds) == 1:
+        if len(maxinds) == 1:
             maxinds = np.array([maxinds[0], 0], dtype=np.int)
+        if len(mininds) == 1:
             mininds = np.array([mininds[0], 0], dtype=np.int)
-        else:
-            maxinds = np.array(maxinds, dtype=np.int)
-            mininds = np.array(mininds, dtype=np.int)
 
-        maxinds = maxinds[np.argsort(d2s[maxinds])[::-1]]
-        mininds = mininds[np.argsort(d2s[mininds])]
+        is11 = -1
+        is12 = mininds[0]
+        is21 = -1
+        is22 = mininds[1]
+        diff1 = np.inf
+        diff2 = np.inf
+
+        for j in maxinds:
+            diff12 = phi[ind][is12] - phi[ind][j]
+            diff22 = phi[ind][is22] - phi[ind][j]
+            if diff12 > np.pi:
+                diff12 -= 2*np.pi
+            if diff12 < -np.pi:
+                diff12 += 2*np.pi
+            if diff22 > np.pi:
+                diff22 -= 2*np.pi
+            if diff22 < -np.pi:
+                diff22 += 2*np.pi
+            if diff12 < diff1 and diff12 > 0:
+                is11 = j
+                diff1 = diff12
+            if diff22 < diff2 and diff22 > 0:
+                is21 = j
+                diff2 = diff22
 
         if i > 0:
-            diff0a = phi[ind][maxinds[0]] - phiSa[i-1,0]
-            diff1a = phi[ind][maxinds[1]] - phiSa[i-1,0]
+            diff0a = phi[ind][is11] - phiSa[i-1,0]
+            diff1a = phi[ind][is21] - phiSa[i-1,0]
             if diff0a < -np.pi:
                 diff0a += 2*np.pi
             elif diff0a > np.pi:
@@ -223,34 +488,40 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, name, pars):
             elif diff1a > np.pi:
                 diff1a -= 2*np.pi
             if np.fabs(diff0a) < np.fabs(diff1a):
-                isa1 = maxinds[0]
-                isb1 = maxinds[1]
+                isa1 = is11
+                isa2 = is12
+                isb1 = is21
+                isb2 = is22
             else:
-                isa1 = maxinds[1]
-                isb1 = maxinds[0]
+                isa1 = is21
+                isa2 = is22
+                isb1 = is11
+                isb2 = is12
 
         else:
-            isa1 = maxinds[0]
-            isb1 = maxinds[1]
+            isa1 = is11
+            isa2 = is12
+            isb1 = is21
+            isb2 = is22
 
-        diffa = phi[ind][mininds[0]] - phi[ind][isa1]
-        diffb = phi[ind][mininds[1]] - phi[ind][isa1]
+        #diffa = phi[ind][mininds[0]] - phi[ind][isa1]
+        #diffb = phi[ind][mininds[1]] - phi[ind][isa1]
 
-        if diffa < -np.pi:
-            diffa += 2*np.pi
-        elif diffa > np.pi:
-            diffa -= 2*np.pi
-        if diffb < -np.pi:
-            diffb += 2*np.pi
-        elif diffb > np.pi:
-            diffb -= 2*np.pi
+        #if diffa < -np.pi:
+        #    diffa += 2*np.pi
+        #elif diffa > np.pi:
+        #    diffa -= 2*np.pi
+        #if diffb < -np.pi:
+        #    diffb += 2*np.pi
+        #elif diffb > np.pi:
+        #    diffb -= 2*np.pi
 
-        if np.fabs(diffa) < np.fabs(diffb):
-            isa2 = mininds[0]
-            isb2 = mininds[1]
-        else:
-            isa2 = mininds[1]
-            isb2 = mininds[0]
+        #if np.fabs(diffa) < np.fabs(diffb):
+        #    isa2 = mininds[0]
+        #    isb2 = mininds[1]
+        #else:
+        #    isa2 = mininds[1]
+        #    isb2 = mininds[0]
         
         dphiSa = phi[ind][isa2] - phi[ind][isa1]
         dphiSb = phi[ind][isb2] - phi[ind][isb1]
@@ -326,13 +597,17 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, name, pars):
     if (dQdr > 0).any():
         ax[3].set_yscale('log')
 
-    fig.savefig("plot_minidisc_psi_{0}.png".format(name))
+    figname = "plot_minidisc_psi_{0}.png".format(name)
+    print("Saving {0:s}...".format(figname))
+    fig.savefig(figname)
     plt.close(fig)
 
     R1 = Rs[0]
     R2 = Rs[N/4]
-    R3 = Rs[N/2]
-    R4 = Rs[3*N/4]
+    #R3 = Rs[N/2]
+    #R4 = Rs[3*N/4]
+    R3 = Rs[(3*N)/8]
+    R4 = Rs[N/2]
     R5 = Rs[N-1]
     
     RR = np.array([R1, R2, R3, R4, R5])
@@ -349,22 +624,60 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, name, pars):
         d2s = sr - 2*s + sl
         d2s = -srr + 16*sr - 30*s + 16*sl - sll
 
+        NP = s.shape[0]
+
         ax2 = ax1[0,i].twinx()
+        if shockDetPlot:
+            ax3 = ax1[0,i].twinx()
         maxinds = signal.argrelmax(d2s, order=10, mode='wrap')[0]
         mininds = signal.argrelmin(d2s, order=10, mode='wrap')[0]
-        maxinds = maxinds[np.argsort(d2s[maxinds])[::-1]]
+        #maxinds = maxinds[np.argsort(d2s[maxinds])[::-1]]
         mininds = mininds[np.argsort(d2s[mininds])]
+
+        isa2 = mininds[0]
+        if len(mininds) > 1:
+            isb2 = mininds[1]
+        else:
+            isb2 = 0
+
+        isa1 = -1
+        diffa = np.inf
+
+        for j in maxinds[:]:
+            diff = phi[ind][isa2] - phi[ind][j]
+            if diff > np.pi:
+                diff -= 2*np.pi
+            if diff < -np.pi:
+                diff += 2*np.pi
+            if diff < diffa and diff > 0:
+                isa1 = j
+                diffa = diff
+
+        isb1 = -1
+        diffb = np.inf
+
+        for j in maxinds[:]:
+            diff = phi[ind][isb2] - phi[ind][j]
+            if diff > np.pi:
+                diff -= 2*np.pi
+            if diff < -np.pi:
+                diff += 2*np.pi
+            if diff < diffb and diff > 0:
+                isb1 = j
+                diffb = diff
+
         for j in xrange(ax.shape[0]):
-            if maxinds.shape[0] > 1:
-                ax1[j,i].axvline(phi[ind][maxinds[0]], color='b')
-            if maxinds.shape[0] > 2:
-                ax1[j,i].axvline(phi[ind][maxinds[1]], color='b')
-            if mininds.shape[0] > 1:
-                ax1[j,i].axvline(phi[ind][mininds[0]], color='g')
-            if mininds.shape[0] > 2:
-                ax1[j,i].axvline(phi[ind][mininds[1]], color='g')
-        ax1[0,i].plot(phi[ind], d2s, 'r+')
-        ax2.plot(phi[ind], S[ind], 'k+')
+            ax1[j,i].axvline(phi[ind][isa1], color='b')
+            ax1[j,i].axvline(phi[ind][isb1], color='b')
+            ax1[j,i].axvline(phi[ind][isa2], color='g')
+            ax1[j,i].axvline(phi[ind][isb2], color='g')
+        if shockDetPlot:
+            ax1[0,i].plot(phi[ind], vel12[ind]-velRS[ind], 'b+')
+            ax2.plot(phi[ind], d2s, 'r+')
+            ax3.plot(phi[ind], S[ind], 'k+')
+        else:
+            ax2.plot(phi[ind], d2s, 'r+')
+            ax1[0,i].plot(phi[ind], S[ind], 'k+')
 
         ax1[1,i].plot(phi[ind], sig[ind]*S[ind], 'k+')
         ax1[2,i].plot(phi[ind], sig[ind]*u0[ind]*S[ind], 'k+')
@@ -382,7 +695,9 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, name, pars):
     ax1[5,0].set_ylabel(r"$\Pi$")
     ax1[6,0].set_ylabel(r"$\Pi / \Sigma$")
 
-    fig1.savefig("plot_minidisc_diss_{0}.png".format(name))
+    figname = "plot_minidisc_diss_{0}.png".format(name)
+    print("Saving {0:s}...".format(figname))
+    fig1.savefig(figname)
     plt.close(fig1)
 
     return phiS, phiSa, phiSb, psiQ
@@ -419,8 +734,13 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     chckname = filename.split("/")[-1]
     chcknum = "_".join(chckname.split(".")[0].split("_")[1:])
 
-    phiS, phiSa, phiSb, psiQ = dissipation_plot(t, r, phi, sig, pi, vr, vp, u0,
-                                                dphi, chcknum, pars)
+    if shockDetPlot:
+        shockDat = shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, chcknum, pars)
+        phiS, phiSa, phiSb, psiQ = dissipation_plot(t, r, phi, sig, pi, 
+                                    vr, vp, u0, dphi, shockDat, chcknum, pars)
+    else:
+        phiS, phiSa, phiSb, psiQ = dissipation_plot(t, r, phi, sig, pi, 
+                                    vr, vp, u0, dphi, None, chcknum, pars)
 
     RR = np.logspace(np.log10(r.min()), np.log10(r.max()), 100)
 
@@ -612,6 +932,13 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     tanPitch0 = -1.0 / (dphi0dr * Rs[1:-1])
     tanPitch1 = -1.0 / (dphi1dr * Rs[1:-1])
 
+    dpdra = 0.5*(phiSa[2:,0]+phiSa[2:,1] - phiSa[:-2,0] - phiSa[:-2,1]) / (
+                    Rs[2:] - Rs[:-2])
+    dpdrb = 0.5*(phiSb[2:,0]+phiSb[2:,1] - phiSb[:-2,0] - phiSb[:-2,1]) / (
+                    Rs[2:] - Rs[:-2])
+    tpa = -1.0 / (dpdra * Rs[1:-1])
+    tpb = -1.0 / (dpdrb * Rs[1:-1])
+
     #Rafikov-Analysis
     djdr = (j[2:]-j[:-2]) / (Rs[2:]-Rs[:-2])
     pi_raf_sig = (2+(gam+1)*deltaSig/Sig0) / (2-(gam-1)*deltaSig/Sig0)
@@ -692,6 +1019,22 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     plot_data(ax[2,0], Rs, shock1Phi, 'b')
     pretty_axis(ax[2,0], pars, xlabel=r"$R$", ylabel=r"$\phi_{S}$", 
             yscale='linear')
+
+    omk = np.sqrt(M/(Rs*Rs*Rs))
+    tpWKB = 1.0 / (avMach * np.sqrt((1-bw/omk)*(1-bw/omk)-0.25))
+    tpWKB1 = 1.0 / (avMach * np.sqrt((1-bw/omk)*(1-bw/omk)-0.6))
+    tpWKB2 = 1.0 / (avMach * np.sqrt((1-bw/omk)*(1-bw/omk)-0.7))
+    tpWKBrel = 1.0 / avMachNorb * np.sqrt(
+            (1-2*M/Rs)*(1-3*M/Rs)
+        / ((1-bw/omk)*(1-bw/omk)-0.25*(1-6*M/Rs)/(1-2*M/Rs)))
+    tpWKBrel1 = 1.0 / avMachNorb * np.sqrt(
+            (1-2*M/Rs)*(1-3*M/Rs)
+        / ((1-bw/omk)*(1-bw/omk)-0.6*(1-6*M/Rs)/(1-2*M/Rs)))
+    tpWKBrel2 = 1.0 / avMachNorb * np.sqrt(
+            (1-2*M/Rs)*(1-3*M/Rs)
+        / ((1-bw/omk)*(1-bw/omk)-0.7*(1-6*M/Rs)/(1-2*M/Rs)))
+
+
     if (tanPitch0 < np.inf).any() or (tanPitch1 < np.inf).any():
         real0 = (tanPitch0 > 0) * (tanPitch0 < np.inf)
         real1 = (tanPitch1 > 0) * (tanPitch1 < np.inf)
@@ -734,31 +1077,18 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         #if coeff1 is not None:
         #    plot_line(ax[1,2], math.pow(10.0,coeff1[1])*np.power(TP,coeff1[0]),
         #                    TP, color='g')
-        omk = np.sqrt(M/(Rs[1:-1]*Rs[1:-1]*Rs[1:-1]))
-        tpWKB = 1.0 / (avMach[1:-1] * np.sqrt((1-bw/omk)*(1-bw/omk)-0.25))
-        tpWKB1 = 1.0 / (avMach[1:-1] * np.sqrt((1-bw/omk)*(1-bw/omk)-0.6))
-        tpWKB2 = 1.0 / (avMach[1:-1] * np.sqrt((1-bw/omk)*(1-bw/omk)-0.7))
-        tpWKBrel = 1.0 / avMachNorb[1:-1] * np.sqrt(
-                (1-2*M/Rs[1:-1])*(1-3*M/Rs[1:-1])
-            / ((1-bw/omk)*(1-bw/omk)-0.25*(1-6*M/Rs[1:-1])/(1-2*M/Rs[1:-1])))
-        tpWKBrel1 = 1.0 / avMachNorb[1:-1] * np.sqrt(
-                (1-2*M/Rs[1:-1])*(1-3*M/Rs[1:-1])
-            / ((1-bw/omk)*(1-bw/omk)-0.6*(1-6*M/Rs[1:-1])/(1-2*M/Rs[1:-1])))
-        tpWKBrel2 = 1.0 / avMachNorb[1:-1] * np.sqrt(
-                (1-2*M/Rs[1:-1])*(1-3*M/Rs[1:-1])
-            / ((1-bw/omk)*(1-bw/omk)-0.7*(1-6*M/Rs[1:-1])/(1-2*M/Rs[1:-1])))
-        plot_line(ax[1,2], avMach[1:-1], tpWKB, color='r')
+        plot_line(ax[1,2], avMach, tpWKB, color='r')
         #plot_line(ax[1,2], avMach[1:-1], tpWKB1, color='r', ls='--')
         #plot_line(ax[1,2], avMach[1:-1], tpWKB2, color='r', ls=':')
-        plot_line(ax[1,2], avMach[1:-1], tpWKBrel, color='g')
+        plot_line(ax[1,2], avMach, tpWKBrel, color='g')
         #plot_line(ax[1,2], avMach[1:-1], tpWKBrel1, color='g', ls='--')
-        plot_line(ax[1,2], avMach[1:-1], tpWKBrel2, color='g', ls='--')
+        plot_line(ax[1,2], avMach, tpWKBrel2, color='g', ls='--')
 
         pretty_axis(ax[1,2], pars, xlabel=r"$\mathcal{M}$",
                         ylabel=r"$\tan \theta_S$", yscale='log', xscale='log')
 
         figNice, axNice = plt.subplots(1,1,figsize=(12,9))
-        axNice.plot(avMachNorb[1:-1], tpWKBrel, '-', lw=4, color="grey", 
+        axNice.plot(avMachNorb, tpWKBrel, '-', lw=4, color="grey", 
                         label="WKB")
         axNice.plot(avMachNorb[1:-1][tanPitch0>0], tanPitch0[tanPitch0>0], 
                         '+', color=blue, ms=10, mew=2, label="Shock 1")
@@ -795,6 +1125,26 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     figNice.savefig(outname)
     plt.close(figNice)
 
+    figNice, axNice = plt.subplots(1,1,figsize=(12,9))
+    axNice.plot(avMachNorb, tpWKBrel, '-', lw=4, color="grey", 
+                    label="WKB")
+    axNice.plot(avMachNorb[1:-1][tpa>0], tpa[tpa>0], 
+                    '+', color=blue, ms=10, mew=2, label="Shock 1")
+    axNice.plot(avMachNorb[1:-1][tpb>0], tpb[tpb>0], 
+                    '+', color=orange, ms=10, mew=2, label="Shock 2")
+    axNice.set_xlabel(r"$\mathcal{M}_N = \langle r v^\phi / c_s \rangle$",
+                        fontsize=24)
+    axNice.set_ylabel(r"$\tan \theta_S$", fontsize=24)
+    #axNice.set_xscale('log')
+    #axNice.set_yscale('log')
+    axNice.tick_params(labelsize=18)
+    plt.legend(loc="upper right", fontsize=24)
+    axNice.set_title("Dispersion Relation", fontsize=36)
+    outname = "plot_minidisc_tanq_mach_ds_{0}.png".format(
+                "_".join(chckname.split(".")[0].split("_")[1:]))
+    print("Saving {0:s}...".format(outname))
+    figNice.savefig(outname)
+    plt.close(figNice)
 
     outname = "plot_minidisc_orbit_{0}.png".format(
                 "_".join(chckname.split(".")[0].split("_")[1:]))
@@ -1021,6 +1371,39 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
     return fig, None
 
+
+if __name__ == "__main__":
+
+    if len(sys.argv) < 3:
+        print("\nGive me a parfile and checkpoint (.h5) file(s).\n")
+        sys.exit()
+
+#    elif len(sys.argv) == 3:
+#        parname = sys.argv[1]
+#        filename = sys.argv[2]
+#        pars = dp.readParfile(parname)
+#        fig = plot_r_profile(filename, pars, sca=scale)
+#        plt.show()
+#
+    else:
+        all_bounds = np.zeros((9,2))
+        parname = sys.argv[1]
+        pars = dp.readParfile(parname)
+        #all_bounds[:,0] = np.inf
+        #all_bounds[:,1] = -np.inf
+        #for filename in sys.argv[1:]:
+            #fig, bounds = plot_r_profile(filename, pars, sca=scale,
+            #                                plot=False)
+            #fig, bounds = plot_r_profile(filename, pars, sca=scale,
+            #                                plot=False)
+            #all_bounds[:,0] = np.minimum(all_bounds[:,0], bounds[:,0])
+            #all_bounds[:,1] = np.maximum(all_bounds[:,1], bounds[:,1])
+
+        for filename in sys.argv[2:]:
+            fig, bounds = plot_r_profile(filename, pars, sca=scale, plot=True,
+                                        bounds=all_bounds)
+            plt.close(fig)
+
 """
     #binW = pars['BinW']#\
 
@@ -1151,35 +1534,3 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
     return fig, bounds
 """
-
-if __name__ == "__main__":
-
-    if len(sys.argv) < 3:
-        print("\nGive me a parfile and checkpoint (.h5) file(s).\n")
-        sys.exit()
-
-    elif len(sys.argv) == 3:
-        parname = sys.argv[1]
-        filename = sys.argv[2]
-        pars = dp.readParfile(parname)
-        fig = plot_r_profile(filename, pars, sca=scale)
-        plt.show()
-
-    else:
-        all_bounds = np.zeros((9,2))
-        parname = sys.argv[1]
-        pars = dp.readParfile(parname)
-        #all_bounds[:,0] = np.inf
-        #all_bounds[:,1] = -np.inf
-        #for filename in sys.argv[1:]:
-            #fig, bounds = plot_r_profile(filename, pars, sca=scale,
-            #                                plot=False)
-            #fig, bounds = plot_r_profile(filename, pars, sca=scale,
-            #                                plot=False)
-            #all_bounds[:,0] = np.minimum(all_bounds[:,0], bounds[:,0])
-            #all_bounds[:,1] = np.maximum(all_bounds[:,1], bounds[:,1])
-
-        for filename in sys.argv[2:]:
-            fig, bounds = plot_r_profile(filename, pars, sca=scale, plot=True,
-                                        bounds=all_bounds)
-            plt.close(fig)
