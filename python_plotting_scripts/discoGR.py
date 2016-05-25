@@ -23,44 +23,44 @@ def calc_g(r, pars):
     gpp = np.zeros(r.shape)
 
     if pars['Metric'] == 0:
-        g00 = -1.0
-        g0r = 0.0
-        g0p = 0.0
-        grr = 1.0
-        grp = 0.0
-        gpp = r*r
+        g00[:] = -1.0
+        g0r[:] = 0.0
+        g0p[:] = 0.0
+        grr[:] = 1.0
+        grp[:] = 0.0
+        gpp[:] = r*r
 
     elif pars['Metric'] == 1:
-        g00 = -1.0 + 2*M/r
-        g0r = 0.0
-        g0p = 0.0
-        grr = 1.0/(1.0 - 2*M/r)
-        grp = 0.0
-        gpp = r*r
+        g00[:] = -1.0 + 2*M/r
+        g0r[:] = 0.0
+        g0p[:] = 0.0
+        grr[:] = 1.0/(1.0 - 2*M/r)
+        grp[:] = 0.0
+        gpp[:] = r*r
 
     elif pars['Metric'] == 2:
-        g00 = -1.0 + 2*M/r
-        g0r = 2*M/r
-        g0p = 0.0
-        grr = 1.0 + 2*M/r
-        grp = 0.0
-        gpp = r*r
+        g00[:] = -1.0 + 2*M/r
+        g0r[:] = 2*M/r
+        g0p[:] = 0.0
+        grr[:] = 1.0 + 2*M/r
+        grp[:] = 0.0
+        gpp[:] = r*r
 
     elif pars['Metric'] == 3:
-        g00 = -1.0
-        g0r = 0.0
-        g0p = 0.0
-        grr = 1.0
-        grp = 0.0
-        gpp = 1.0
+        g00[:] = -1.0
+        g0r[:] = 0.0
+        g0p[:] = 0.0
+        grr[:] = 1.0
+        grp[:] = 0.0
+        gpp[:] = 1.0
 
     elif pars['Metric'] == 6:
-        g00 = -1.0 + 2*M/r + r*r*bw*bw
-        g0r = 2*M/r
-        g0p = r*r*bw
-        grr = 1.0 + 2*M/r
-        grp = 0.0
-        gpp = r*r
+        g00[:] = -1.0 + 2*M/r + r*r*bw*bw
+        g0r[:] = 2*M/r
+        g0p[:] = r*r*bw
+        grr[:] = 1.0 + 2*M/r
+        grp[:] = 0.0
+        gpp[:] = r*r
 
     return g00, g0r, g0p, grr, grp, gpp
 
