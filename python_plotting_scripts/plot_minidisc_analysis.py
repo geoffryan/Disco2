@@ -443,13 +443,13 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
         mininds = mininds[np.argsort(d2s[mininds])]
 
         if len(maxinds) == 0:
-            maxinds = np.array([0,0])
+            maxinds = np.array([0,0], dtype=np.int)
         if len(mininds) == 0:
-            mininds = np.array([0,0])
+            mininds = np.array([0,0], dtype=np.int)
         if len(maxinds) == 1:
-            maxinds = np.array([maxinds[0], 0])
+            maxinds = np.array([maxinds[0], 0], dtype=np.int)
         if len(mininds) == 1:
-            mininds = np.array([mininds[0], 0])
+            mininds = np.array([mininds[0], 0], dtype=np.int)
 
         is11 = -1
         is12 = mininds[0]
