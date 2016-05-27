@@ -11,10 +11,12 @@ import discoEOS as eos
 import discoGR as gr
 
 scale = 'log'
-RMAX = 70.0
-RMIN = 6.0
+RMAX = 60.0
+RMIN = 4.5
 
 shockDetPlot = False
+dissPlot = True
+allTheOtherPlots = False
 
 blue = (31.0/255, 119.0/255, 180.0/255)
 orange = (255.0/255, 127.0/255, 14.0/255)
@@ -709,8 +711,168 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
     fig1.savefig(figname)
     plt.close(fig1)
 
-    return phiS, phiSa, phiSb, psiQ
+    return phiS, phiSa, phiSb, psiQ, dQdm, dQdr
 
+def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi, 
+                                shockDissDat, pars, name):
+
+    gam = pars['Adiabatic_Index']
+    a = pars['BinA']
+    M1 = pars['BinM']
+
+    g00, g0r, g0p, grr, grp, gpp = gr.calc_g(r, pars)
+    ur = u0*vr
+    up = u0*vp
+
+    u0d = g00*u0 + g0r*ur + g0p*up
+    urd = g0r*u0 + grr*ur + grp*up
+    upd = g0p*u0 + grp*ur + gpp*up
+
+    h = 1 + gam*pi/((gam-1)*sig)
+
+    d = r*sig*u0
+    j = r*sig*u0*h*upd
+    l = h*upd
+    mdot = r*sig*ur
+    f = r*sig*ur*h*upd
+
+    temp = pi/sig
+    ka_bbes = 0.4 # cm^2/g
+    cool_cgs = 8*eos.sb * (temp*eos.mp*eos.c*eos.c)**4 / (
+                3*ka_bbes*sig * eos.rho_scale*eos.rg_solar)
+    cool = cool_cgs / (eos.c*eos.c*eos.c*eos.rho_scale)
+    qdotc = -r*cool*upd
+
+    x = r*np.cos(phi)
+    y = r*np.sin(phi)
+    X = -a
+    Y = 0.0
+    A = math.sqrt(X*X+Y*Y)
+    r2 = np.sqrt((x-X)*(x-X)+(y-Y)*(y-Y))
+    fx = M1*( -(x-X)/(r2*r2*r2) - X/(A*A*A) ) * sig*h*u0*u0
+    fy = M1*( -(y-Y)/(r2*r2*r2) - Y/(A*A*A) ) * sig*h*u0*u0
+    t = r*(-y*fx + x*fy)
+
+    Rs = np.unique(r)
+    L = np.zeros(Rs.shape)
+    J = np.zeros(Rs.shape)
+    Mdot = np.zeros(Rs.shape)
+    D = np.zeros(Rs.shape)
+    F = np.zeros(Rs.shape)
+    Qdotc = np.zeros(Rs.shape)
+    Cool = np.zeros(Rs.shape)
+    T = np.zeros(Rs.shape)
+    Om = np.zeros(Rs.shape)
+
+    for i,R in enumerate(Rs):
+        ind = (r==R)
+        L[i] = (l[ind]*dphi[ind]).sum() / (2*math.pi)
+        Om[i] = (up[ind]*dphi[ind]).sum() / (2*math.pi)
+        J[i] = (j[ind]*dphi[ind]).sum()
+        F[i] = (f[ind]*dphi[ind]).sum()
+        D[i] = (d[ind]*dphi[ind]).sum()
+        Mdot[i] = (mdot[ind]*dphi[ind]).sum()
+        Qdotc[i] = (qdotc[ind]*dphi[ind]).sum()
+        T[i] = (t[ind]*dphi[ind]).sum()
+        Cool[i] = (R*cool[ind]*dphi[ind]).sum()
+
+    fig, ax = plt.subplots(2,3, figsize=(12,9))
+    ax[0,0].plot(Rs, L, 'k+')
+    ax[0,0].set_ylabel(r'$\langle h u_\phi \rangle$')
+    ax[0,0].set_xscale('log')
+    ax[0,1].plot(Rs, J, 'k+')
+    ax[0,1].set_ylabel(r'$[ r \rho u^t h u_\phi ]$')
+    ax[0,1].set_xscale('log')
+    ax[0,2].plot(Rs, F, 'k+')
+    ax[0,2].set_ylabel(r'$[ r \rho u^r h u_\phi ]$')
+    ax[0,2].set_xscale('log')
+    ax[1,0].plot(Rs, Mdot, 'k+')
+    ax[1,0].set_ylabel(r'$[ r \rho u^r ]$')
+    ax[1,0].set_xscale('log')
+    ax[1,1].plot(Rs, Qdotc, 'k+')
+    ax[1,1].set_ylabel(r'$[ r \dot{Q} u_\phi ]$')
+    ax[1,1].set_xscale('log')
+    ax[1,2].plot(Rs, T, 'k+')
+    ax[1,2].set_ylabel(r'$[ r f_\phi ]$')
+    ax[1,2].set_xscale('log')
+    ax[1,0].set_xlabel(r'$R$')
+    ax[1,1].set_xlabel(r'$R$')
+    ax[1,2].set_xlabel(r'$R$')
+
+    plt.tight_layout()
+
+    figname = "plot_minidisc_fluxRaw_{0}.png".format(name)
+    print("Saving {0:s}...".format(figname))
+    fig.savefig(figname)
+    plt.close(fig)
+
+    if shockDissDat is not None:
+        dQdr = shockDissDat[5][:,2]
+
+    Riph = 0.5*(Rs[:-1]+Rs[1:])
+    #AMmdot = np.zeros(Rs.shape)
+    #AMdiss = np.zeros(Rs.shape)
+    #AMcool = np.zeros(Rs.shape)
+    #AMtorq = np.zeros(Rs.shape)
+    AMmdot = np.zeros(Riph.shape)
+    AMdiss = np.zeros(Riph.shape)
+    AMcool = np.zeros(Riph.shape)
+    AMtorq = np.zeros(Riph.shape)
+
+    dLdR = (L[2:]-L[:-2]) / (Rs[2:]-Rs[:-2])
+    AMmdot[1:-1] = 0.5*(Mdot[2:-1]*dLdR[1:] + Mdot[1:-2]*dLdR[:-1]) * (
+                        Rs[2:-1]-Rs[1:-2])
+    AMdiss = (F - Mdot*L)[1:] - (F-Mdot*L)[:-1]
+    AMcool = 0.5*(Qdotc[1:]+Qdotc[:-1])*(Rs[1:]-Rs[:-1])
+    AMtorq = 0.5*(T[1:]+T[:-1])*(Rs[1:]-Rs[:-1])
+
+    fig, ax = plt.subplots(2,2, figsize=(12,9))
+    ax[0,0].plot(Rs, J, 'b+')
+    ax[0,0].plot(Rs, D*L, 'r+')
+    ax[0,0].plot(Rs, J - D*L, 'k+')
+    ax[0,1].plot(Rs, F, 'b+')
+    ax[0,1].plot(Rs, Mdot*L, 'r+')
+    ax[0,1].plot(Rs, F - Mdot*L, 'k+')
+
+    ax[1,0].plot(Riph, AMmdot, 'b+')
+    ax[1,0].plot(Riph, AMdiss, 'r+')
+    ax[1,0].plot(Riph, AMcool, 'bx')
+    ax[1,0].plot(Riph, AMtorq, 'rx')
+    ax[1,0].plot(Riph, -AMdiss+AMcool+AMtorq, 'g+')
+    ax[1,0].plot(Riph, AMmdot+AMdiss-AMcool-AMtorq, 'k+')
+
+    #ax[1,1].plot(Rs, (F-Mdot*L)*Om/Rs, 'b+')
+    #if shockDissDat is not None:
+    #    ax[1,1].plot(Rs, dQdr, 'r+')
+    #ax[1,1].plot(Rs, Cool, 'g+')
+
+    if shockDissDat is not None:
+        AMdqdr = np.zeros(Riph.shape)
+        #dOm = (Om[2:] - Om[:-2]) / (Rs[2:] - Rs[:-2])
+        dOm = -1.5 * Om/Rs
+        tau = Rs*dQdr / dOm
+        AMdqdr = -(tau[1:]-tau[:-1])
+
+    ax[1,1].plot(Riph,-AMmdot, 'b+')
+    ax[1,1].plot(Riph, AMdiss-AMcool-AMtorq, 'g+')
+    if shockDissDat is not None:
+        #ax[1,1].plot(Riph, AMdqdr, 'r+')
+        ax[1,1].plot(Rs, 2.0/3.0 * Rs * dQdr / Om, 'rx')
+    #ax[1,1].plot(Rs, Riph * dQdr / Om + AMmdot, 'k+')
+
+    ax[0,0].set_xscale('log')
+    ax[0,1].set_xscale('log')
+    ax[1,0].set_xscale('log')
+    ax[1,1].set_xscale('log')
+    ax[0,0].set_xlim(r.min(), r.max())
+    ax[0,1].set_xlim(r.min(), r.max())
+    ax[1,0].set_xlim(r.min(), r.max())
+    ax[1,1].set_xlim(r.min(), r.max())
+
+    figname = "plot_minidisc_fluxComp_{0}.png".format(name)
+    print("Saving {0:s}...".format(figname))
+    fig.savefig(figname)
+    plt.close(fig)
 
 def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
@@ -743,13 +905,36 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     chckname = filename.split("/")[-1]
     chcknum = "_".join(chckname.split(".")[0].split("_")[1:])
 
+    
+
     if shockDetPlot:
-        shockDat = shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, chcknum, pars)
-        phiS, phiSa, phiSb, psiQ = dissipation_plot(t, r, phi, sig, pi, 
-                                    vr, vp, u0, dphi, shockDat, chcknum, pars)
+        shockDetDat = shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, chcknum, 
+                                pars)
     else:
-        phiS, phiSa, phiSb, psiQ = dissipation_plot(t, r, phi, sig, pi, 
-                                    vr, vp, u0, dphi, None, chcknum, pars)
+        shockDetDat = None
+    if dissPlot:
+        shockDissDat = dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, 
+                                            dphi, shockDetDat, chcknum, pars)
+        phiS = shockDissDat[0]
+        phiSa = shockDissDat[1]
+        phiSb = shockDissDat[2]
+        psiQ = shockDissDat[3]
+        dQdm = shockDissDat[4]
+        dQdr = shockDissDat[5]
+    else:
+        shockDissDat = None
+        phiS = None
+        phiSa = None
+        phiSb = None
+        psiQ = None
+        dQdm = None
+        dQdr = None
+
+    angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi, shockDissDat,
+                                pars, chcknum)
+
+    if not allTheOtherPlots:
+        return
 
     RR = np.logspace(np.log10(r.min()), np.log10(r.max()), 100)
 
@@ -1377,8 +1562,7 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
     print("Saving {0:s}...".format(outname))
     fig.savefig(outname)
-
-    return fig, None
+    plt.close(fig)
 
 
 if __name__ == "__main__":
@@ -1409,9 +1593,8 @@ if __name__ == "__main__":
             #all_bounds[:,1] = np.maximum(all_bounds[:,1], bounds[:,1])
 
         for filename in sys.argv[2:]:
-            fig, bounds = plot_r_profile(filename, pars, sca=scale, plot=True,
+            plot_r_profile(filename, pars, sca=scale, plot=True,
                                         bounds=all_bounds)
-            plt.close(fig)
 
 """
     #binW = pars['BinW']#\
