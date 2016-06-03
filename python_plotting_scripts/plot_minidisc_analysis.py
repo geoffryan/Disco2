@@ -402,6 +402,171 @@ def relvSS(sig1, pi1, v1x, v1t, sig2, pi2, v2x, v2t, gam):
                 (Vs-v2x) * (h2*sig2*W22*(1-v2x*v2x)+pi1-pi2))
     
 
+def find_shocks_d2s(r, phi, S):
+
+#Find shocks by looking at derivatives of S.
+
+    Rs = np.unique(r)
+    N = Rs.shape[0]
+
+    phiSa = np.zeros((N,2))
+    phiSb = np.zeros((N,2))
+
+    iSa = np.zeros((N,2),dtype=np.int)
+    iSb = np.zeros((N,2),dtype=np.int)
+
+    for i,R in enumerate(Rs):
+        ind = r==R
+        s = S[ind]
+        sl = np.roll(s,1)
+        sll = np.roll(s,2)
+        sr = np.roll(s,-1)
+        srr = np.roll(s,-2)
+        d2s = sr - 2*s + sl
+        d2s = -srr + 16*sr - 30*s + 16*sl - sll
+
+        smax = s.max()
+        smin = s.min()
+
+        d2sB = 2*(smax-smin)
+
+        maxinds = signal.argrelmax(d2s, order=10, mode='wrap')[0]
+        mininds = signal.argrelmin(d2s, order=10, mode='wrap')[0]
+        mininds = mininds[np.argsort(d2s[mininds])]
+
+        #maxinds = maxinds[d2s[maxinds] >  d2sB]
+        #mininds = mininds[d2s[mininds] < -d2sB]
+
+        iS = []
+
+        used = []
+        for j in mininds:
+            is2 = j
+            phi2 = phi[ind][j]
+            diff = np.inf
+            is1 = -1
+
+            for k in maxinds:
+                if k in used:
+                    continue
+                jump = phi2 - phi[ind][k]
+                if jump > np.pi:
+                    jump -= 2*np.pi
+                if jump < -np.pi:
+                    jump += 2*np.pi
+                if jump > 0 and jump < diff:
+                    is1 = k
+                    diff = jump
+
+            if diff > np.pi/4:
+                continue
+
+            iS.append([is1, is2])
+            used.append(is1)
+
+        #print iS
+
+        if len(iS) == 0:
+            iSa[i,:] = -1
+            iSb[i,:] = -1
+            phiSa[i,:] = np.inf
+            phiSb[i,:] = np.inf
+            continue
+
+        if i == 0:
+            iSa[i,:] = iS[0]
+            phiSa[i,:] = phi[ind][iS[0]]
+            if len(iS) > 1:
+                iSb[i,:] = iS[1]
+                phiSb[i,:] = phi[ind][iS[1]]
+            else:
+                iSb[i,:] = -1
+                phiSb[i,:] = np.inf
+
+        else:
+            sa = -1
+            sb = -1
+            diffa = np.inf
+            diffb = np.inf
+            for j,sh in enumerate(iS):
+                jumpa = phi[ind][sh[1]] - phiSa[i-1,1]
+                jumpb = phi[ind][sh[1]] - phiSb[i-1,1]
+                if jumpa > np.pi:
+                    jumpa -= 2*np.pi
+                elif jumpa < -np.pi:
+                    jumpa += 2*np.pi
+                if jumpb > np.pi:
+                    jumpb -= 2*np.pi
+                elif jumpb < -np.pi:
+                    jumpb += 2*np.pi
+                if math.fabs(jumpa) < math.fabs(diffa):
+                    sa = j
+                    diffa = jumpa
+                if math.fabs(jumpb) < math.fabs(diffb):
+                    sb = j
+                    diffb = jumpb
+            if iSa[i-1,0] < 0 and iSb[i-1,0] < 0:
+                iSa[i,:] = iS[0]
+                iSb[i,:] = iS[1]
+                phiSa[i,:] = phi[ind][iS[0]]
+                phiSb[i,:] = phi[ind][iS[1]]
+            elif iSb[i-1,0] < 0:
+                iSa[i,:] = iS[sa]
+                phiSa[i,:] = phi[ind][iS[sa]]
+                if len(iS) == 1:
+                    iSb[i,:] = -1
+                    phiSb[i,:] = np.inf
+                elif sa == 0:
+                    iSb[i,:] = 1
+                    phiSb[i,:] = phi[ind][iS[1]]
+                else:
+                    iSb[i,:] = 0
+                    phiSb[i,:] = phi[ind][iS[0]]
+            elif iSa[i-1,0] < 0:
+                iSb[i,:] = iS[sb]
+                phiSb[i,:] = phi[ind][iS[sb]]
+                if len(iS) == 1:
+                    iSa[i,:] = -1
+                    phiSa[i,:] = np.inf
+                elif sb == 0:
+                    iSa[i,:] = 1
+                    phiSa[i,:] = phi[ind][iS[1]]
+                else:
+                    iSa[i,:] = 0
+                    phiSa[i,:] = phi[ind][iS[0]]
+            elif sa != sb and sa > -1 and sb > -1:
+                iSa[i,:] = iS[sa]
+                iSb[i,:] = iS[sb]
+                phiSa[i,:] = phi[ind][iS[sa]]
+                phiSb[i,:] = phi[ind][iS[sb]]
+            else:
+                if math.fabs(diffa) < math.fabs(diffb):
+                    iSa[i,:] = iS[sa]
+                    iSb[i,:] = -1
+                    phiSa[i,:] = phi[ind][iS[sa]]
+                    phiSb[i,:] = np.inf
+                else:
+                    iSa[i,:] = -1
+                    iSb[i,:] = iS[sb]
+                    phiSa[i,:] = np.inf
+                    phiSb[i,:] = phi[ind][iS[sb]]
+
+    for i in xrange(N):
+        if iSa[i,0] > -1:
+            dphia = phiSa[i,1] - phiSa[i,0]
+            if dphia > np.pi:
+                phiSa[i,0] += 2*np.pi
+            elif dphia < -np.pi:
+                phiSa[i,0] -= 2*np.pi
+        if iSb[i,0] > -1:
+            dphib = phiSb[i,1] - phiSb[i,0]
+            if dphib > np.pi:
+                phiSb[i,0] += 2*np.pi
+            elif dphib < -np.pi:
+                phiSb[i,0] -= 2*np.pi
+
+    return iSa, iSb, phiSa, phiSb
+
 def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat, 
                         name, pars):
 
@@ -415,145 +580,60 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
         vel12 = shockDat[2]
 
     S = np.log(pi * np.power(sig, -gam)) / (gam-1.0)
-
     S -= S.min()
+
+    iSa, iSb, phiSa, phiSb = find_shocks_d2s(r, phi, S)
 
     up = u0*vp
     N = Rs.shape[0]
-
     dS = np.zeros((N,3))
     psiQ = np.zeros((N,3))
     dQdm = np.zeros((N,3))
     dQdr = np.zeros((N,3))
     phiS = np.zeros((N,2))
-    phiSa = np.zeros((N,2))
-    phiSb = np.zeros((N,2))
+
+    phiS[:,0] = 0.5*(phiSa[:,0] + phiSa[:,1])
+    phiS[:,1] = 0.5*(phiSb[:,0] + phiSb[:,1])
+
+    fig, ax = plt.subplots(1,1,figsize=(12,9))
+    ax.plot(Rs*np.cos(phiS[:,0]), Rs*np.sin(phiS[:,0]), 'k+')
+    ax.plot(Rs*np.cos(phiSa[:,0]), Rs*np.sin(phiSa[:,0]), 'r+')
+    ax.plot(Rs*np.cos(phiSa[:,1]), Rs*np.sin(phiSa[:,1]), 'b+')
+    ax.plot(Rs*np.cos(phiS[:,1]), Rs*np.sin(phiS[:,1]), 'k+')
+    ax.plot(Rs*np.cos(phiSb[:,0]), Rs*np.sin(phiSb[:,0]), 'r+')
+    ax.plot(Rs*np.cos(phiSb[:,1]), Rs*np.sin(phiSb[:,1]), 'b+')
+    figname = "plot_minidisc_shockPlot_{0}.png".format(name)
+    print("Saving {0:s}...".format(figname))
+    fig.savefig(figname)
+    plt.close(fig)
 
     for i,R in enumerate(Rs):
-        ind = r==R
+
+        ind = (r==R)
         s = S[ind]
-        sl = np.roll(s,1)
-        sll = np.roll(s,2)
-        sr = np.roll(s,-1)
-        srr = np.roll(s,-2)
-        d2s = sr - 2*s + sl
-        d2s = -srr + 16*sr - 30*s + 16*sl - sll
 
-        maxinds = signal.argrelmax(d2s, order=10, mode='wrap')[0]
-        mininds = signal.argrelmin(d2s, order=10, mode='wrap')[0]
-        #maxinds = maxinds[np.argsort(d2s[maxinds])[::-1]]
-        mininds = mininds[np.argsort(d2s[mininds])]
-
-        if len(maxinds) == 0:
-            maxinds = np.array([0,0], dtype=np.int)
-        if len(mininds) == 0:
-            mininds = np.array([0,0], dtype=np.int)
-        if len(maxinds) == 1:
-            maxinds = np.array([maxinds[0], 0], dtype=np.int)
-        if len(mininds) == 1:
-            mininds = np.array([mininds[0], 0], dtype=np.int)
-
-        is11 = -1
-        is12 = mininds[0]
-        is21 = -1
-        is22 = mininds[1]
-        diff1 = np.inf
-        diff2 = np.inf
-
-        for j in maxinds:
-            diff12 = phi[ind][is12] - phi[ind][j]
-            diff22 = phi[ind][is22] - phi[ind][j]
-            if diff12 > np.pi:
-                diff12 -= 2*np.pi
-            if diff12 < -np.pi:
-                diff12 += 2*np.pi
-            if diff22 > np.pi:
-                diff22 -= 2*np.pi
-            if diff22 < -np.pi:
-                diff22 += 2*np.pi
-            if diff12 < diff1 and diff12 > 0:
-                is11 = j
-                diff1 = diff12
-            if diff22 < diff2 and diff22 > 0:
-                is21 = j
-                diff2 = diff22
-
-        if i > 0:
-            diff0a = phi[ind][is11] - phiSa[i-1,0]
-            diff1a = phi[ind][is21] - phiSa[i-1,0]
-            if diff0a < -np.pi:
-                diff0a += 2*np.pi
-            elif diff0a > np.pi:
-                diff0a -= 2*np.pi
-            if diff1a < -np.pi:
-                diff1a += 2*np.pi
-            elif diff1a > np.pi:
-                diff1a -= 2*np.pi
-            if np.fabs(diff0a) < np.fabs(diff1a):
-                isa1 = is11
-                isa2 = is12
-                isb1 = is21
-                isb2 = is22
-            else:
-                isa1 = is21
-                isa2 = is22
-                isb1 = is11
-                isb2 = is12
-
-        else:
-            isa1 = is11
-            isa2 = is12
-            isb1 = is21
-            isb2 = is22
-
-        #diffa = phi[ind][mininds[0]] - phi[ind][isa1]
-        #diffb = phi[ind][mininds[1]] - phi[ind][isa1]
-
-        #if diffa < -np.pi:
-        #    diffa += 2*np.pi
-        #elif diffa > np.pi:
-        #    diffa -= 2*np.pi
-        #if diffb < -np.pi:
-        #    diffb += 2*np.pi
-        #elif diffb > np.pi:
-        #    diffb -= 2*np.pi
-
-        #if np.fabs(diffa) < np.fabs(diffb):
-        #    isa2 = mininds[0]
-        #    isb2 = mininds[1]
-        #else:
-        #    isa2 = mininds[1]
-        #    isb2 = mininds[0]
+        #print iSa[i], iSb[i]
         
-        dphiSa = phi[ind][isa2] - phi[ind][isa1]
-        dphiSb = phi[ind][isb2] - phi[ind][isb1]
-
-        if dphiSa > np.pi:
-            dphiSa -= 2*np.pi
-        elif dphiSa < -np.pi:
-            dphiSa += 2*np.pi
-        if dphiSb > np.pi:
-            dphiSb -= 2*np.pi
-        elif dphiSb < -np.pi:
-            dphiSb += 2*np.pi
-
-        phiSa[i,0] = phi[ind][isa1]
-        phiSa[i,1] = phiSa[i,0] + dphiSa
-        phiSb[i,0] = phi[ind][isb1]
-        phiSb[i,1] = phiSb[i,0] + dphiSb
-
-        phiS[i,0] = phi[ind][isa1]+0.5*dphiSa
-        phiS[i,1] = phi[ind][isb1]+0.5*dphiSb
-
-        dsa = s[isa2] - s[isa1]
-        dsb = s[isb2] - s[isb1]
-        siga = sig[ind][isa1]
-        sigb = sig[ind][isb1]
-        Ta = pi[ind][isa1] / siga
-        Tb = pi[ind][isb1] / sigb
-
-        upa = u0[ind][isa1]*vp[ind][isa1]
-        upb = u0[ind][isb1]*vp[ind][isb1]
+        if iSa[i,0] > -1:
+            dsa = s[iSa[i,1]] - s[iSa[i,0]]
+            siga = sig[ind][iSa[i,0]]
+            Ta = pi[ind][iSa[i,0]] / siga
+            upa = up[ind][iSa[i,0]]
+        else:
+            dsa = 0.0
+            siga = 0.0
+            Ta = 0.0
+            upa = 0.0
+        if iSb[i,0] > -1:
+            dsb = s[iSb[i,1]] - s[iSb[i,0]]
+            sigb = sig[ind][iSb[i,0]]
+            Tb = pi[ind][iSb[i,0]] / sigb
+            upb = up[ind][iSb[i,0]]
+        else:
+            dsb = 0.0
+            sigb = 0.0
+            Tb = 0.0
+            upb = 0.0
 
         dS[i,0] = dsa
         dS[i,1] = dsb
@@ -564,8 +644,8 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
         dQdm[i,0] = Ta * psiQ[i,0]
         dQdm[i,1] = Ta * psiQ[i,1]
         dQdm[i,2] = dQdm[i,0] + dQdm[i,1]
-        dQdr[i,0] = siga * upa * dQdm[i,0]
-        dQdr[i,1] = sigb * upb * dQdm[i,1]
+        dQdr[i,0] = R * siga * upa * dQdm[i,0]
+        dQdr[i,1] = R * sigb * upb * dQdm[i,1]
         dQdr[i,2] = dQdr[i,0] + dQdr[i,1]
 
     fig, ax = plt.subplots(4, 1, figsize=(12,9))
@@ -604,19 +684,13 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
     fig.savefig(figname)
     plt.close(fig)
 
-    R1 = Rs[0]
-    R2 = Rs[N/4]
-    #R3 = Rs[N/2]
-    #R4 = Rs[3*N/4]
-    R3 = Rs[(3*N)/8]
-    R4 = Rs[N/2]
-    R5 = Rs[N-1]
-    
-    RR = np.array([R1, R2, R3, R4, R5])
 
-    fig1, ax1 = plt.subplots(7, RR.shape[0], figsize=(50,40))
+    Is = np.array([0,N/4,N/2,3*N/4,N-1])
 
-    for i,R in enumerate(RR):
+    fig1, ax1 = plt.subplots(8, Is.shape[0], figsize=(50,40))
+
+    for i,I in enumerate(Is):
+        R = Rs[I]
         ind = r==R
         s = S[ind]
         sl = np.roll(s,1)
@@ -626,85 +700,46 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
         d2s = sr - 2*s + sl
         d2s = -srr + 16*sr - 30*s + 16*sl - sll
 
+        phir = np.roll(phi[ind],-1)
+
         NP = s.shape[0]
 
         ax2 = ax1[0,i].twinx()
         if shockDetPlot:
             ax3 = ax1[0,i].twinx()
-        maxinds = signal.argrelmax(d2s, order=10, mode='wrap')[0]
-        mininds = signal.argrelmin(d2s, order=10, mode='wrap')[0]
-        #maxinds = maxinds[np.argsort(d2s[maxinds])[::-1]]
-        mininds = mininds[np.argsort(d2s[mininds])]
 
-        if len(maxinds) == 0:
-            maxinds = np.array([0,0], dtype=np.int)
-        if len(mininds) == 0:
-            mininds = np.array([0,0], dtype=np.int)
-        if len(maxinds) == 1:
-            maxinds = np.array([maxinds[0], 0], dtype=np.int)
-        if len(mininds) == 1:
-            mininds = np.array([mininds[0], 0], dtype=np.int)
-
-        isa2 = mininds[0]
-        if len(mininds) > 1:
-            isb2 = mininds[1]
-        else:
-            isb2 = 0
-
-        isa1 = -1
-        diffa = np.inf
-
-        for j in maxinds[:]:
-            diff = phi[ind][isa2] - phi[ind][j]
-            if diff > np.pi:
-                diff -= 2*np.pi
-            if diff < -np.pi:
-                diff += 2*np.pi
-            if diff < diffa and diff > 0:
-                isa1 = j
-                diffa = diff
-
-        isb1 = -1
-        diffb = np.inf
-
-        for j in maxinds[:]:
-            diff = phi[ind][isb2] - phi[ind][j]
-            if diff > np.pi:
-                diff -= 2*np.pi
-            if diff < -np.pi:
-                diff += 2*np.pi
-            if diff < diffb and diff > 0:
-                isb1 = j
-                diffb = diff
-
-        for j in xrange(ax.shape[0]):
-            ax1[j,i].axvline(phi[ind][isa1], color='b')
-            ax1[j,i].axvline(phi[ind][isb1], color='b')
-            ax1[j,i].axvline(phi[ind][isa2], color='g')
-            ax1[j,i].axvline(phi[ind][isb2], color='g')
+        for j in xrange(ax1.shape[0]):
+            if iSa[I,0] > -1:
+                ax1[j,i].axvline(phiSa[I,0], color='b')
+                ax1[j,i].axvline(phiSa[I,1], color='g')
+            if iSb[I,0] > -1:
+                ax1[j,i].axvline(phiSb[I,0], color='b')
+                ax1[j,i].axvline(phiSb[I,1], color='g')
         if shockDetPlot:
             ax1[0,i].plot(phi[ind], vel12[ind]-velRS[ind], 'b+')
             ax2.plot(phi[ind], d2s, 'r+')
-            ax3.plot(phi[ind], S[ind], 'k+')
+            ax3.plot(phi[ind], s, 'k+')
         else:
             ax2.plot(phi[ind], d2s, 'r+')
-            ax1[0,i].plot(phi[ind], S[ind], 'k+')
+            ax1[0,i].plot(phi[ind], s, 'k+')
 
-        ax1[1,i].plot(phi[ind], sig[ind]*S[ind], 'k+')
-        ax1[2,i].plot(phi[ind], sig[ind]*u0[ind]*S[ind], 'k+')
-        ax1[3,i].plot(phi[ind], sig[ind]*up[ind]*S[ind], 'k+')
-        ax1[4,i].plot(phi[ind], sig[ind], 'k+')
-        ax1[5,i].plot(phi[ind], pi[ind], 'k+')
-        ax1[6,i].plot(phi[ind], pi[ind]/sig[ind], 'k+')
-        ax1[6,i].set_xlabel(r"$\phi$")
+        ax1[1,i].plot(phi[ind] + 0.5*dphi[ind], (sr-s)/(phir-phi[ind]), 'k+')
+        ax1[2,i].plot(phi[ind], sig[ind]*s, 'k+')
+        ax1[3,i].plot(phi[ind], sig[ind]*u0[ind]*s, 'k+')
+        ax1[4,i].plot(phi[ind], sig[ind]*up[ind]*s, 'k+')
+        ax1[5,i].plot(phi[ind], sig[ind], 'k+')
+        ax1[6,i].plot(phi[ind], pi[ind], 'k+')
+        ax1[7,i].plot(phi[ind], pi[ind]/sig[ind], 'k+')
+        ax1[7,i].set_xlabel(r"$\phi$")
 
     ax1[0,0].set_ylabel(r"$s$")
-    ax1[1,0].set_ylabel(r"$\Sigma_0 s$")
-    ax1[2,0].set_ylabel(r"$\Sigma_0 u^0 s$")
-    ax1[3,0].set_ylabel(r"$\Sigma_0 u^\phi s$")
-    ax1[4,0].set_ylabel(r"$\Sigma_0$")
-    ax1[5,0].set_ylabel(r"$\Pi$")
-    ax1[6,0].set_ylabel(r"$\Pi / \Sigma$")
+    ax1[1,0].set_ylabel(r"$\partial s / \partial \phi$")
+    ax1[2,0].set_ylabel(r"$\Sigma_0 s$")
+    ax1[3,0].set_ylabel(r"$\Sigma_0 u^0 s$")
+    ax1[4,0].set_ylabel(r"$\Sigma_0 u^\phi s$")
+    ax1[5,0].set_ylabel(r"$\Sigma_0$")
+    ax1[6,0].set_ylabel(r"$\Pi$")
+    ax1[7,0].set_ylabel(r"$\Pi / \Sigma$")
 
     figname = "plot_minidisc_diss_{0}.png".format(name)
     print("Saving {0:s}...".format(figname))
@@ -848,7 +883,7 @@ def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi,
 
     if shockDissDat is not None:
         AMdqdr = np.zeros(Riph.shape)
-        #dOm = (Om[2:] - Om[:-2]) / (Rs[2:] - Rs[:-2])
+        dOm = (Om[2:] - Om[:-2]) / (Rs[2:] - Rs[:-2])
         dOm = -1.5 * Om/Rs
         tau = Rs*dQdr / dOm
         AMdqdr = -(tau[1:]-tau[:-1])
@@ -857,7 +892,7 @@ def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi,
     ax[1,1].plot(Riph, AMdiss-AMcool-AMtorq, 'g+')
     if shockDissDat is not None:
         #ax[1,1].plot(Riph, AMdqdr, 'r+')
-        ax[1,1].plot(Rs, 2.0/3.0 * Rs * dQdr / Om, 'rx')
+        ax[1,1].plot(Rs, dQdr / Om, 'rx')
     #ax[1,1].plot(Rs, Riph * dQdr / Om + AMmdot, 'k+')
 
     ax[0,0].set_xscale('log')
