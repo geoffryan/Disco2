@@ -16,7 +16,7 @@ RMIN = 4.5
 
 shockDetPlot = False
 dissPlot = True
-allTheOtherPlots = False
+allTheOtherPlots = True
 
 blue = (31.0/255, 119.0/255, 180.0/255)
 orange = (255.0/255, 127.0/255, 14.0/255)
@@ -432,7 +432,8 @@ def find_shocks_d2s(r, phi, S):
 
         maxinds = signal.argrelmax(d2s, order=10, mode='wrap')[0]
         mininds = signal.argrelmin(d2s, order=10, mode='wrap')[0]
-        mininds = mininds[np.argsort(d2s[mininds])]
+        if mininds.shape[0] > 0:
+            mininds = mininds[np.argsort(d2s[mininds])]
 
         #maxinds = maxinds[d2s[maxinds] >  d2sB]
         #mininds = mininds[d2s[mininds] < -d2sB]
@@ -1105,7 +1106,8 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         pii = pi[inds]
         maxinds = signal.argrelmax(pii, order=20, mode='wrap')[0]
         #print len(maxinds), phii[maxinds], pii[maxinds]
-        phimaxima = phii[maxinds]
+        if maxinds.shape[0] > 0:
+            phimaxima = phii[maxinds]
 
         if len(maxinds) == 0:
             shock0Phi[i] = np.inf
