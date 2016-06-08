@@ -135,6 +135,8 @@ def plot_periodogram(ts, rss, mdots):
     fig, ax = plt.subplots(5, 1, figsize=(20,10))
     nr = rss.shape[1]
 
+    t0 = 15.0 * 2.0*np.pi*1.0e4
+
     ax[0].plot(ts, mdots[:,2], 'k+')
     ax[1].plot(ts, mdots[:,nr/4], 'k+')
     ax[2].plot(ts, mdots[:,nr/2], 'k+')
@@ -150,11 +152,11 @@ def plot_periodogram(ts, rss, mdots):
     fig, ax = plt.subplots(5, 1, figsize=(20,10))
     nr = rss.shape[1]
 
-    f0, p0 = signal.periodogram(mdots[:,2])
-    f1, p1 = signal.periodogram(mdots[:,nr/4])
-    f2, p2 = signal.periodogram(mdots[:,nr/2])
-    f3, p3 = signal.periodogram(mdots[:,3*nr/4])
-    f4, p4 = signal.periodogram(mdots[:,-3])
+    f0, p0 = signal.periodogram(mdots[ts>=t0,2])
+    f1, p1 = signal.periodogram(mdots[ts>=t0,nr/4])
+    f2, p2 = signal.periodogram(mdots[ts>=t0,nr/2])
+    f3, p3 = signal.periodogram(mdots[ts>=t0,3*nr/4])
+    f4, p4 = signal.periodogram(mdots[ts>=t0,-3])
 
     ax[0].plot(f0, p0, 'k+')
     ax[1].plot(f1, p1, 'k+')
