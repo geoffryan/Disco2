@@ -132,8 +132,7 @@ def plot_io(ts, rss, mdots):
     plt.close(fig)
 
 def plot_periodogram(ts, rss, mdots):
-    fig = plt.figure()
-    ax = fig.subplots(5, 1, figsize=(20,10))
+    fig, ax = plt.subplots(5, 1, figsize=(20,10))
     nr = rss.shape[1]
 
     f0, p0 = signal.periodogram(mdots[:,2])
