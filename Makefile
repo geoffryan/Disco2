@@ -55,6 +55,15 @@ endif
 	@mkdir -p $(INSDIR)/$(VISDIR)
 	@cp -r $(VISDIR)/* $(INSDIR)/$(VISDIR)/
 
+python:
+ifndef INSTALL_DIR
+	$(error INSTALL_DIR has not been set in Makefile.in $(INSTALL_DIR))
+endif
+	@echo "Installing into $(INSDIR)..."
+	@echo "   Installing pyscripts/"
+	@mkdir -p $(INSDIR)/$(VISDIR)
+	@cp -r $(VISDIR)/* $(INSDIR)/$(VISDIR)/
+
 $(BINDIR)/$(APP): buildrepo $(OBJS)
 	@mkdir -p `dirname $@`
 	@echo "Linking $@..."
