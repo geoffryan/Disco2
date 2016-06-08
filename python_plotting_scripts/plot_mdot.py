@@ -135,6 +135,21 @@ def plot_periodogram(ts, rss, mdots):
     fig, ax = plt.subplots(5, 1, figsize=(20,10))
     nr = rss.shape[1]
 
+    ax[0].plot(ts, mdots[:,2], 'k+')
+    ax[1].plot(ts, mdots[:,nr/4], 'k+')
+    ax[2].plot(ts, mdots[:,nr/2], 'k+')
+    ax[3].plot(ts, mdots[:,3*nr/4], 'k+')
+    ax[4].plot(ts, mdots[:,-3], 'k+')
+    ax[4].set_xlabel(r"$t$")
+
+    outname = "mdot_mdot.png"
+
+    print("Saving {0:s}...".format(outname))
+    fig.savefig(outname)
+    plt.close(fig)
+    fig, ax = plt.subplots(5, 1, figsize=(20,10))
+    nr = rss.shape[1]
+
     f0, p0 = signal.periodogram(mdots[:,2])
     f1, p1 = signal.periodogram(mdots[:,nr/4])
     f2, p2 = signal.periodogram(mdots[:,nr/2])
