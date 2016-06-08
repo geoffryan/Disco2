@@ -1,7 +1,7 @@
 import math
-from numpy import *
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
+import scipy.signal as signal
 import sys
 import numpy as np
 import discopy as dp
@@ -88,7 +88,7 @@ def get_mdot(filename, pars):
     if i == -1:
         i = 2
 
-    return t, mdot[i], mdot[-3]
+    return t, rs, mdot
 
 def plot_mdot(parfile, filenames):
 
@@ -98,14 +98,29 @@ def plot_mdot(parfile, filenames):
     mdot_inner = np.zeros(len(filenames))
     mdot_outer = np.zeros(len(filenames))
 
-    for i,f in enumerate(filenames):
-        t[i], mdot_inner[i], mdot_outer[i] = get_mdot(f, pars)
+    ts = []
+    rss = []
+    mdots = []
 
+    for i,f in enumerate(filenames):
+        t, rs, mdot = get_mdot(f, pars)
+        ts.append(t)
+        rss.append(rs)
+        mdots.append(mdot)
+
+    ts = np.array(ts)
+    rss = np.array(rss)
+    mdots = np.array(mdots)
+
+    plot_io(ts, rss, mdots)
+    plot_periodogram(ts, rss, mdots)
+
+def plot_io(ts, rss, mdots):
     fig = plt.figure()
     ax = fig.add_subplot(1, 1, 1)
 
-    ax.plot(t, mdot_inner, 'k+')
-    ax.plot(t, mdot_outer, 'r+')
+    ax.plot(ts, mdots[:,2], 'k+')
+    ax.plot(ts, mdots[:,-3], 'r+')
     ax.set_xlabel(r"$t$")
     ax.set_ylabel(r"$\dot{M}$")
     ax.set_yscale(yscale)
@@ -113,7 +128,32 @@ def plot_mdot(parfile, filenames):
     outname = "mdot.png"
 
     print("Saving {0:s}...".format(outname))
-    plt.savefig(outname)
+    fig.savefig(outname)
+    plt.close(fig)
+
+def plot_periodogram(ts, rss, mdots):
+    fig = plt.figure()
+    ax = fig.subplots(5, 1, figsize=(20,10))
+    nr = rss.shape[1]
+
+    f0, p0 = signal.periodogram(mdots[:,2])
+    f1, p1 = signal.periodogram(mdots[:,nr/4])
+    f2, p2 = signal.periodogram(mdots[:,nr/2])
+    f3, p3 = signal.periodogram(mdots[:,3*nr/4])
+    f4, p4 = signal.periodogram(mdots[:,-3])
+
+    ax[0].plot(f0, p0, 'k+')
+    ax[1].plot(f1, p1, 'k+')
+    ax[2].plot(f2, p2, 'k+')
+    ax[3].plot(f3, p3, 'k+')
+    ax[4].plot(f4, p4, 'k+')
+    ax[4].set_xlabel(r"$\nu$")
+
+    outname = "mdot_periodogram.png"
+
+    print("Saving {0:s}...".format(outname))
+    fig.savefig(outname)
+    plt.close(fig)
 
 if __name__ == "__main__":
 

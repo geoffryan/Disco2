@@ -16,7 +16,7 @@ RMIN = 4.5
 
 shockDetPlot = False
 dissPlot = True
-allTheOtherPlots = True
+allTheOtherPlots = False
 
 blue = (31.0/255, 119.0/255, 180.0/255)
 orange = (255.0/255, 127.0/255, 14.0/255)
@@ -845,11 +845,53 @@ def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi,
     if shockDissDat is not None:
         dQdr = shockDissDat[5][:,2]
 
+    fig, ax = plt.subplots(2,2, figsize=(12,9))
+    ax[0,0].plot(Rs, J, 'b+')
+    ax[0,0].plot(Rs, D*L, 'r+')
+    ax[0,0].plot(Rs, J - D*L, 'k+')
+    ax[0,1].plot(Rs, F, 'b+')
+    ax[0,1].plot(Rs, Mdot*L, 'r+')
+    ax[0,1].plot(Rs, F - Mdot*L, 'k+')
+    
+    AMmdot = np.zeros(Rs.shape)
+    AMdiss = np.zeros(Rs.shape)
+    AMcool = np.zeros(Rs.shape)
+    AMtorq = np.zeros(Rs.shape)
+
+    dLdR = (L[2:]-L[:-2]) / (Rs[2:]-Rs[:-2])
+    AMmdot[1:-1] = Mdot[1:-1] * dLdR
+    AMdiss[1:-1] = ((F-Mdot*L)[2:] - (F-Mdot*L)[:-2]) / (Rs[2:]-Rs[:-2])
+    AMcool[:] = Qdotc[:]
+    AMtorq[:] = T[:]
+    if shockDissDat is not None:
+        AMdqdr = np.zeros(Rs.shape)
+        dOm = (Om[2:] - Om[:-2]) / (Rs[2:] - Rs[:-2])
+        #dOm = -1.5 * Om/Rs
+        tau = dQdr[1:-1] / dOm
+        tauS = signal.savgol_filter(tau, 9, 1)
+        AMdqdr = -(tauS[2:]-tauS[:-2]) / (Rs[3:-1] - Rs[1:-3])
+
+    ax[1,0].plot(Rs, AMmdot, 'b+')
+    ax[1,0].plot(Rs, AMdiss, 'r+')
+    ax[1,0].plot(Rs, AMcool, 'bx')
+    ax[1,0].plot(Rs, AMtorq, 'rx')
+    ax[1,0].plot(Rs, -AMdiss+AMcool+AMtorq, 'g+')
+    ax[1,0].plot(Rs, AMmdot+AMdiss-AMcool-AMtorq, 'k+')
+
+    ax[1,1].plot(Rs,-AMmdot, 'b+')
+    ax[1,1].plot(Rs, AMdiss-AMcool-AMtorq, 'g+')
+    if shockDissDat is not None:
+        ax[1,1].plot(Rs[2:-2], AMdqdr, 'r+')
+        #ax[1,1].plot(Rs[1:-1], tau, 'k+')
+        #ax[1,1].plot(Rs[1:-1], tauS, 'b+')
+        #ax[1,1].plot(Rs[1:-1], tauS2, 'g+')
+        #ax[1,1].plot(Rs[1:-1], tauS3, 'y+')
+        #ax[1,1].plot(Rs[1:-1], tauS4, 'r+')
+        #ax[1,1].plot(Rs, Rs * dQdr / Om, 'rx')
+    #ax[1,1].plot(Rs, Riph * dQdr / Om + AMmdot, 'k+')
+   
+    """
     Riph = 0.5*(Rs[:-1]+Rs[1:])
-    #AMmdot = np.zeros(Rs.shape)
-    #AMdiss = np.zeros(Rs.shape)
-    #AMcool = np.zeros(Rs.shape)
-    #AMtorq = np.zeros(Rs.shape)
     AMmdot = np.zeros(Riph.shape)
     AMdiss = np.zeros(Riph.shape)
     AMcool = np.zeros(Riph.shape)
@@ -862,14 +904,13 @@ def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi,
     AMcool = 0.5*(Qdotc[1:]+Qdotc[:-1])*(Rs[1:]-Rs[:-1])
     AMtorq = 0.5*(T[1:]+T[:-1])*(Rs[1:]-Rs[:-1])
 
-    fig, ax = plt.subplots(2,2, figsize=(12,9))
-    ax[0,0].plot(Rs, J, 'b+')
-    ax[0,0].plot(Rs, D*L, 'r+')
-    ax[0,0].plot(Rs, J - D*L, 'k+')
-    ax[0,1].plot(Rs, F, 'b+')
-    ax[0,1].plot(Rs, Mdot*L, 'r+')
-    ax[0,1].plot(Rs, F - Mdot*L, 'k+')
-
+    if shockDissDat is not None:
+        AMdqdr = np.zeros(Riph.shape)
+        dOm = (Om[2:] - Om[:-2]) / (Rs[2:] - Rs[:-2])
+        dOm = -1.5 * Om/Rs
+        tau = Rs*dQdr / dOm
+        AMdqdr = -(tau[1:]-tau[:-1])
+    
     ax[1,0].plot(Riph, AMmdot, 'b+')
     ax[1,0].plot(Riph, AMdiss, 'r+')
     ax[1,0].plot(Riph, AMcool, 'bx')
@@ -877,24 +918,14 @@ def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi,
     ax[1,0].plot(Riph, -AMdiss+AMcool+AMtorq, 'g+')
     ax[1,0].plot(Riph, AMmdot+AMdiss-AMcool-AMtorq, 'k+')
 
-    #ax[1,1].plot(Rs, (F-Mdot*L)*Om/Rs, 'b+')
-    #if shockDissDat is not None:
-    #    ax[1,1].plot(Rs, dQdr, 'r+')
-    #ax[1,1].plot(Rs, Cool, 'g+')
-
-    if shockDissDat is not None:
-        AMdqdr = np.zeros(Riph.shape)
-        dOm = (Om[2:] - Om[:-2]) / (Rs[2:] - Rs[:-2])
-        dOm = -1.5 * Om/Rs
-        tau = Rs*dQdr / dOm
-        AMdqdr = -(tau[1:]-tau[:-1])
-
     ax[1,1].plot(Riph,-AMmdot, 'b+')
     ax[1,1].plot(Riph, AMdiss-AMcool-AMtorq, 'g+')
     if shockDissDat is not None:
         #ax[1,1].plot(Riph, AMdqdr, 'r+')
-        ax[1,1].plot(Rs, dQdr / Om, 'rx')
+        ax[1,1].plot(Rs, 2.0/3.0 * dQdr / Om, 'rx')
     #ax[1,1].plot(Rs, Riph * dQdr / Om + AMmdot, 'k+')
+    """
+
 
     ax[0,0].set_xscale('log')
     ax[0,1].set_xscale('log')
@@ -906,6 +937,34 @@ def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi,
     ax[1,1].set_xlim(r.min(), r.max())
 
     figname = "plot_minidisc_fluxComp_{0}.png".format(name)
+    print("Saving {0:s}...".format(figname))
+    fig.savefig(figname)
+    plt.close(fig)
+
+    fig, ax = plt.subplots(1,1, figsize=(12,9))
+
+    ax.plot(Rs,-AMmdot, marker='+', ms=10, mew=2, color='k', 
+                label=r"$\dot{M} \partial_r \langle h u_\phi \rangle$")
+    ax.plot(Rs, AMdiss-AMcool-AMtorq, marker='+', ms=10, mew=2, color=blue,
+                label=r"$\partial_r \delta \langle T^r_\phi \rangle$")
+    """
+    ax.plot(Riph,-AMmdot, marker='+', ms=10, mew=2, color='k', 
+                label=r"$\dot{M} \partial_r \langle h u_\phi \rangle$")
+    ax.plot(Riph, AMdiss-AMcool-AMtorq, marker='+', ms=10, mew=2, color=blue,
+                label=r"$\partial_r \delta \langle T^r_\phi \rangle$")
+    """
+    if shockDissDat is not None:
+        ax.plot(Rs, dQdr / Om, marker='+', ms=10, mew=2, ls='',
+                    color=green, label=r"shock $\partial F_J / \partial r$")
+        ax.plot(Rs[2:-2], AMdqdr, marker='+', ms=10, mew=2, ls='',
+                    color=orange, label=r"shock $\partial F_J / \partial r$")
+    ax.set_xlim(r.min(), r.max())
+    ax.set_xlabel(r"$r (M)$")
+    ax.set_ylabel("Angular Momentum Flux")
+    ax.set_xscale("log")
+    plt.legend()
+
+    figname = "plot_minidisc_fluxCompNice_{0}.png".format(name)
     print("Saving {0:s}...".format(figname))
     fig.savefig(figname)
     plt.close(fig)
@@ -940,8 +999,6 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     outpath = filename.split("/")[:-1]
     chckname = filename.split("/")[-1]
     chcknum = "_".join(chckname.split(".")[0].split("_")[1:])
-
-    
 
     if shockDetPlot:
         shockDetDat = shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, chcknum, 
