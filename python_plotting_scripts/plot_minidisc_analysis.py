@@ -944,7 +944,7 @@ def find_shocks_d2sDet(r, phi, dphi, S, dV12):
 
         dv12 = dV12[ind]
 
-        maxinds = signal.argrelmax(dv12, order=10, mode='wrap')[0]
+        maxinds = signal.argrelmax(dv12, order=5, mode='wrap')[0]
         print maxinds
         if maxinds.shape[0] > 0:
             maxinds = maxinds[np.argsort(dv12[maxinds])[::-1]]
@@ -1000,7 +1000,7 @@ def find_shocks_d2sDet(r, phi, dphi, S, dV12):
         ds = (sr-s) / (phiR - phiC)
         
         dv12 = dV12[ind]
-        maxinds = signal.argrelmax(dv12, order=10, mode='wrap')[0]
+        maxinds = signal.argrelmax(dv12, order=5, mode='wrap')[0]
         if maxinds.shape[0] > 0:
             maxinds = maxinds[np.argsort(dv12[maxinds])[::-1]]
         if maxinds.shape[0] > 2:
@@ -1035,7 +1035,7 @@ def find_shocks_d2sDet(r, phi, dphi, S, dV12):
         smin = s.min()
 
         dv12 = dV12[ind]
-        maxinds = signal.argrelmax(dv12, order=10, mode='wrap')[0]
+        maxinds = signal.argrelmax(dv12, order=5, mode='wrap')[0]
         if maxinds.shape[0] > 0:
             maxinds = maxinds[np.argsort(dv12[maxinds])[::-1]]
         if maxinds.shape[0] >= 4:
@@ -1659,12 +1659,12 @@ def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi,
 
     fig, ax = plt.subplots(1,1, figsize=(12,9))
 
-    ax.plot(Rs,-AMmdot, marker='+', ms=10, mew=2, color='k', 
+    ax.plot(Rs,-AMmdot, marker='+', ms=10, mew=2, color='k', ls='',
                 label=r"$\dot{M} \partial_r \langle h u_\phi \rangle$")
-    ax.plot(Rs, AMdiss, marker='+', ms=10, mew=2, color=blue,
+    ax.plot(Rs, AMdiss, marker='+', ms=10, mew=2, color=blue, ls='',
                 label=r"$\partial_r \delta \langle T^r_\phi \rangle$")
     ax.plot(Rs, AMdiss-AMcool-AMtorq, marker='+', ms=10, mew=2, color=green,
-                label=r"$\partial_r \delta \langle T^r_\phi \rangle - \langle f_\phi \rangle$")
+                ls='', label=r"$\partial_r \delta \langle T^r_\phi \rangle - \langle f_\phi \rangle$")
     """
     ax.plot(Riph,-AMmdot, marker='+', ms=10, mew=2, color='k', 
                 label=r"$\dot{M} \partial_r \langle h u_\phi \rangle$")
