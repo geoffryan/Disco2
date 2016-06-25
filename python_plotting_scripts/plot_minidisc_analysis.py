@@ -11,12 +11,12 @@ import discoEOS as eos
 import discoGR as gr
 
 scale = 'log'
-RMAX = 60.0
-RMIN = 4.5
+RMAX = 100.0
+RMIN = 6.0
 
-shockDetPlot = False
+shockDetPlot = True
 dissPlot = True
-allTheOtherPlots = False
+allTheOtherPlots = True
 
 blue = (31.0/255, 119.0/255, 180.0/255)
 orange = (255.0/255, 127.0/255, 14.0/255)
@@ -169,11 +169,18 @@ def wavespeeds(r, u0, ur, up, cs, pars):
 
     return (vrp, vrm), (vpp, vpm)
 
-def shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, name, pars):
+def shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, name, pars, slopelimit=False,
+                TH=2.0):
 
-    v12RS, v21RS, vRS, vSS, v12 = shockVal(r, sig, pi, u0, vr, vp, pars)
+    v12RS, v21RS, vRS, vSS, v12 = shockVal(r, phi, sig, pi, u0, vr, vp, pars,
+                                            slopelimit=slopelimit, TH=TH)
 
-    fig, ax = plt.subplots(2,3, figsize=(32,20))
+    gam = pars['Adiabatic_Index']
+    S = np.log(pi * np.power(sig, -gam)) / (gam-1.0)
+    dSdr, dSdp = calcGrad(r, phi, phi+dphi, S, pars, slopelimit=False)
+
+
+    fig, ax = plt.subplots(2,4, figsize=(40,20))
 
     Rs = np.unique(r)
     Nr = Rs.shape[0]
@@ -183,10 +190,17 @@ def shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, name, pars):
     dvRSmin = (v12-vRS).min()
     dvSSmax = (v12-vSS).max()
     dvSSmin = (v12-vSS).min()
+    dvSSRSmin = (vSS-vRS).min()
+    dvSSRSmax = (vSS-vRS).max()
+
+    chi[chi<0] = chi[chi>0].min()
+    lchi = np.log10(chi)
 
     for i, R in enumerate(Rs):
         ind = r==R
         N = r[ind].shape[0]
+
+        sind = np.argmax(dSdp[ind])
 
         if i>0:
             rm = 0.5*(R+Rs[i-1])
@@ -211,6 +225,7 @@ def shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, name, pars):
         #print(v21RS.shape)
         #print(v12.shape)
 
+
         C0 = ax[0,0].pcolormesh(X, Y, np.atleast_2d(vRS[ind]), 
                         edgecolors='none', vmin=vRS.min(), vmax=vRS.max(),
                         cmap=dp.viridis)
@@ -221,18 +236,29 @@ def shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, name, pars):
                         edgecolors='none', vmin=v12.min(), vmax=v12.max(),
                         cmap=dp.viridis)
         C3 = ax[1,0].pcolormesh(X, Y, np.atleast_2d(v12[ind]-vRS[ind]), 
-                        edgecolors='none', vmin=dvRSmin, vmax=dvRSmax,
+                        edgecolors='none', vmin=0.0, vmax=dvRSmax,
                         cmap=dp.viridis)
         C4 = ax[1,1].pcolormesh(X, Y, np.atleast_2d(v12[ind]-vSS[ind]), 
                         edgecolors='none', vmin=dvSSmin, vmax=dvSSmax,
                         cmap=dp.viridis)
-        C5 = ax[1,2].pcolormesh(X, Y, np.atleast_2d(np.log10(chi[ind])), 
+        C5 = ax[1,2].pcolormesh(X, Y, np.atleast_2d(vSS[ind]-vRS[ind]), 
+                        edgecolors='none', vmin=dvSSRSmin, vmax=dvSSRSmax,
+                        cmap=dp.viridis)
+        C6 = ax[1,3].pcolormesh(X, Y, np.atleast_2d(lchi[ind]), 
                         edgecolors='none', 
-                        vmin=-0.3,
-                        vmax=0.3,
+                        vmin=lchi.min(),
+                        vmax=lchi.max(),
                         #vmin=math.log10(chi.min()), 
                         #vmax=math.log10(chi.max()),
                         cmap=dp.viridis)
+        
+        ax[0,0].plot(phi[ind][sind], r[ind][sind], 'r+')
+        ax[0,1].plot(phi[ind][sind], r[ind][sind], 'r+')
+        ax[0,2].plot(phi[ind][sind], r[ind][sind], 'r+')
+        ax[1,0].plot(phi[ind][sind], r[ind][sind], 'r+')
+        ax[1,1].plot(phi[ind][sind], r[ind][sind], 'r+')
+        ax[1,2].plot(phi[ind][sind], r[ind][sind], 'r+')
+        ax[1,3].plot(phi[ind][sind], r[ind][sind], 'r+')
 
     fig.colorbar(C0, ax=ax[0,0])
     fig.colorbar(C1, ax=ax[0,1])
@@ -240,6 +266,7 @@ def shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, name, pars):
     fig.colorbar(C3, ax=ax[1,0])
     fig.colorbar(C4, ax=ax[1,1])
     fig.colorbar(C5, ax=ax[1,2])
+    fig.colorbar(C6, ax=ax[1,3])
 
     ax[0,0].set_xlabel(r'$\phi$')
     ax[0,1].set_xlabel(r'$\phi$')
@@ -247,33 +274,35 @@ def shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, name, pars):
     ax[1,0].set_xlabel(r'$\phi$')
     ax[1,1].set_xlabel(r'$\phi$')
     ax[1,2].set_xlabel(r'$\phi$')
+    ax[1,3].set_xlabel(r'$\phi$')
     ax[0,0].set_ylabel(r'$r$')
     ax[0,1].set_ylabel(r'$r$')
     ax[0,2].set_ylabel(r'$r$')
     ax[1,0].set_ylabel(r'$r$')
     ax[1,1].set_ylabel(r'$r$')
     ax[1,2].set_ylabel(r'$r$')
+    ax[1,3].set_ylabel(r'$r$')
     ax[0,0].set_title(r'$(v_{12})_\mathcal{RS}$')
-    ax[0,1].set_title(r'$(v_{12})_\mathcal{SS}$')
+    ax[0,1].set_title(r'$(v_{12})_\mathcal{2S}$')
     ax[0,2].set_title(r'$v_{12}$')
     ax[1,0].set_title(r'$v_{12} - (v_{12})_\mathcal{RS}$')
-    ax[1,1].set_title(r'$v_{12} - (v_{12})_\mathcal{SS}$')
-    ax[1,2].set_title(r'$(v_{12} - (v_{12})_\mathcal{RS}) / (v_{12})_\mathcal{SS} - (v_{12})_\mathcal{RS})$')
+    ax[1,1].set_title(r'$v_{12} - (v_{12})_\mathcal{2S}$')
+    ax[1,2].set_title(r'$(v_{12})_\mathcal{2S} - (v_{12})_\mathcal{RS}$')
+    ax[1,3].set_title(r'$(v_{12} - (v_{12})_\mathcal{RS}) / ((v_{12})_\mathcal{2S} - (v_{12})_\mathcal{RS})$')
     ax[0,0].set_ylim(r.min(), r.max())
     ax[0,1].set_ylim(r.min(), r.max())
     ax[0,2].set_ylim(r.min(), r.max())
     ax[1,0].set_ylim(r.min(), r.max())
     ax[1,1].set_ylim(r.min(), r.max())
     ax[1,2].set_ylim(r.min(), r.max())
+    ax[1,3].set_ylim(r.min(), r.max())
     ax[0,0].set_yscale('log')
     ax[0,1].set_yscale('log')
     ax[0,2].set_yscale('log')
     ax[1,0].set_yscale('log')
     ax[1,1].set_yscale('log')
     ax[1,2].set_yscale('log')
-    #ax[0].plot(r, v12RS, 'k+')
-    #ax[1].plot(r, v21RS, 'k+')
-    #ax[2].plot(r, v12, 'k+')
+    ax[1,3].set_yscale('log')
 
     figname = "plot_minidisc_shockDet_{0}.png".format(name)
     print("Saving {0:s}...".format(figname))
@@ -283,7 +312,7 @@ def shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, name, pars):
     return vRS, vSS, v12
 
 
-def shockVal(r, sig, pi, u0, vr, vp, pars):
+def shockVal(r, phi, sig, pi, u0, vr, vp, pars, slopelimit=True, TH=2.0):
 
     Rs = np.unique(r)
 
@@ -298,7 +327,7 @@ def shockVal(r, sig, pi, u0, vr, vp, pars):
     bw = pars['BinW']
 
     lapse = 1.0/np.sqrt(1+2*M/r)
-    shiftr = 2*M/r / (1+2*M/r)
+    shiftr = 2*M / (r*(1+2*M/r))
     shiftp = bw
 
     W = lapse * u0
@@ -322,30 +351,67 @@ def shockVal(r, sig, pi, u0, vr, vp, pars):
         vRS_s = np.zeros(N)
         vSS_s = np.zeros(N)
 
+        dsig = np.zeros(N)
+        dpi = np.zeros(N)
+        dVR = np.zeros(N)
+        dVP = np.zeros(N)
+
+        phiC = phi[ind]
+        phiR = np.roll(phiC, -1)
+        phiL = np.roll(phiC, 1)
+        phiR[phiR<phiC] += 2*np.pi
+        phiL[phiL>phiC] -= 2*np.pi
+        dsigC = (np.roll(sig[ind],-1) - np.roll(sig[ind],1)) / (phiR-phiL)
+        dpiC = (np.roll(pi[ind],-1) - np.roll(pi[ind],1)) / (phiR-phiL)
+        dVRC = (np.roll(VR[ind],-1) - np.roll(VR[ind],1)) / (phiR-phiL)
+        dVPC = (np.roll(VP[ind],-1) - np.roll(VP[ind],1)) / (phiR-phiL)
+        dsigL = (sig[ind] - np.roll(sig[ind],1)) / (phiC-phiL)
+        dpiL = (pi[ind] - np.roll(pi[ind],1)) / (phiC-phiL)
+        dVRL = (VR[ind] - np.roll(VR[ind],1)) / (phiC-phiL)
+        dVPL = (VP[ind] - np.roll(VP[ind],1)) / (phiC-phiL)
+        dsigR = (np.roll(sig[ind],-1) - sig[ind]) / (phiR-phiC)
+        dpiR = (np.roll(pi[ind],-1) - pi[ind]) / (phiR-phiC)
+        dVRR = (np.roll(VR[ind],-1) - VR[ind]) / (phiR-phiC)
+        dVPR = (np.roll(VP[ind],-1) - VP[ind]) / (phiR-phiC)
+
+        if slopelimit:
+            dsig = minmod(TH*dsigL, dsigC, TH*dsigR)
+            dpi = minmod(TH*dpiL, dpiC, TH*dpiR)
+            dVR = minmod(TH*dVRL, dVRC, TH*dVRR)
+            dVP = minmod(TH*dVPL, dVPC, TH*dVPR)
+        else:
+            dsig = dsigC
+            dpi = dpiC
+            dVR = dVRC
+            dVP = dVPC
+
         for j in xrange(N):
             iL = j
             iR = j+1
             if iR >= N:
                 iR = 0
-            v12RS_s[j] = relvRS(sig[ind][iL], pi[ind][iL], VP[ind][iL], 
-                                    VR[ind][iL], sig[ind][iR], pi[ind][iR], 
-                                    VP[ind][iR], VR[ind][iR], gam)
-            v21RS_s[j] = relvRS(sig[ind][iR], pi[ind][iR], VP[ind][iR], 
-                                    VR[ind][iR], sig[ind][iL], pi[ind][iL], 
-                                    VP[ind][iL], VR[ind][iL], gam)
-            if pi[ind][iR] > pi[ind][iL]:
+            dphiL = 0.5*(phiR[iL]-phiC[iL])
+            dphiR = 0.5*(phiL[iR]-phiC[iR])
+            sigL = sig[ind][iL] + dsig[iL]*dphiL
+            piL = pi[ind][iL] + dpi[iL]*dphiL
+            VRL = VR[ind][iL] + dVR[iL]*dphiL
+            VPL = VP[ind][iL] + dVP[iL]*dphiL
+            sigR = sig[ind][iR] + dsig[iR]*dphiR
+            piR = pi[ind][iR] + dpi[iR]*dphiR
+            VRR = VR[ind][iR] + dVR[iR]*dphiR
+            VPR = VP[ind][iR] + dVP[iR]*dphiR
+
+            v12RS_s[j] = relvRS(sigL, piL, VPL, VRL, sigR, piR, VPR, VRR, gam)
+            v21RS_s[j] = relvRS(sigR, piR, VPR, VRR, sigL, piL, VPL, VRL, gam)
+
+            if piR > piL:
                 vRS_s[j] = v21RS_s[j]
-                vSS_s[j] = relvSS(sig[ind][iR], pi[ind][iR], -VP[ind][iR],
-                                    VR[ind][iR], sig[ind][iL], pi[ind][iL],
-                                    -VP[ind][iL], VR[ind][iL], gam)
+                vSS_s[j] = relvSS(sigR, piR, -VPR, VRR, sigL, piL, -VPL, VRL, gam)
             else:
                 vRS_s[j] = v12RS_s[j]
-                vSS_s[j] = relvSS(sig[ind][iL], pi[ind][iL], VP[ind][iL],
-                                    VR[ind][iL], sig[ind][iR], pi[ind][iR],
-                                    VP[ind][iR], VR[ind][iR], gam)
+                vSS_s[j] = relvSS(sigL, piL, VPL, VRL, sigR, piR, VPR, VRR, gam)
 
-            v12_s[j] = (VP[ind][iL] - VP[ind][iR]) / (
-                                1.0 - VP[ind][iL]*VP[ind][iR])
+            v12_s[j] = (VPL - VPR) / (1.0 - VPL*VPR)
 
         v12[ind] = v12_s[:]
         v12RS[ind] = v12RS_s[:]
@@ -371,8 +437,8 @@ def relvRS(sig1, pi1, v1x, v1t, sig2, pi2, v2x, v2t, gam):
 
     res = integrate.quad(func, pi1, pi2)
 
-    #for i,r in enumerate(res):
-    #    print i,r
+#for i,r in enumerate(res):
+#    print i,r
 
     return math.tanh(res[0])
 
@@ -385,22 +451,285 @@ def relvSS(sig1, pi1, v1x, v1t, sig2, pi2, v2x, v2t, gam):
     h2 = 1.0 + gam*pi2/((gam-1.0)*sig2)
     W22 = 1.0 / (1.0 - v2x*v2x - v2t*v2t)
 
-    #eq B.11
+#eq B.11
     D = 1 - 4*gam*pi1*((gam-1.0)*pi2+pi1)*(h2*(pi2-pi1)/sig2-h2*h2) / (
                 (gam-1.0)*(gam-1.0)*(pi1-pi2)*(pi1-pi2))
-    #eq B.10
+#eq B.10
     h3p = (math.sqrt(D)-1.0)*(gam-1.0)*(pi1-pi2) / ( 2*((gam-1.0)*pi2+pi1))
-    #eq B.9
+#eq B.9
     J23p2 = -gam*(pi1-pi2) / ((gam-1.0)*(h3p*(h3p-1.0)/pi1-h2*(h2-1.0)/pi2))
     if J23p2 < 0:
         print("Whoa: J23p2 = {0:f}".format(J23p2))
-    #eq B.8
+        print sig1, pi1, v1x, v1t, sig2, pi2, v2x, v2t
+        J23p2 = 0.0
+#eq B.8
     Vs = (sig2*sig2*W22*v2x*v2x + math.sqrt(J23p2*(J23p2 + sig2*sig2*W22
                 * (1-v2x*v2x)))) / (sig2*sig2*W22 + J23p2)
-    #eq 4.5
+#eq 4.5
     return (pi1-pi2) * (1-v2x*Vs) / (
                 (Vs-v2x) * (h2*sig2*W22*(1-v2x*v2x)+pi1-pi2))
+
+def minmod(a, b, c):
+    d = a.copy()
+    bltd = np.fabs(b) < np.fabs(d)
+    d[bltd] = b[bltd]
+    cltd = np.fabs(c) < np.fabs(d)
+    d[cltd] = c[cltd]
+    d[a*b < 0] = 0.0
+    d[a*c < 0] = 0.0
+    return d
+
+def calcGrad(r, phi, piph, f, pars, slopelimit=True, TH=2.0):
+
+    g = dp.Grid(pars)
+    rf = (g.rFaces).copy()
+
+    Rs = np.unique(r)
+
+    rf = rf[(rf>Rs.min()) * (rf < Rs.max())]
     
+    dfdr = np.zeros(f.shape)
+    dfdrC = np.zeros(f.shape)
+    dA = np.zeros(f.shape)
+    dfdp = np.zeros(f.shape)
+    dfdpL = np.zeros(f.shape)
+    dfdpR = np.zeros(f.shape)
+    dfdpC = np.zeros(f.shape)
+    
+    for i,R in enumerate(Rs):
+        ind = r==R
+        phiC = phi[ind]
+        phiR = np.roll(phiC, -1)
+        phiL = np.roll(phiC, 1)
+        phiR[phiR<phiC] += 2*np.pi
+        phiL[phiL>phiC] -= 2*np.pi
+        fC = f[ind]
+        fR = np.roll(fC, -1)
+        fL = np.roll(fC, 1)
+
+        dfdpR[ind] = (fR - fC) / (phiR - phiC)
+        dfdpC[ind] = (fR - fL) / (phiR - phiL)
+        dfdpL[ind] = (fC - fL) / (phiC - phiL)
+
+    if slopelimit:
+        dfdp = minmod(TH*dfdpL, dfdpC, TH*dfdpR)
+    else:
+        dfdp = dfdpC
+
+    for i in xrange(Rs.shape[0]-1):
+        R1 = Rs[i]
+        R2 = Rs[i+1]
+        R = rf[i]
+        if R > R2 or R < R1:
+            print "Grid Wrong! {0} {1} {2}".format(R1, R, R2)
+
+        ind1 = r==R1
+        ind2 = r==R2
+
+        phi1 = phi[ind1]
+        phi2 = phi[ind2]
+        piph1 = piph[ind1]
+        piph2 = piph[ind2]
+        f1 = f[ind1]
+        f2 = f[ind2]
+        dfdp1 = dfdp[ind1]
+        dfdp2 = dfdp[ind2]
+
+        dfdrC1_s = np.zeros(f1.shape)
+        dfdrC2_s = np.zeros(f2.shape)
+        dA1_s = np.zeros(f1.shape)
+        dA2_s = np.zeros(f2.shape)
+
+        j2 = 0
+        phi1p = piph1[0]
+        phi1m = piph1[-1]
+        before = False
+        after = False
+        j2_start = -1
+        for j2 in xrange(phi2.shape[0]):
+            diff = piph2[j2]-phi1m
+            if diff > np.pi:
+                diff -= 2*np.pi
+            elif diff < -np.pi:
+                diff += 2*np.pi
+            if diff < 0:
+                before = True
+            if before and diff > 0:
+                j2_start = j2
+        if j2_start == -1:
+            j2_start = 0
+
+        j1 = 0
+        j2 = j2_start
+        #j2_start is the first cell in i2 that shares a face with j1=0
+        while j1 < phi1.shape[0]:
+            phi1p = piph1[j1]
+            phi1m = piph1[j1-1]
+            phi2p = piph2[j2]
+            phi2m = piph2[j2-1]
+            if phi1m-phi1p > np.pi:
+                phi1m -= 2*np.pi
+            elif phi1m-phi1p < -np.pi:
+                phi1m += 2*np.pi
+            if phi2p-phi1p > np.pi:
+                phi2p -= 2*np.pi
+            elif phi2p-phi1p < -np.pi:
+                phi2p += 2*np.pi
+            if phi2m-phi1p > np.pi:
+                phi2m -= 2*np.pi
+            elif phi2m-phi1p < -np.pi:
+                phi2m += 2*np.pi
+
+            phiF = min(phi1p, phi2p)
+            phiB = max(phi1m, phi2m)
+            phiC = 0.5*(phiF + phiB)
+            dphi = phiF - phiB
+            dphi1 = phiF - phi1[j1]
+            dphi2 = phiF - phi2[j2]
+            if dphi1 > np.pi:
+                dphi1 -= 2*np.pi
+            elif dphi1 < -np.pi:
+                dphi1 += 2*np.pi
+            if dphi2 > np.pi:
+                dphi2 -= 2*np.pi
+            elif dphi2 < -np.pi:
+                dphi2 += 2*np.pi
+
+            fL = f1[j1] + dphi1*dfdp1[j1]
+            fR = f2[j2] + dphi2*dfdp2[j2]
+
+            Af = dphi*R
+
+            dfdrC1_s[j1] += Af * (fR - fL) / (R2 - R1)
+            dfdrC2_s[j2] += Af * (fR - fL) / (R2 - R1)
+            dA1_s[j1] += Af
+            dA2_s[j2] += Af
+
+            if phi1p < phi2p:
+                j1 += 1
+            else:
+                j2 += 1
+
+            if j2 == phi2.shape[0]:
+                j2 = 0
+        dfdrC[ind1] += dfdrC1_s[:]
+        dfdrC[ind2] += dfdrC2_s[:]
+        dA[ind1] += dA1_s[:]
+        dA[ind2] += dA2_s[:]
+
+    dfdrC = dfdrC / dA
+
+    if slopelimit:
+        for i in xrange(Rs.shape[0]-1):
+            R1 = Rs[i]
+            R2 = Rs[i+1]
+            R = rf[i]
+            if R > R2 or R < R1:
+                print "Grid Wrong! {0} {1} {2}".format(R1, R, R2)
+
+            ind1 = r==R1
+            ind2 = r==R2
+
+            phi1 = phi[ind1]
+            phi2 = phi[ind2]
+            piph1 = piph[ind1]
+            piph2 = piph[ind2]
+            f1 = f[ind1]
+            f2 = f[ind2]
+            dfdp1 = dfdp[ind1]
+            dfdp2 = dfdp[ind2]
+            
+            dfdr1_s = dfdrC[ind1].copy()
+            dfdr2_s = dfdrC[ind2].copy()
+
+            j2 = 0
+            phi1p = piph1[0]
+            phi1m = piph1[-1]
+            before = False
+            after = False
+            j2_start = -1
+            for j2 in xrange(phi2.shape[0]):
+                diff = piph2[j2]-phi1m
+                if diff > np.pi:
+                    diff -= 2*np.pi
+                elif diff < -np.pi:
+                    diff += 2*np.pi
+                if diff < 0:
+                    before = True
+                if before and diff > 0:
+                    j2_start = j2
+            if j2_start == -1:
+                j2_start = 0
+
+            j1 = 0
+            j2 = j2_start
+            #j2_start is the first cell in i2 that shares a face with j1=0
+            while j1 < phi1.shape[0]:
+                phi1p = piph1[j1]
+                phi1m = piph1[j1-1]
+                phi2p = piph2[j2]
+                phi2m = piph2[j2-1]
+                if phi1m-phi1p > np.pi:
+                    phi1m -= 2*np.pi
+                elif phi1m-phi1p < -np.pi:
+                    phi1m += 2*np.pi
+                if phi2p-phi1p > np.pi:
+                    phi2p -= 2*np.pi
+                elif phi2p-phi1p < -np.pi:
+                    phi2p += 2*np.pi
+                if phi2m-phi1p > np.pi:
+                    phi2m -= 2*np.pi
+                elif phi2m-phi1p < -np.pi:
+                    phi2m += 2*np.pi
+
+                phiF = min(phi1p, phi2p)
+                phiB = max(phi1m, phi2m)
+                phiC = 0.5*(phiF + phiB)
+                dphi = phiF - phiB
+                dphi1 = phiF - phi1[j1]
+                dphi2 = phiF - phi2[j2]
+                if dphi1 > np.pi:
+                    dphi1 -= 2*np.pi
+                elif dphi1 < -np.pi:
+                    dphi1 += 2*np.pi
+                if dphi2 > np.pi:
+                    dphi2 -= 2*np.pi
+                elif dphi2 < -np.pi:
+                    dphi2 += 2*np.pi
+
+                fL = f1[j1] + dphi1*dfdp1[j1]
+                fR = f2[j2] + dphi2*dfdp2[j2]
+
+                df = (fR - fL) / (R2 - R1)
+
+                dfL = dfdr1_s[j1]
+                dfR = dfdr2_s[j2]
+
+                if df*dfL < 0:
+                    dfdr1_s[j1] = 0.0
+                elif np.fabs(TH*df) < np.fabs(dfL):
+                    dfdr1_s[j1] = TH*df
+                if df*dfR < 0:
+                    dfdr2_s[j2] = 0.0
+                elif np.fabs(TH*df) < np.fabs(dfR):
+                    dfdr2_s[j2] = TH*df
+
+                if phi1p < phi2p:
+                    j1 += 1
+                else:
+                    j2 += 1
+
+                if j2 == phi2.shape[0]:
+                    j2 = 0
+
+            dfdr[ind1] = dfdr1_s[:]
+            dfdr[ind2] = dfdr2_s[:]
+
+    else:
+        dfdr = dfdrC
+
+    return dfdr, dfdp
+
 
 def find_shocks_d2s(r, phi, S):
 
@@ -417,26 +746,36 @@ def find_shocks_d2s(r, phi, S):
 
     for i,R in enumerate(Rs):
         ind = r==R
+
+        phiC = phi[ind]
+        phiR = np.roll(phiC, -1)
+        phiL = np.roll(phiC, 1)
+        phiR[phiR<phiC] += 2*np.pi
+        phiL[phiL>phiC] -= 2*np.pi
+        dphiAve = (phiR-phiC).mean()
+
         s = S[ind]
         sl = np.roll(s,1)
         sll = np.roll(s,2)
         sr = np.roll(s,-1)
         srr = np.roll(s,-2)
-        d2s = sr - 2*s + sl
-        d2s = -srr + 16*sr - 30*s + 16*sl - sll
+        d2s = (sr - 2*s + sl) / (dphiAve*dphiAve)
+        d2s = (-srr + 16*sr - 30*s + 16*sl - sll) / (dphiAve*dphiAve)
 
         smax = s.max()
         smin = s.min()
 
-        d2sB = 2*(smax-smin)
+        d2sB = 2 * 2*(smax-smin)
 
         maxinds = signal.argrelmax(d2s, order=10, mode='wrap')[0]
         mininds = signal.argrelmin(d2s, order=10, mode='wrap')[0]
         if mininds.shape[0] > 0:
             mininds = mininds[np.argsort(d2s[mininds])]
 
-        #maxinds = maxinds[d2s[maxinds] >  d2sB]
-        #mininds = mininds[d2s[mininds] < -d2sB]
+        maxinds = maxinds[d2s[maxinds] >  d2sB]
+        mininds = mininds[d2s[mininds] < -d2sB]
+
+        #print d2s.min(), d2s.max(), d2sB
 
         iS = []
 
@@ -568,6 +907,295 @@ def find_shocks_d2s(r, phi, S):
 
     return iSa, iSb, phiSa, phiSb
 
+def find_shocks_d2sDet(r, phi, dphi, S, dV12):
+
+#Find shocks by looking at derivatives of S AND the Rezzolla&Zanotti quantity.
+
+    Rs = np.unique(r)
+    N = Rs.shape[0]
+
+    phiSa = np.zeros((N,2))
+    phiSb = np.zeros((N,2))
+
+    iSa = np.zeros((N,2),dtype=np.int)
+    iSb = np.zeros((N,2),dtype=np.int)
+
+    RsI = [Rs[0], Rs[N/5], Rs[(2*N)/5], Rs[(3*N)/5], Rs[(4*N)/5], Rs[-20]]
+    fig, ax = plt.subplots(2, 3, figsize=(24,9))
+
+    for i, ax in enumerate(ax.flat):
+        R = RsI[i]
+        ind = r==R
+
+        phiC = phi[ind]
+        phiR = np.roll(phiC, -1)
+        phiL = np.roll(phiC, 1)
+        phiR[phiR<phiC] += 2*np.pi
+        phiL[phiL>phiC] -= 2*np.pi
+        dphiAve = (phiR-phiC).mean()
+
+        s = S[ind]
+        sl = np.roll(s,1)
+        sll = np.roll(s,2)
+        sr = np.roll(s,-1)
+        srr = np.roll(s,-2)
+        d2s = (-srr + 16*sr - 30*s + 16*sl - sll) / (dphiAve*dphiAve)
+        d1s = (sr - sl) / (phiR - phiL)
+
+        dv12 = dV12[ind]
+
+        maxinds = signal.argrelmax(dv12, order=10, mode='wrap')[0]
+        print maxinds
+        if maxinds.shape[0] > 0:
+            maxinds = maxinds[np.argsort(dv12[maxinds])[::-1]]
+        print maxinds
+        ax2 = ax.twinx()
+        ax3 = ax.twinx()
+        ax4 = ax.twinx()
+        ax.plot(phiC, s, 'k+')
+        ax2.plot(phiC, d1s, 'b+')
+        ax3.plot(phiC, d2s, 'g+')
+        ax4.plot(0.5*(phiR+phiC), dv12, 'r+')
+        if maxinds.shape[0] >= 1:
+            ax.axvline(phiC[maxinds[0]], color='k')
+        if maxinds.shape[0] >= 2:
+            ax.axvline(phiC[maxinds[1]], color='b')
+        if maxinds.shape[0] >= 3:
+            ax.axvline(phiC[maxinds[2]], color='g')
+        if maxinds.shape[0] >= 4:
+            ax.axvline(phiC[maxinds[3]], color='r')
+        ax.set_title(r"$R = {0:f}$".format(R))
+    plt.tight_layout()
+    fig.savefig("shock_comp.png")
+    plt.close()
+
+    fig, ax = plt.subplots(1, 1)
+    for i,R in enumerate(Rs):
+        ind = r==R
+        numphi = r[ind].shape[0]
+
+        if i>0:
+            rm = 0.5*(R+Rs[i-1])
+        else:
+            rm = R - 0.5*(Rs[1]-R)
+        if i<N-1:
+            rp = 0.5*(R+Rs[i+1])
+        else:
+            rp = R + 0.5*(R-Rs[i-1])
+
+        X = np.zeros((2, numphi+1))
+        Y = np.zeros((2, numphi+1))
+        X[:,1:] = (phi[ind] + 0.5*dphi[ind])[None,:]
+        X[:,0] = phi[ind][0] - 0.5*dphi[ind][0]
+        Y[0,:] = rm
+        Y[1,:] = rp
+
+        dat = np.zeros(r[ind].shape)
+        phiC = phi[ind]
+        phiR = np.roll(phiC, -1)
+        phiR[phiR<phiC] += 2*np.pi
+
+        s = S[ind]
+        sr = np.roll(s,-1)
+        ds = (sr-s) / (phiR - phiC)
+        
+        dv12 = dV12[ind]
+        maxinds = signal.argrelmax(dv12, order=10, mode='wrap')[0]
+        if maxinds.shape[0] > 0:
+            maxinds = maxinds[np.argsort(dv12[maxinds])[::-1]]
+        if maxinds.shape[0] > 2:
+            thresh = dv12[maxinds[2]]
+            indsss = (dv12 > thresh)*(ds > 0)
+            dat[indsss] = 1.0
+
+        C = ax.pcolormesh(X, Y, np.atleast_2d(dat), 
+                        edgecolors='none', vmin=0.0, vmax=1.0,
+                        cmap=dp.viridis)
+    ax.set_yscale('log')
+    plt.tight_layout()
+    fig.savefig("shock_det.png")
+    plt.close()
+
+    for i,R in enumerate(Rs):
+        ind = r==R
+
+        phiC = phi[ind]
+        phiR = np.roll(phiC, -1)
+        phiL = np.roll(phiC, 1)
+        phiR[phiR<phiC] += 2*np.pi
+        phiL[phiL>phiC] -= 2*np.pi
+
+        s = S[ind]
+        sl = np.roll(s,1)
+        sr = np.roll(s,-1)
+
+        d1sR = (sr - s) / (phiR -phiC)
+
+        smax = s.max()
+        smin = s.min()
+
+        dv12 = dV12[ind]
+        maxinds = signal.argrelmax(dv12, order=10, mode='wrap')[0]
+        if maxinds.shape[0] > 0:
+            maxinds = maxinds[np.argsort(dv12[maxinds])[::-1]]
+        if maxinds.shape[0] >= 4:
+            thresh = dv12[maxinds[3]]
+        elif maxinds.shape[0] > 1:
+            thresh = dv12[maxinds[-1]]
+        else:
+            thresh = dv12.mean()
+        if thresh < 0.0:
+            thresh = 0.0
+
+        inds = (d1sR > 0) * (dv12 > thresh)
+
+        iS = []
+
+        sortInds = np.argsort(d1sR)[::-1]
+        shock1 = 0
+        shock2 = 0
+        for j in sortInds:
+            if not inds[j]:
+                continue
+            if shock1 == 0:
+                shock1 = 1
+            elif shock1 == 2 and shock2 == 0:
+                used = False
+                for pair in iS:
+                    if pair[0] < pair[1]:
+                        if j >= pair[0] and j < pair[1]:
+                            used = True
+                            break
+                    elif pair[0] > pair[1]:
+                        if (j >= pair[0] or j < pair[1]):
+                            used = True
+                            break
+                if not used:
+                    shock2 = 1
+            if shock1 == 1 or shock2 == 1:
+                jL = j
+                jR = j+1
+                if jR == s.shape[0]:
+                    jR = 0
+                while inds[jR]:
+                    jR += 1
+                    if jR == s.shape[0]:
+                        jR = 0
+                while inds[jL]:
+                    jL -= 1
+                    if jL == -1:
+                        jL = s.shape[0]-1
+                iS.append([jL, jR])
+                if shock1 == 1:
+                    shock1 = 2
+                elif shock2 == 1:
+                    break
+
+        print iS, len(s[inds])
+        if len(iS) == 1:
+            print np.arange(s.shape[0])[inds]
+
+        if len(iS) == 0:
+            iSa[i,:] = -1
+            iSb[i,:] = -1
+            phiSa[i,:] = np.inf
+            phiSb[i,:] = np.inf
+            continue
+
+        if i == 0:
+            iSa[i,:] = iS[0]
+            phiSa[i,:] = phi[ind][iS[0]]
+            if len(iS) > 1:
+                iSb[i,:] = iS[1]
+                phiSb[i,:] = phi[ind][iS[1]]
+            else:
+                iSb[i,:] = -1
+                phiSb[i,:] = np.inf
+
+        else:
+            sa = -1
+            sb = -1
+            diffa = np.inf
+            diffb = np.inf
+            for j,sh in enumerate(iS):
+                jumpa = phi[ind][sh[1]] - phiSa[i-1,1]
+                jumpb = phi[ind][sh[1]] - phiSb[i-1,1]
+                if jumpa > np.pi:
+                    jumpa -= 2*np.pi
+                elif jumpa < -np.pi:
+                    jumpa += 2*np.pi
+                if jumpb > np.pi:
+                    jumpb -= 2*np.pi
+                elif jumpb < -np.pi:
+                    jumpb += 2*np.pi
+                if math.fabs(jumpa) < math.fabs(diffa):
+                    sa = j
+                    diffa = jumpa
+                if math.fabs(jumpb) < math.fabs(diffb):
+                    sb = j
+                    diffb = jumpb
+            if iSa[i-1,0] < 0 and iSb[i-1,0] < 0:
+                iSa[i,:] = iS[0]
+                iSb[i,:] = iS[1]
+                phiSa[i,:] = phi[ind][iS[0]]
+                phiSb[i,:] = phi[ind][iS[1]]
+            elif iSb[i-1,0] < 0:
+                iSa[i,:] = iS[sa]
+                phiSa[i,:] = phi[ind][iS[sa]]
+                if len(iS) == 1:
+                    iSb[i,:] = -1
+                    phiSb[i,:] = np.inf
+                elif sa == 0:
+                    iSb[i,:] = 1
+                    phiSb[i,:] = phi[ind][iS[1]]
+                else:
+                    iSb[i,:] = 0
+                    phiSb[i,:] = phi[ind][iS[0]]
+            elif iSa[i-1,0] < 0:
+                iSb[i,:] = iS[sb]
+                phiSb[i,:] = phi[ind][iS[sb]]
+                if len(iS) == 1:
+                    iSa[i,:] = -1
+                    phiSa[i,:] = np.inf
+                elif sb == 0:
+                    iSa[i,:] = 1
+                    phiSa[i,:] = phi[ind][iS[1]]
+                else:
+                    iSa[i,:] = 0
+                    phiSa[i,:] = phi[ind][iS[0]]
+            elif sa != sb and sa > -1 and sb > -1:
+                iSa[i,:] = iS[sa]
+                iSb[i,:] = iS[sb]
+                phiSa[i,:] = phi[ind][iS[sa]]
+                phiSb[i,:] = phi[ind][iS[sb]]
+            else:
+                if math.fabs(diffa) < math.fabs(diffb):
+                    iSa[i,:] = iS[sa]
+                    iSb[i,:] = -1
+                    phiSa[i,:] = phi[ind][iS[sa]]
+                    phiSb[i,:] = np.inf
+                else:
+                    iSa[i,:] = -1
+                    iSb[i,:] = iS[sb]
+                    phiSa[i,:] = np.inf
+                    phiSb[i,:] = phi[ind][iS[sb]]
+
+    for i in xrange(N):
+        if iSa[i,0] > -1:
+            dphia = phiSa[i,1] - phiSa[i,0]
+            if dphia > np.pi:
+                phiSa[i,0] += 2*np.pi
+            elif dphia < -np.pi:
+                phiSa[i,0] -= 2*np.pi
+        if iSb[i,0] > -1:
+            dphib = phiSb[i,1] - phiSb[i,0]
+            if dphib > np.pi:
+                phiSb[i,0] += 2*np.pi
+            elif dphib < -np.pi:
+                phiSb[i,0] -= 2*np.pi
+
+    return iSa, iSb, phiSa, phiSb
+
 def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat, 
                         name, pars):
 
@@ -579,11 +1207,15 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
         velRS = shockDat[0]
         velSS = shockDat[1]
         vel12 = shockDat[2]
+        dV12 = vel12 - velRS
+    else:
+        dV12 = None
 
     S = np.log(pi * np.power(sig, -gam)) / (gam-1.0)
     S -= S.min()
 
-    iSa, iSb, phiSa, phiSb = find_shocks_d2s(r, phi, S)
+    #iSa, iSb, phiSa, phiSb = find_shocks_d2s(r, phi, S)
+    iSa, iSb, phiSa, phiSb = find_shocks_d2sDet(r, phi, dphi, S, dV12)
 
     up = u0*vp
     N = Rs.shape[0]
@@ -607,6 +1239,13 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
     print("Saving {0:s}...".format(figname))
     fig.savefig(figname)
     plt.close(fig)
+
+    temp = pi/sig
+    ka_bbes = 0.4 # cm^2/g
+    cool_cgs = 8*eos.sb * (temp*eos.mp*eos.c*eos.c)**4 / (
+                3*ka_bbes*sig * eos.rho_scale*eos.rg_solar)
+    cool = cool_cgs / (eos.c*eos.c*eos.c*eos.rho_scale)
+    dQcool = np.zeros(Rs.shape)
 
     for i,R in enumerate(Rs):
 
@@ -643,11 +1282,12 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
         psiQ[i,1] = (math.exp((gam-1)*dsb)-1) / (gam-1.0)
         psiQ[i,2] = psiQ[i,0] + psiQ[i,1]
         dQdm[i,0] = Ta * psiQ[i,0]
-        dQdm[i,1] = Ta * psiQ[i,1]
+        dQdm[i,1] = Tb * psiQ[i,1]
         dQdm[i,2] = dQdm[i,0] + dQdm[i,1]
         dQdr[i,0] = R * siga * upa * dQdm[i,0]
         dQdr[i,1] = R * sigb * upb * dQdm[i,1]
         dQdr[i,2] = dQdr[i,0] + dQdr[i,1]
+        dQcool[i] = (cool[ind] * R * dphi[ind]).sum()
 
     fig, ax = plt.subplots(4, 1, figsize=(12,9))
     ax[0].plot(Rs, dS[:,0], 'r+')
@@ -685,6 +1325,39 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
     fig.savefig(figname)
     plt.close(fig)
 
+    fig, ax = plt.subplots(3, 1, figsize=(12,9))
+    ax[0].plot(Rs, dS[:,0], ls='', marker='+', ms=10, mew=2, color=orange)
+    ax[0].plot(Rs, dS[:,1], ls='', marker='+', ms=10, mew=2, color=green)
+    ax[0].plot(Rs, dS[:,2], ls='', marker='+', ms=10, mew=2, color=blue)
+    ax[0].set_ylabel(r'$\mu \Delta s$')
+    ax[0].set_xscale('log')
+    ax[0].set_xlim(Rs.min(), Rs.max())
+    if (dS > 0).any():
+        ax[0].set_yscale('log')
+    ax[1].plot(Rs, psiQ[:,0], ls='', marker='+', ms=10, mew=2, color=orange)
+    ax[1].plot(Rs, psiQ[:,1], ls='', marker='+', ms=10, mew=2, color=green)
+    ax[1].plot(Rs, psiQ[:,2], ls='', marker='+', ms=10, mew=2, color=blue)
+    ax[1].set_ylabel(r'$\psi_Q$')
+    ax[1].set_xscale('log')
+    ax[1].set_xlim(Rs.min(), Rs.max())
+    if (psiQ > 0).any():
+        ax[1].set_yscale('log')
+    ax[2].plot(Rs, dQdr[:,0], ls='', marker='+', ms=10, mew=2, color=orange)
+    ax[2].plot(Rs, dQdr[:,1], ls='', marker='+', ms=10, mew=2, color=green)
+    ax[2].plot(Rs, dQdr[:,2], ls='', marker='+', ms=10, mew=2, color=blue)
+    ax[2].plot(Rs, dQcool, ls='', marker='+', ms=10, mew=2, color=red)
+    ax[2].set_ylabel(r'$\dot{Q}$')
+    ax[2].set_xscale('log')
+    ax[2].set_xlim(Rs.min(), Rs.max())
+    if (dQdr > 0).any() or (dQcool > 0).any():
+        ax[2].set_yscale('log')
+    fig.subplots_adjust(hspace=0.0, wspace=0.0)
+    ax[2].set_xlabel(r'$r$ ($M$)')
+
+    figname = "plot_minidisc_psiNice_{0}.pdf".format(name)
+    print("Saving {0:s}...".format(figname))
+    fig.savefig(figname)
+    plt.close(fig)
 
     Is = np.array([0,N/4,N/2,3*N/4,N-1])
 
@@ -746,6 +1419,49 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
     print("Saving {0:s}...".format(figname))
     fig1.savefig(figname)
     plt.close(fig1)
+
+    dSdr, dSdp = calcGrad(r, phi, phi+dphi, S, pars, slopelimit=True)
+
+    dS = vr*dSdr+vp*dSdp
+    fig, ax = plt.subplots(1,3, figsize=(16,9))
+
+    Nr = Rs.shape[0]
+    for i,R in enumerate(Rs):
+        ind = r==R
+        N = r[ind].shape[0]
+
+        if i>0:
+            rm = 0.5*(R+Rs[i-1])
+        else:
+            rm = R - 0.5*(Rs[1]-R)
+        if i<Nr-1:
+            rp = 0.5*(R+Rs[i+1])
+        else:
+            rp = R + 0.5*(R-Rs[i-1])
+
+        X = np.zeros((2, N+1))
+        Y = np.zeros((2, N+1))
+        X[:,1:] = (phi[ind] + 0.5*dphi[ind])[None,:]
+        X[:,0] = phi[ind][0] - 0.5*dphi[ind][0]
+        Y[0,:] = rm
+        Y[1,:] = rp
+
+        C0 = ax[0].pcolormesh(X, Y, np.atleast_2d(dSdr[ind]), 
+                        edgecolors='none', vmin=dSdr.min(), vmax=dSdr.max(),
+                        cmap=dp.viridis)
+        C1 = ax[1].pcolormesh(X, Y, np.atleast_2d(dSdp[ind]), 
+                        edgecolors='none', vmin=dSdp.min(), vmax=dSdp.max(),
+                        cmap=dp.viridis)
+        C2 = ax[2].pcolormesh(X, Y, np.atleast_2d(dS[ind]-dS[ind].min()), 
+                        edgecolors='none',
+                        cmap=dp.viridis)
+    fig.colorbar(C0, ax=ax[0])
+    fig.colorbar(C1, ax=ax[1])
+    fig.colorbar(C2, ax=ax[2])
+    figname = "plot_minidisc_ds_{0}.png".format(name)
+    print("Saving {0:s}...".format(figname))
+    fig.savefig(figname)
+    plt.close(fig)
 
     return phiS, phiSa, phiSb, psiQ, dQdm, dQdr
 
@@ -945,26 +1661,30 @@ def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi,
 
     ax.plot(Rs,-AMmdot, marker='+', ms=10, mew=2, color='k', 
                 label=r"$\dot{M} \partial_r \langle h u_\phi \rangle$")
-    ax.plot(Rs, AMdiss-AMcool-AMtorq, marker='+', ms=10, mew=2, color=blue,
+    ax.plot(Rs, AMdiss, marker='+', ms=10, mew=2, color=blue,
                 label=r"$\partial_r \delta \langle T^r_\phi \rangle$")
+    ax.plot(Rs, AMdiss-AMcool-AMtorq, marker='+', ms=10, mew=2, color=green,
+                label=r"$\partial_r \delta \langle T^r_\phi \rangle - \langle f_\phi \rangle$")
     """
     ax.plot(Riph,-AMmdot, marker='+', ms=10, mew=2, color='k', 
                 label=r"$\dot{M} \partial_r \langle h u_\phi \rangle$")
     ax.plot(Riph, AMdiss-AMcool-AMtorq, marker='+', ms=10, mew=2, color=blue,
                 label=r"$\partial_r \delta \langle T^r_\phi \rangle$")
     """
+    ylim = ax.get_ylim()
     if shockDissDat is not None:
         ax.plot(Rs, dQdr / Om, marker='+', ms=10, mew=2, ls='',
-                    color=green, label=r"shock $\partial F_J / \partial r$")
+                    color=red, label=r"shock $\left(\partial F_J / \partial r\right)_{global}$")
         ax.plot(Rs[2:-2], AMdqdr, marker='+', ms=10, mew=2, ls='',
-                    color=orange, label=r"shock $\partial F_J / \partial r$")
+                    color=orange, label=r"shock $\left (\partial F_J / \partial r\right)_{local}$")
     ax.set_xlim(r.min(), r.max())
+    ax.set_ylim(ylim)
     ax.set_xlabel(r"$r (M)$")
     ax.set_ylabel("Angular Momentum Flux")
     ax.set_xscale("log")
     plt.legend()
 
-    figname = "plot_minidisc_fluxCompNice_{0}.png".format(name)
+    figname = "plot_minidisc_fluxCompNice_{0}.pdf".format(name)
     print("Saving {0:s}...".format(figname))
     fig.savefig(figname)
     plt.close(fig)
@@ -1002,7 +1722,7 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
     if shockDetPlot:
         shockDetDat = shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, chcknum, 
-                                pars)
+                                pars, slopelimit=True, TH=0.0)
     else:
         shockDetDat = None
     if dissPlot:
@@ -1390,7 +2110,7 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         axNice.tick_params(labelsize=18)
         plt.legend(loc="upper right", fontsize=24)
         axNice.set_title("Dispersion Relation", fontsize=36)
-        outname = "plot_minidisc_tanq_mach_{0}.png".format(
+        outname = "plot_minidisc_tanq_mach_{0}.pdf".format(
                     "_".join(chckname.split(".")[0].split("_")[1:]))
         print("Saving {0:s}...".format(outname))
         figNice.savefig(outname)
@@ -1405,9 +2125,10 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     axNice.set_ylabel(r"$\alpha$", fontsize=24)
     axNice.set_xscale('log')
     axNice.set_yscale('log')
+    axNice.set_xlim(RMIN, RMAX)
     axNice.tick_params(labelsize=18)
     axNice.set_title(r"$\alpha$ Parameter", fontsize=36)
-    outname = "plot_minidisc_alpha_r_{0}.png".format(
+    outname = "plot_minidisc_alpha_r_{0}.pdf".format(
                 "_".join(chckname.split(".")[0].split("_")[1:]))
     print("Saving {0:s}...".format(outname))
     figNice.savefig(outname)
@@ -1428,7 +2149,7 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     axNice.tick_params(labelsize=18)
     plt.legend(loc="upper right", fontsize=24)
     axNice.set_title("Dispersion Relation", fontsize=36)
-    outname = "plot_minidisc_tanq_mach_ds_{0}.png".format(
+    outname = "plot_minidisc_tanq_mach_ds_{0}.pdf".format(
                 "_".join(chckname.split(".")[0].split("_")[1:]))
     print("Saving {0:s}...".format(outname))
     figNice.savefig(outname)
