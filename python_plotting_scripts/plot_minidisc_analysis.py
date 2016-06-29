@@ -1,4 +1,5 @@
 import math
+import pickle
 from numpy import *
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
@@ -1051,7 +1052,8 @@ def find_shocks_d2sDet(r, phi, dphi, S, dV12):
 
         iS = []
 
-        sortInds = np.argsort(d1sR)[::-1]
+        #sortInds = np.argsort(d1sR)[::-1]
+        sortInds = np.argsort(dv12)[::-1]
         shock1 = 0
         shock2 = 0
         for j in sortInds:
@@ -1463,7 +1465,7 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
     fig.savefig(figname)
     plt.close(fig)
 
-    return phiS, phiSa, phiSb, psiQ, dQdm, dQdr
+    return phiS, phiSa, phiSb, psiQ, dQdm, dQdr, iSa, iSb, dQcool
 
 def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi, 
                                 shockDissDat, pars, name):
@@ -1689,6 +1691,8 @@ def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi,
     fig.savefig(figname)
     plt.close(fig)
 
+    return L, AMmdot, AMdiss, AMtorq, AMcool, AMdqdr
+
 def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
     print("Reading {0:s}".format(filename))
@@ -1734,6 +1738,9 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         psiQ = shockDissDat[3]
         dQdm = shockDissDat[4]
         dQdr = shockDissDat[5]
+        iSa = shockDissDat[6]
+        iSb = shockDissDat[7]
+        dCool = shockDissDat[8]
     else:
         shockDissDat = None
         phiS = None
@@ -1742,9 +1749,12 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         psiQ = None
         dQdm = None
         dQdr = None
+        iSa = None
+        iSb = None
 
-    angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi, shockDissDat,
-                                pars, chcknum)
+    torqueDat = angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi,
+                                                dphi, shockDissDat,
+                                                pars, chcknum)
 
     if not allTheOtherPlots:
         return
@@ -1794,6 +1804,7 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     avE = np.zeros(Rs.shape)
     avvr = np.zeros(Rs.shape)
     avvp = np.zeros(Rs.shape)
+    avpi = np.zeros(Rs.shape)
     Mdot = np.zeros(Rs.shape)
     Ldot = np.zeros(Rs.shape)
     Edot = np.zeros(Rs.shape)
@@ -1855,6 +1866,7 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         avE[i] = Etot / A
         avvr[i] = Dflux / Dtot
         avvp[i] = Dfluxp / Dtot
+        avpi[i] = (pi[inds] * R*dphi[inds]).sum() / A
         avMach[i] = (sig[inds]*mach[inds] * R*dphi[inds]).sum() / sigtot
         avMachNorb[i] = (sig[inds]*machNorb[inds] * R*dphi[inds]).sum()/sigtot
 
@@ -1926,6 +1938,88 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
             shock0Phi[i] = phimaxima[0]
             shock1Phi[i] = phimaxima[1]
 
+    data = {'T': t,
+            'M': pars['GravM'],
+            'gam': pars['Adiabatic_Index'],
+            'M2': pars['BinM'],
+            'bw': pars['BinW'],
+            'ba': pars['BinA'],
+            'Mdot': pars['BoundPar2'],
+            'R': Rs,
+            'A': 2*np.pi*Rs,
+            'J0': avD,
+            'Jr': Mdot,
+            'Tp0': avL,
+            'Tpr': Ldot,
+            'T00': avE,
+            'T0r': Edot,
+            'sig': avsig,
+            'pi': avpi,
+            'vr': avvr,
+            'vp': avvp}
+
+    if shockDissDat != None:
+        data['iSa'] = iSa
+        data['iSb'] = iSb
+        data['phiSa'] = phiSa
+        data['phiSb'] = phiSb
+        data['psiQa'] = psiQ[:,0]
+        data['psiQb'] = psiQ[:,1]
+        data['dQdma'] = dQdm[:,0]
+        data['dQdmb'] = dQdm[:,1]
+        data['dQdra'] = dQdr[:,0]
+        data['dQdrb'] = dQdr[:,1]
+        data['dCool'] = dCool[:]
+
+        siga = np.zeros((Rs.shape[0],2))
+        sigb = np.zeros((Rs.shape[0],2))
+        pia = np.zeros((Rs.shape[0],2))
+        pib = np.zeros((Rs.shape[0],2))
+        vra = np.zeros((Rs.shape[0],2))
+        vrb = np.zeros((Rs.shape[0],2))
+        vpa = np.zeros((Rs.shape[0],2))
+        vpb = np.zeros((Rs.shape[0],2))
+
+        for i,R in enumerate(Rs):
+            ind = r==R
+            siga[i,:] = sig[ind][iSa[i]]
+            pia[i,:] = pi[ind][iSa[i]]
+            vra[i,:] = vr[ind][iSa[i]]
+            vpa[i,:] = vp[ind][iSa[i]]
+            sigb[i,:] = sig[ind][iSb[i]]
+            pib[i,:] = pi[ind][iSb[i]]
+            vrb[i,:] = vr[ind][iSb[i]]
+            vpb[i,:] = vp[ind][iSb[i]]
+
+        data['siga'] = siga
+        data['pia'] = pia
+        data['vpa'] = vra
+        data['vra'] = vpa
+        data['sigb'] = sigb
+        data['pib'] = pib
+        data['vpb'] = vrb
+        data['vrb'] = vpb
+
+    if torqueDat is not None:
+        l = torqueDat[0]
+        AMmdot = torqueDat[1]
+        AMdiss = torqueDat[2]
+        AMtorq = torqueDat[3]
+        AMcool = torqueDat[4]
+        AMdqdr = torqueDat[5]
+
+        data['l'] = l
+        data['Tmdot'] = -AMmdot
+        data['Tre'] = -AMdiss
+        data['Text'] = AMtorq
+        data['Tcool'] = AMcool
+        Tpsiq = np.zeros(Rs.shape)
+        Tpsiq[2:-2] = -AMdqdr
+        data['Tpsiq'] = Tpsiq
+
+    f = open("plot_minidisc_data_{0}.dat".format(chcknum), "w")
+    pickle.dump(data, f, protocol=-1)
+    f.close()
 
     j = Ldot/Mdot
     e = Edot/Mdot
