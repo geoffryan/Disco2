@@ -80,8 +80,14 @@ def add_disp_plot(ax, data, marker, mc, ls, lc, mode='ABC'):
 
     phiA = 0.5*(phiSA[indA,0]+phiSA[indA,1])
     phiB = 0.5*(phiSB[indB,0]+phiSB[indB,1])
-    dpdrA = (phiA[2:] - phiA[:-2]) / (RA[2:] - RA[:-2])
-    dpdrB = (phiB[2:] - phiB[:-2]) / (RB[2:] - RB[:-2])
+    diffA = phiA[2:] - phiA[:-2]
+    diffA[diffA>np.pi] -= 2*np.pi
+    diffA[diffA<-np.pi] += 2*np.pi
+    diffB = phiB[2:] - phiB[:-2]
+    diffB[diffB>np.pi] -= 2*np.pi
+    diffB[diffB<-np.pi] += 2*np.pi
+    dpdrA = diffA / (RA[2:] - RA[:-2])
+    dpdrB = diffB / (RB[2:] - RB[:-2])
 
     tpA = -1.0 / (dpdrA * RA[1:-1])
     tpB = -1.0 / (dpdrB * RB[1:-1])

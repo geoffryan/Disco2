@@ -194,7 +194,10 @@ def shockPlot(r, phi, dphi, sig, pi, u0, vr, vp, name, pars, slopelimit=False,
     dvSSRSmin = (vSS-vRS).min()
     dvSSRSmax = (vSS-vRS).max()
 
-    chi[chi<0] = chi[chi>0].min()
+    if (chi>0).any():
+        chi[chi<0] = chi[chi>0].min()
+    else:
+        chi[chi<0] = 1.0e-16
     lchi = np.log10(chi)
 
     for i, R in enumerate(Rs):
