@@ -1223,6 +1223,7 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
     #iSa, iSb, phiSa, phiSb = find_shocks_d2s(r, phi, S)
     iSa, iSb, phiSa, phiSb = find_shocks_d2sDet(r, phi, dphi, S, dV12)
 
+    ur = u0*vr
     up = u0*vp
     N = Rs.shape[0]
     dS = np.zeros((N,3))
@@ -1253,6 +1254,23 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
     cool = cool_cgs / (eos.c*eos.c*eos.c*eos.rho_scale)
     dQcool = np.zeros(Rs.shape)
 
+    inda = iSa[:,0] >= 0
+    indb = iSb[:,0] >= 0
+    dpdra = np.zeros(Rs.shape)
+    dpdrb = np.zeros(Rs.shape)
+    Ra = Rs[inda]
+    Rb = Rs[indb]
+    phia = phiSa[inda,0]
+    phib = phiSb[indb,0]
+    diffa = phia[2:] - phia[:-2]
+    diffa[diffa > np.pi] -= 2*np.pi
+    diffa[diffa < -np.pi] += 2*np.pi
+    diffb = phib[2:] - phib[:-2]
+    diffb[diffb > np.pi] -= 2*np.pi
+    diffb[diffb < -np.pi] += 2*np.pi
+    dpdra[inda[1:-1]] = diffa / (Ra[2:] - Ra[:-2])
+    dpdrb[indb[1:-1]] = diffb / (Rb[2:] - Rb[:-2])
+
     for i,R in enumerate(Rs):
 
         ind = (r==R)
@@ -1264,21 +1282,25 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
             dsa = s[iSa[i,1]] - s[iSa[i,0]]
             siga = sig[ind][iSa[i,0]]
             Ta = pi[ind][iSa[i,0]] / siga
+            ura = ur[ind][iSa[i,0]]
             upa = up[ind][iSa[i,0]]
         else:
             dsa = 0.0
             siga = 0.0
             Ta = 0.0
             upa = 0.0
+            ura = 0.0
         if iSb[i,0] > -1:
             dsb = s[iSb[i,1]] - s[iSb[i,0]]
             sigb = sig[ind][iSb[i,0]]
             Tb = pi[ind][iSb[i,0]] / sigb
+            urb = ur[ind][iSb[i,0]]
             upb = up[ind][iSb[i,0]]
         else:
             dsb = 0.0
             sigb = 0.0
             Tb = 0.0
+            urb = 0.0
             upb = 0.0
 
         dS[i,0] = dsa
@@ -1290,12 +1312,12 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
         dQdm[i,0] = Ta * psiQ[i,0]
         dQdm[i,1] = Tb * psiQ[i,1]
         dQdm[i,2] = dQdm[i,0] + dQdm[i,1]
-        dQdr[i,0] = R * siga * upa * dQdm[i,0]
-        dQdr[i,1] = R * sigb * upb * dQdm[i,1]
+        dQdr[i,0] = R * siga * (-dpdra[i]*ura + upa) * dQdm[i,0]
+        dQdr[i,1] = R * sigb * (-dpdrb[i]*urb + upb) * dQdm[i,1]
         dQdr[i,2] = dQdr[i,0] + dQdr[i,1]
         dQcool[i] = (cool[ind] * R * dphi[ind]).sum()
 
-    fig, ax = plt.subplots(4, 1, figsize=(12,9))
+    fig, ax = plt.subplots(5, 1, figsize=(12,12))
     ax[0].plot(Rs, dS[:,0], 'r+')
     ax[0].plot(Rs, dS[:,1], 'b+')
     ax[0].plot(Rs, dS[:,2], 'k+')
@@ -1325,6 +1347,11 @@ def dissipation_plot(t, r, phi, sig, pi, vr, vp, u0, dphi, shockDat,
     ax[3].set_xscale('log')
     if (dQdr > 0).any():
         ax[3].set_yscale('log')
+    ax[4].plot(Rs, dpdra, 'r+')
+    ax[4].plot(Rs, dpdrb, 'b+')
+    ax[4].set_xlabel(r'$r$')
+    ax[4].set_ylabel(r'$\frac{d\Phi}{dr}$')
+    ax[4].set_xscale('log')
 
     figname = "plot_minidisc_psi_{0}.png".format(name)
     print("Saving {0:s}...".format(figname))

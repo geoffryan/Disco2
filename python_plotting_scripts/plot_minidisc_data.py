@@ -190,6 +190,87 @@ def diss_plot(datas, name):
     fig.savefig(name)
     plt.close(fig)
 
+def dissCorrPlot(data, name):
+#(r, sig, pi, vr, vp, u0, shockDissDat, pars, name):
+
+    R = data['R']
+    M = data['M']
+    bw = data['bw']
+
+    pars = {'Metric': 6,
+            'GravM': M,
+            'GravA': 0.0,
+            'BinW': bw}
+
+    phiSa = data['phiSa']
+    phiSb = data['phiSb']
+    psiqa = data['psiQa']
+    psiqb= data['psiQb']
+    dqdra = data['dQdra']
+    dqdrb = data['dQdrb']
+
+    sigA = data['siga'][:,0]
+    vrA = data['vra'][:,0]
+    vpA = data['vpa'][:,0]
+    sigB = data['sigb'][:,0]
+    vrB = data['vrb'][:,0]
+    vpB = data['vpb'][:,0]
+
+    dpdra = np.zeros(Rs.shape)
+    dpdrb = np.zeros(Rs.shape)
+    dpdra[1:-1] = (phiSa[2:,0]-phiSa[:-2,0]) / (R[2:] - R[:-2])
+    dpdrb[1:-1] = (phiSb[2:,0]-phiSb[:-2,0]) / (R[2:] - R[:-2])
+    
+    g00, g0r, g0p, grr, grp, gpp = gr.calc_g(R, pars)
+    u0A = calc_u0(R, vrA, vpA, M, bw)
+    u0B = calc_u0(R, vrB, vpB, M, bw)
+
+    dgam = grr*gpp-grp*grp
+
+    igamrr = gpp/dgam
+    igamrp = -grp/dgam
+    igampp = grr/dgam
+    br = igamrr*g0r + igamrp*g0p
+    bp = igamrp*grp + igampp*gpp
+    b2 = br*g0r + bp*g0p
+    a2 = b2 - g00
+
+    igrr = igamrr - br*br/a2
+    igrp = igamrp - br*bp/a2
+    igpp = igampp - bp*bp/a2
+
+    jaca = np.sqrt(-g00*(grr+2*dpdra*grp+dpdra*dpdra*gpp)
+                    + (g0r+dpdra*g0p)*(g0r+dpdra*g0p))
+    jacb = np.sqrt(-g00*(grr+2*dpdrb*grp+dpdra*dpdrb*gpp)
+                    + (g0r+dpdrb*g0p)*(g0r+dpdrb*g0p))
+
+    norma = np.sqrt(igrr*dpdra*dpdra + 2*igrp*dpdra + igpp)
+    normb = np.sqrt(igrr*dpdrb*dpdrb + 2*igrp*dpdrb + igpp)
+
+    fluxa = np.zeros(R.shape)
+    fluxb = np.zeros(R.shape)
+    
+    fluxa = jaca * sigA*u0A * (-vrA*dpdra+vpA)/norma
+    fluxb = jacb * sigB*u0B * (-vrB*dpdrb+vpB)/normb
+
+    dQdrCorr = np.zeros((Rs.shape[0], 2))
+    dQdrCorr[:,0] = dQdm[:,0]*fluxa
+    dQdrCorr[:,1] = dQdm[:,1]*fluxb
+
+    fig, ax = plt.subplots(1,1)
+    ax.plot(Rs, dQdr[:,0], 'k+')
+    ax.plot(Rs, dQdr[:,1], 'g+')
+    ax.plot(Rs, dQdrCorr[:,0], 'b+')
+    ax.plot(Rs, dQdrCorr[:,1], 'r+')
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    
+    figname = "plot_minidisc_dissCorr_{0}.png".format(name)
+    print("Saving {0:s}...".format(figname))
+    fig.savefig(figname)
+    plt.close(fig)
+
+
 def torque_plot_single(data, name):
 
     R = data['R']
