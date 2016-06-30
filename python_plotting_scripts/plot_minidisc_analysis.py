@@ -1113,74 +1113,78 @@ def find_shocks_d2sDet(r, phi, dphi, S, dV12):
             else:
                 iSb[i,:] = -1
                 phiSb[i,:] = np.inf
+            continue
 
-        else:
-            sa = -1
-            sb = -1
-            diffa = np.inf
-            diffb = np.inf
-            for j,sh in enumerate(iS):
-                jumpa = phi[ind][sh[1]] - phiSa[i-1,1]
-                jumpb = phi[ind][sh[1]] - phiSb[i-1,1]
-                if jumpa > np.pi:
-                    jumpa -= 2*np.pi
-                elif jumpa < -np.pi:
-                    jumpa += 2*np.pi
-                if jumpb > np.pi:
-                    jumpb -= 2*np.pi
-                elif jumpb < -np.pi:
-                    jumpb += 2*np.pi
-                if math.fabs(jumpa) < math.fabs(diffa):
-                    sa = j
-                    diffa = jumpa
-                if math.fabs(jumpb) < math.fabs(diffb):
-                    sb = j
-                    diffb = jumpb
-            if iSa[i-1,0] < 0 and iSb[i-1,0] < 0:
-                iSa[i,:] = iS[0]
+        sa = -1
+        sb = -1
+        diffa = np.inf
+        diffb = np.inf
+        for j,sh in enumerate(iS):
+            jumpa = phi[ind][sh[1]] - phiSa[i-1,1]
+            jumpb = phi[ind][sh[1]] - phiSb[i-1,1]
+            if jumpa > np.pi:
+                jumpa -= 2*np.pi
+            elif jumpa < -np.pi:
+                jumpa += 2*np.pi
+            if jumpb > np.pi:
+                jumpb -= 2*np.pi
+            elif jumpb < -np.pi:
+                jumpb += 2*np.pi
+            if math.fabs(jumpa) < math.fabs(diffa):
+                sa = j
+                diffa = jumpa
+            if math.fabs(jumpb) < math.fabs(diffb):
+                sb = j
+                diffb = jumpb
+        if iSa[i-1,0] < 0 and iSb[i-1,0] < 0:
+            iSa[i,:] = iS[0]
+            phiSa[i,:] = phi[ind][iS[0]]
+            if len(iS) > 1:
                 iSb[i,:] = iS[1]
-                phiSa[i,:] = phi[ind][iS[0]]
                 phiSb[i,:] = phi[ind][iS[1]]
-            elif iSb[i-1,0] < 0:
-                iSa[i,:] = iS[sa]
-                phiSa[i,:] = phi[ind][iS[sa]]
-                if len(iS) == 1:
-                    iSb[i,:] = -1
-                    phiSb[i,:] = np.inf
-                elif sa == 0:
-                    iSb[i,:] = 1
-                    phiSb[i,:] = phi[ind][iS[1]]
-                else:
-                    iSb[i,:] = 0
-                    phiSb[i,:] = phi[ind][iS[0]]
-            elif iSa[i-1,0] < 0:
-                iSb[i,:] = iS[sb]
-                phiSb[i,:] = phi[ind][iS[sb]]
-                if len(iS) == 1:
-                    iSa[i,:] = -1
-                    phiSa[i,:] = np.inf
-                elif sb == 0:
-                    iSa[i,:] = 1
-                    phiSa[i,:] = phi[ind][iS[1]]
-                else:
-                    iSa[i,:] = 0
-                    phiSa[i,:] = phi[ind][iS[0]]
-            elif sa != sb and sa > -1 and sb > -1:
-                iSa[i,:] = iS[sa]
-                iSb[i,:] = iS[sb]
-                phiSa[i,:] = phi[ind][iS[sa]]
-                phiSb[i,:] = phi[ind][iS[sb]]
             else:
-                if math.fabs(diffa) < math.fabs(diffb):
-                    iSa[i,:] = iS[sa]
-                    iSb[i,:] = -1
-                    phiSa[i,:] = phi[ind][iS[sa]]
-                    phiSb[i,:] = np.inf
-                else:
-                    iSa[i,:] = -1
-                    iSb[i,:] = iS[sb]
-                    phiSa[i,:] = np.inf
-                    phiSb[i,:] = phi[ind][iS[sb]]
+                iSb[i,:] = -1
+                phiSb[i,:] = np.inf
+        elif iSb[i-1,0] < 0:
+            iSa[i,:] = iS[sa]
+            phiSa[i,:] = phi[ind][iS[sa]]
+            if len(iS) == 1:
+                iSb[i,:] = -1
+                phiSb[i,:] = np.inf
+            elif sa == 0:
+                iSb[i,:] = 1
+                phiSb[i,:] = phi[ind][iS[1]]
+            else:
+                iSb[i,:] = 0
+                phiSb[i,:] = phi[ind][iS[0]]
+        elif iSa[i-1,0] < 0:
+            iSb[i,:] = iS[sb]
+            phiSb[i,:] = phi[ind][iS[sb]]
+            if len(iS) == 1:
+                iSa[i,:] = -1
+                phiSa[i,:] = np.inf
+            elif sb == 0:
+                iSa[i,:] = 1
+                phiSa[i,:] = phi[ind][iS[1]]
+            else:
+                iSa[i,:] = 0
+                phiSa[i,:] = phi[ind][iS[0]]
+        elif sa != sb and sa > -1 and sb > -1:
+            iSa[i,:] = iS[sa]
+            iSb[i,:] = iS[sb]
+            phiSa[i,:] = phi[ind][iS[sa]]
+            phiSb[i,:] = phi[ind][iS[sb]]
+        else:
+            if math.fabs(diffa) < math.fabs(diffb):
+                iSa[i,:] = iS[sa]
+                iSb[i,:] = -1
+                phiSa[i,:] = phi[ind][iS[sa]]
+                phiSb[i,:] = np.inf
+            else:
+                iSa[i,:] = -1
+                iSb[i,:] = iS[sb]
+                phiSa[i,:] = np.inf
+                phiSb[i,:] = phi[ind][iS[sb]]
 
     for i in xrange(N):
         if iSa[i,0] > -1:

@@ -135,35 +135,32 @@ def plot_periodogram(ts, rss, mdots):
     fig, ax = plt.subplots(5, 1, figsize=(20,10))
     nr = rss.shape[1]
 
-    t0 = 15.0 * 2.0*np.pi*1.0e4
+    T = 2*np.pi*1.0e4
+    t0 = 15.0 * T
+    fs = T / (ts[1:]-ts[:-1]).mean()
 
-    ax[0].plot(ts, mdots[:,2], 'k+')
-    ax[1].plot(ts, mdots[:,nr/4], 'k+')
-    ax[2].plot(ts, mdots[:,nr/2], 'k+')
-    ax[3].plot(ts, mdots[:,3*nr/4], 'k+')
-    ax[4].plot(ts, mdots[:,-3], 'k+')
-    ax[4].set_xlabel(r"$t$")
+    ans = np.array([2,nr/5,2*nr/5,3*nr/5,-3])
+
+    for i in xrange(5):
+        ax[i].plot(ts/T, mdots[:,ans[i]], 'k+')
+        ax[i].set_ylabel(r"$\dot{M}$"+r"$(r={0:.1f})$".format(rss[0,ans[i]]))
+    ax[-1].set_xlabel(r"$t$ $(T_{bin})$")
 
     outname = "mdot_mdot.png"
-
     print("Saving {0:s}...".format(outname))
     fig.savefig(outname)
     plt.close(fig)
+
+
     fig, ax = plt.subplots(5, 1, figsize=(20,10))
-    nr = rss.shape[1]
 
-    f0, p0 = signal.periodogram(mdots[ts>=t0,2])
-    f1, p1 = signal.periodogram(mdots[ts>=t0,nr/4])
-    f2, p2 = signal.periodogram(mdots[ts>=t0,nr/2])
-    f3, p3 = signal.periodogram(mdots[ts>=t0,3*nr/4])
-    f4, p4 = signal.periodogram(mdots[ts>=t0,-3])
+    for i in xrange(5):
+        f, p = signal.periodogram(mdots[ts>=t0,ans[i]], fs=fs)
+        ax[i].plot(f, p, 'k+')
+        ax[i].set_ylabel(r"$\mathcal{P}[\dot{M}$"
+                            +r"$(r={0:.1f})]$".format(rss[0,ans[i]]))
 
-    ax[0].plot(f0, p0, 'k+')
-    ax[1].plot(f1, p1, 'k+')
-    ax[2].plot(f2, p2, 'k+')
-    ax[3].plot(f3, p3, 'k+')
-    ax[4].plot(f4, p4, 'k+')
-    ax[4].set_xlabel(r"$\nu$")
+    ax[-1].set_xlabel(r"$f (1/T_{bin})$")
 
     outname = "mdot_periodogram.png"
 

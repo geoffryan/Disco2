@@ -363,7 +363,7 @@ def plot_all(filename, pars, rmax=-1.0, plot=True, bounds=None,
                 quiverData=quiverData, Vmax=Vmax, orbitData=localOrbit, 
                 label=r'$T$', title=title, filename=logTname, cmap=poscmap)
 
-        
+        """
         #Vr
         make_plot(mesh, vr, pars, gridbounds=gridbounds, datscale="linear", 
                 datbounds=bounds[2], rocheData=rocheData, 
@@ -393,6 +393,7 @@ def plot_all(filename, pars, rmax=-1.0, plot=True, bounds=None,
                         quiverData=quiverData, Vmax=Vmax, 
                         orbitData=localOrbit, label=r'$q_{0:d}$'.format(i), 
                         title=title, filename=qname, cmap=poscmap)
+        """
 
     return bounds, Vmax
 
