@@ -4,6 +4,8 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 
+labelsize = 24
+
 blue = (31.0/255, 119.0/255, 180.0/255)
 orange = (255.0/255, 127.0/255, 14.0/255)
 green = (44.0/255, 160.0/255, 44.0/255)
@@ -121,8 +123,8 @@ def disp_plot(datas, name, mode='ABC'):
             add_disp_plot(ax, data, markers[i], colors[i], linestyles[i], 
                             'k', 'C')
 
-    ax.set_xlabel(r'$\mathcal{M}$', fontsize=24)
-    ax.set_ylabel(r'$\tan \theta_S$', fontsize=24)
+    ax.set_xlabel(r'$\mathcal{M}$', fontsize=labelsize)
+    ax.set_ylabel(r'$\tan \theta_S$', fontsize=labelsize)
     ax.set_xscale('linear')
     ax.set_yscale('linear')
     ylim = ax.get_ylim()
@@ -182,9 +184,9 @@ def diss_plot(datas, name):
     ax[0].set_yscale('log')
     ax[1].set_xscale('log')
     ax[1].set_yscale('log')
-    ax[1].set_xlabel(r'$r$ ($M$)', fontsize=24)
-    ax[0].set_ylabel(r'$\psi_Q$', fontsize=24)
-    ax[1].set_ylabel(r'$\langle \dot{Q} \rangle$', fontsize=24)
+    ax[1].set_xlabel(r'$r$ ($M$)', fontsize=labelsize)
+    ax[0].set_ylabel(r'$\psi_Q$', fontsize=labelsize)
+    ax[1].set_ylabel(r'$\langle \dot{Q} \rangle$', fontsize=labelsize)
 
     #ax[0].set_xticklabels([])
     #yticklabels = ax[1].get_yticklabels()
@@ -276,7 +278,6 @@ def dissCorrPlot(data, name):
     fig.savefig(figname)
     plt.close(fig)
 
-
 def torque_plot_single(data, name):
 
     R = data['R']
@@ -310,8 +311,8 @@ def torque_plot_single(data, name):
     ax.set_xlim(floorSig(R.min()), ceilSig(R.max()))
     ax.set_ylim(0,ylim[1])
     ax.set_xscale('log')
-    ax.set_xlabel(r'$r$ $(M)$', fontsize=24)
-    ax.set_ylabel(r'$\tau$', fontsize=24)
+    ax.set_xlabel(r'$r$ $(M)$', fontsize=labelsize)
+    ax.set_ylabel(r'$\tau$', fontsize=labelsize)
 
     legend = ax.legend()
 
@@ -326,6 +327,33 @@ def torque_plot_single(data, name):
     ax.set_xlim(floorSig(R.min()), ceilSig(R.max()))
     fig.savefig("torqfrac.pdf")
     
+def plot_mdot(datas, name):
+
+    N = len(datas)
+    data0 = datas[0]
+    bw = data0['bw']
+    Torb = 2*math.pi / bw
+    t = np.zeros(N)
+    Mdot = np.zeros((N, data0['R'].shape[0]))
+
+    for i, data in enumerate(datas):
+        t[i] = data['T'] / Torb
+        Mdot[i,:] = data['Jr']
+
+    fig, ax = plt.subplots(1,1)
+    ax.plot(t, Mdot[:,2], color=blue, label=r'$\dot{M} (r=r_{in}))$')
+    ax.plot(t, Mdot[:,-3], color=orange, label=r'$\dot{M} (r=r_{out}))$')
+    
+    ax.set_xlabel(r'$t$ $(T_{orb})$', fontsize=labelsize)
+    ax.set_ylabel(r'$\dot{M}$', fontsize=labelsize)
+    ax.set_xscale('linear')
+    ax.set_yscale('log')
+    legend = ax.legend()
+
+    print("Saving " + name + "...")
+    fig.savefig(name)
+    plt.close(fig)
+
 
 def plot_data(data):
 
@@ -405,13 +433,38 @@ if __name__ == "__main__":
     #    data = get_data(fname)
     #    plot_data(data)
 
+    doMdot = False
+    doDisp = False
+    doDiss = False
+    doTorq = False
+
+    if "mdot" in sys.argv:
+        doMdot = True
+        sys.argv.remove("mdot")
+    if "diss" in sys.argv:
+        doMdot = True
+        sys.argv.remove("diss")
+    if "disp" in sys.argv:
+        doMdot = True
+        sys.argv.remove("disp")
+    if "torq" in sys.argv:
+        doMdot = True
+        sys.argv.remove("torq")
+
     datas = []
     for filename in sys.argv[1:]:
         datas.append(get_data(filename))
+    
+    if doDisp:
+        disp_plot(datas, "disp_plot_AC.pdf", 'AC')
+        disp_plot(datas, "disp_plot_BC.pdf", 'BC')
+        disp_plot(datas, "disp_plot_ABC.pdf", 'ABC')
 
-    disp_plot(datas, "disp_plot_AC.pdf", 'AC')
-    disp_plot(datas, "disp_plot_BC.pdf", 'BC')
-    disp_plot(datas, "disp_plot_ABC.pdf", 'ABC')
-    diss_plot(datas, "diss_plot.pdf")
+    if doDiss:
+        diss_plot(datas, "diss_plot.pdf")
 
-    torque_plot_single(datas[0], "torque_plot_single.pdf")
+    if doTorq:
+        torque_plot_single(datas[0], "torque_plot_single.pdf")
+
+    if doMdot:
+        plot_mdot(datas, "mdot_plot.pdf")

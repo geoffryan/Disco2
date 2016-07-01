@@ -5,38 +5,42 @@ import scipy.signal as signal
 import sys
 import numpy as np
 import discopy as dp
+import discoGR as gr
+import discoEOS as eos
+import pickle
 
 yscale = "log"
+
+labelsize = 24
+ticksize = 18
+
+blue = (31.0/255, 119.0/255, 180.0/255)
+orange = (255.0/255, 127.0/255, 14.0/255)
+green = (44.0/255, 160.0/255, 44.0/255)
+red = (214.0/255, 39.0/255, 40.0/255)
+purple = (148.0/255, 103.0/255, 189.0/255)
+brown = (140.0/255, 86.0/255, 75.0/255)
+pink = (227.0/255, 119.0/255, 194.0/255)
+grey = (127.0/255, 127.0/255, 127.0/255)
+yellow = (188.0/255, 189.0/255, 34.0/255)
+teal = (23.0/255, 190.0/255, 207.0/255)
+
+lightblue = (174.0/255, 199.0/255, 232.0/255)
+lightorange = (255.0/255, 187.0/255, 120.0/255)
+lightgreen = (152.0/255, 223.0/255, 138.0/255)
+lightred = (255.0/255, 152.0/255, 150.0/255)
+lightpurple = (197.0/255, 176.0/255, 213.0/255)
+lightbrown = (196.0/255, 156.0/255, 148.0/255)
+lightpink = (247.0/255, 182.0/255, 210.0/255)
+lightgrey = (199.0/255, 199.0/255, 199.0/255)
+lightyellow = (219.0/255, 219.0/255, 141.0/255)
+lightteal = (23.0/255, 190.0/255, 207.0/255)
 
 def horizon(pars):
     M = pars['GravM']
     a = pars['GravA']
     A = M*a
     return M*(1.0 + math.sqrt(1-a*a))
-
-def calc_u0(r, phi, vr, vp, pars):
-
-    M = pars['GravM']
-    a = pars['GravA']
-    A = M*a
-
-    R = r
-    SIG2 = R*R
-    DEL = R*R - 2*M*R + A*A
-    AAA = (R*R+A*A)*(R*R+A*A) - A*A*DEL
-    B = 2*M*R/SIG2
-
-    g00 = -1.0 + 2*M*R/SIG2
-    grr = 1.0 + B
-    gpp = AAA / SIG2
-    g0r = B
-    g0p = -B * A
-    grp = -A * (1.0+B)
-
-    u0 = 1.0/np.sqrt(-g00 - 2*g0r*vr - 2*g0p*vp - grr*vr*vr - gpp*vp*vp
-                     - 2*grp*vr*vp)
-
-    return u0
 
 def calc_mdot(r, phi, z, rho, H, vr, vp, pars):
 
@@ -46,11 +50,10 @@ def calc_mdot(r, phi, z, rho, H, vr, vp, pars):
     RHO = rho[inds]
     HHH = H[inds]
     VR = vr[inds]
-    VP = vp[inds]
-    SIG = 2*RHO[inds]*HHH[inds]
+    VP = vp[inds] + pars['BinW']
+    SIG = RHO[inds]*HHH[inds]
 
-    U0 = calc_u0(r, phi, vr, vp, pars)
-    UR = U0*VR
+    U0, UR, UP = gr.calc_u(RRR, VR, VP, pars)
 
     Rs = np.unique(RRR)
     Mdot = np.zeros(Rs.shape)
@@ -88,6 +91,14 @@ def get_mdot(filename, pars):
     if i == -1:
         i = 2
 
+    if pars['Metric'] == 6 and pars['BoostType'] == 1:
+        t /= 2*np.pi/pars['BinW']
+
+    if pars['BoundTypeSource'] == 6:
+        Mdot0_cgs = pars['BoundPar2'] * eos.M_solar / eos.year
+        Mdot0_code = Mdot0_cgs / (eos.rho_scale * eos.rg_solar**2 * eos.c)
+        mdot /= Mdot0_code
+
     return t, rs, mdot
 
 def plot_mdot(parfile, filenames):
@@ -112,20 +123,27 @@ def plot_mdot(parfile, filenames):
     rss = np.array(rss)
     mdots = np.array(mdots)
 
+    f = open("mdot.dat", "w")
+    pickle.dump({'T':ts, 'R':rss, 'Mdot':mdots, 'pars':pars}, f, protocol=-1)
+    f.close()
+
     plot_io(ts, rss, mdots)
     plot_periodogram(ts, rss, mdots)
 
 def plot_io(ts, rss, mdots):
-    fig = plt.figure()
-    ax = fig.add_subplot(1, 1, 1)
+    fig, ax = plt.subplots(1, 1)
 
-    ax.plot(ts, mdots[:,2], 'k+')
-    ax.plot(ts, mdots[:,-3], 'r+')
-    ax.set_xlabel(r"$t$")
-    ax.set_ylabel(r"$\dot{M}$")
+    ax.plot(ts, mdots[:,2], color=blue, marker='+', ls='',
+            label=r'$\dot{M}(r=r_{in})$')
+    ax.plot(ts, mdots[:,-3], color=orange, marker='x', ls='',
+            label=r'$\dot{M}(r=r_{out})$')
+    ax.set_xlabel(r"$t$ $(T_{bin})$", fontsize=labelsize)
+    ax.set_ylabel(r"$\dot{M}$ $(\dot{M}_{nozzle})$", fontsize=labelsize)
     ax.set_yscale(yscale)
 
-    outname = "mdot.png"
+    legend = ax.legend(fontsize=ticksize)
+
+    outname = "mdot.pdf"
 
     print("Saving {0:s}...".format(outname))
     fig.savefig(outname)
@@ -135,14 +153,13 @@ def plot_periodogram(ts, rss, mdots):
     fig, ax = plt.subplots(5, 1, figsize=(20,10))
     nr = rss.shape[1]
 
-    T = 2*np.pi*1.0e4
-    t0 = 15.0 * T
-    fs = T / (ts[1:]-ts[:-1]).mean()
+    t0 = 15.0
+    fs = 1.0 / (ts[1:]-ts[:-1]).mean()
 
     ans = np.array([2,nr/5,2*nr/5,3*nr/5,-3])
 
     for i in xrange(5):
-        ax[i].plot(ts/T, mdots[:,ans[i]], 'k+')
+        ax[i].plot(ts, mdots[:,ans[i]], 'k+')
         ax[i].set_ylabel(r"$\dot{M}$"+r"$(r={0:.1f})$".format(rss[0,ans[i]]))
     ax[-1].set_xlabel(r"$t$ $(T_{bin})$")
 
