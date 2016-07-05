@@ -24,6 +24,7 @@ orange = (255.0/255, 127.0/255, 14.0/255)
 green = (44.0/255, 160.0/255, 44.0/255)
 red = (214.0/255, 39.0/255, 40.0/255)
 purple = (148.0/255, 103.0/255, 189.0/255)
+brown = (140.0/255, 86.0/255, 75.0/255)
 
 def allTheThings(filename, pars):
 
@@ -1507,6 +1508,7 @@ def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi,
     gam = pars['Adiabatic_Index']
     a = pars['BinA']
     M1 = pars['BinM']
+    M = pars['GravM']
 
     g00, g0r, g0p, grr, grp, gpp = gr.calc_g(r, pars)
     ur = u0*vr
@@ -1552,9 +1554,11 @@ def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi,
     T = np.zeros(Rs.shape)
     Om = np.zeros(Rs.shape)
 
+    L0 = np.sqrt(M*Rs / (1-3*M/Rs))
+    dL0dr = 0.5*(1.0 - 1.0 / (1-3*M/Rs) * 3*M/Rs) * L0 / Rs
+
     for i,R in enumerate(Rs):
         ind = (r==R)
-        L[i] = (l[ind]*dphi[ind]).sum() / (2*math.pi)
         Om[i] = (up[ind]*dphi[ind]).sum() / (2*math.pi)
         J[i] = (j[ind]*dphi[ind]).sum()
         F[i] = (f[ind]*dphi[ind]).sum()
@@ -1563,6 +1567,8 @@ def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi,
         Qdotc[i] = (qdotc[ind]*dphi[ind]).sum()
         T[i] = (t[ind]*dphi[ind]).sum()
         Cool[i] = (R*cool[ind]*dphi[ind]).sum()
+
+    L = J / D
 
     fig, ax = plt.subplots(2,3, figsize=(12,9))
     ax[0,0].plot(Rs, L, 'k+')
@@ -1609,12 +1615,20 @@ def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi,
     AMdiss = np.zeros(Rs.shape)
     AMcool = np.zeros(Rs.shape)
     AMtorq = np.zeros(Rs.shape)
+    AMgrad = np.zeros(Rs.shape)
 
     dLdR = (L[2:]-L[:-2]) / (Rs[2:]-Rs[:-2])
+    dMdotdR = (Mdot[2:]-Mdot[:-2]) / (Rs[2:]-Rs[:-2])
     AMmdot[1:-1] = Mdot[1:-1] * dLdR
     AMdiss[1:-1] = ((F-Mdot*L)[2:] - (F-Mdot*L)[:-2]) / (Rs[2:]-Rs[:-2])
     AMcool[:] = Qdotc[:]
     AMtorq[:] = T[:]
+    AMgrad[1:-1] = L[1:-1] * dMdotdR
+
+    #AMmdot[:] = Mdot * dL0dr
+    #AMdiss[1:-1] = ((F-Mdot*L0)[2:] - (F-Mdot*L0)[:-2]) / (Rs[2:]-Rs[:-2])
+    #AMgrad[1:-1] = L0[1:-1] * dMdotdR
+
     if shockDissDat is not None:
         AMdqdr = np.zeros(Rs.shape)
         dOm = (Om[2:] - Om[:-2]) / (Rs[2:] - Rs[:-2])
@@ -1701,6 +1715,11 @@ def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi,
                 label=r"$\partial_r \delta \langle T^r_\phi \rangle$")
     ax.plot(Rs, AMdiss-AMcool-AMtorq, marker='+', ms=10, mew=2, color=green,
                 ls='', label=r"$\partial_r \delta \langle T^r_\phi \rangle - \langle f_\phi \rangle$")
+    #ax.plot(Rs, AMdiss-AMcool-AMtorq+AMgrad, marker='+', ms=10, mew=2, 
+    #            color=purple,
+    #            ls='', label=r"$\partial_r \delta \langle T^r_\phi \rangle - \langle f_\phi \rangle +  \langle \ell \rangle \partial_r \langle \dot{M} \rangle$")
+    #ax.plot(Rs,-AMmdot+AMgrad, marker='+', ms=10, mew=2, color=brown, ls='',
+    #            label=r"$\dot{M} \partial_r \langle h u_\phi \rangle +  \langle \ell \rangle \partial_r \langle \dot{M} \rangle$")
     """
     ax.plot(Riph,-AMmdot, marker='+', ms=10, mew=2, color='k', 
                 label=r"$\dot{M} \partial_r \langle h u_\phi \rangle$")
@@ -1714,7 +1733,8 @@ def angular_momentum_flux_plot(r, sig, pi, u0, vr, vp, phi, dphi,
         ax.plot(Rs[2:-2], AMdqdr, marker='+', ms=10, mew=2, ls='',
                     color=orange, label=r"shock $\left (\partial F_J / \partial r\right)_{local}$")
     ax.set_xlim(r.min(), r.max())
-    ax.set_ylim(ylim)
+    #ax.set_ylim(ylim)
+    ax.set_ylim(-1,6)
     ax.set_xlabel(r"$r (M)$")
     ax.set_ylabel("Angular Momentum Flux")
     ax.set_xscale("log")

@@ -3,6 +3,8 @@ import pickle
 import math
 import numpy as np
 import matplotlib.pyplot as plt
+import discoGR as gr
+import discoEOS as eos
 
 labelsize = 24
 
@@ -43,13 +45,6 @@ def get_data(filename):
 
     return data
 
-def calc_u0(R, vr, vp, M, bw):
-
-    u0 = 1.0 / np.sqrt(1.0 - 2*M/R - 4*M/R*vr - (1+2*M/R)*vr*vr
-                        - R*R*(bw+vp)*(bw+vp))
-
-    return u0
-
 def add_disp_plot(ax, data, marker, mc, ls, lc, mode='ABC'):
     
     R = data['R']
@@ -64,11 +59,18 @@ def add_disp_plot(ax, data, marker, mc, ls, lc, mode='ABC'):
     phiSB = data['phiSb']
     
     cs2 = gam*pi/sig
+    lapse = 1.0/np.sqrt(1+2*M/R)
+    pars = {'Metric': 6,
+            'GravM': M,
+            'GravA': 0.0,
+            'BoostType': 1,
+            'BinW': bw,
+            'BinA': data['ba'],
+            'BinM': data['M2']}
+            
+    u0, ur, up = gr.calc_u(R, vr, vp, pars)
 
-    alpha = 1.0/np.sqrt(1+2*M/R)
-    u0 = calc_u0(R, vr, vp, M, bw)
-
-    w = alpha*u0
+    w = lapse*u0
     u2 = w*w-1.0
     v2 = 1.0 - 1.0/(w*w)
 
@@ -93,8 +95,8 @@ def add_disp_plot(ax, data, marker, mc, ls, lc, mode='ABC'):
 
     tpA = -1.0 / (dpdrA * RA[1:-1])
     tpB = -1.0 / (dpdrB * RB[1:-1])
-    tpWKBrel = 1.0 / (relMach * np.sqrt((1-2*M/R)*((1-bw/vp)*(1-bw/vp)
-                        - 0.25*(1-6*M/R)/(1-2*M/R))))
+    tpWKBrel = 1.0 / (relMach * np.sqrt((1-2*M/R)*((1-bw/(vp+bw))*(1-bw/(vp+bw))
+                        - 0.25*(1-6*M/R))))
 
     if marker == '+':
         mew=2
@@ -198,6 +200,95 @@ def diss_plot(datas, name):
     fig.savefig(name)
     plt.close(fig)
 
+def diss_plot_single(data, name):
+
+    fig, ax = plt.subplots(3,1, sharex=True, figsize=(9,9))
+
+    R = data['R']
+    Rmin = R.min()
+    Rmax = R.max()
+    
+    gam = data['gam']
+    siga = data['siga']
+    pia = data['pia']
+    sigb = data['sigb']
+    pib = data['pib']
+
+    sa = np.log(pia * np.power(siga, -gam)) / (gam-1.0)
+    sb = np.log(pib * np.power(sigb, -gam)) / (gam-1.0)
+
+    dsa = sa[:,1] - sa[:,0]
+    dsb = sb[:,1] - sb[:,0]
+
+    psiqa = data['psiQa']
+    psiqb = data['psiQb']
+    dQdra = data['dQdra']
+    dQdrb = data['dQdrb']
+    dCool = data['dCool']
+
+    M = data['M']
+    Mdot0_cgs = data['Mdot'] * eos.M_solar / eos.year
+    Mdot0 = Mdot0_cgs / (eos.rho_scale * eos.rg_solar**2 * eos.c)
+
+    ri = 6*M
+    C = 6.0e-2
+    Pfunc = 1 - np.sqrt(ri/R) + np.sqrt(3*M/R)*(
+            np.arctanh(np.sqrt(3*M/R)) - np.arctanh(np.sqrt(3*M/ri)))
+    QNTr = 3*data['Jr'] / (4*np.pi) * (M/(R*R*R)) / (1-3*M/R) * Pfunc
+    QNT = 3*(0.75*Mdot0) / (4*np.pi) * (M/(R*R*R)) / (1-3*M/R) * Pfunc
+    QNTc = 3*(0.75*Mdot0) / (4*np.pi) * (M/(R*R*R)) / (1-3*M/R) * (Pfunc
+            + C/np.sqrt(R))
+
+    ds = dsa+dsb
+    psiq = psiqa + psiqb
+    dqdr = dQdra + dQdrb
+
+    marker = '+'
+    mew = 2
+
+    ax[0].plot(R, dsa, marker=marker, color=blue, mew=mew, ls='')
+    ax[0].plot(R, dsb, marker=marker, color=orange, mew=mew, ls='')
+    ax[1].plot(R, psiqa, marker=marker, color=blue, mew=mew, ls='')
+    ax[1].plot(R, psiqb, marker=marker, color=orange, mew=mew, ls='')
+    ax[2].plot(R, dQdra, marker=marker, color=blue, mew=mew, ls='', 
+                label=r'$\dot{Q}_{irr,A}$')
+    ax[2].plot(R, dQdrb, marker=marker, color=orange, mew=mew, ls='',
+                label=r'$\dot{Q}_{irr,B}$')
+    ax[2].plot(R, dqdr, marker=marker, color='k', mew=mew, ls='',
+                label=r'$\langle \dot{Q}_{irr} \rangle$')
+    ax[2].plot(R, dCool, marker=marker, color=green, mew=mew, ls='',
+                label=r'$\langle \dot{Q}_{cool} \rangle$')
+    ax[2].plot(R, 2*np.pi*R*QNT, marker='', color='grey', ls='-', lw=4,
+                label=r'$\langle \dot{Q}_{NT} \rangle$', alpha=0.75)
+    #ax[2].plot(R, 2*np.pi*R*QNTc, marker='', color='grey', ls='--', lw=4,
+    #            label=r'$\langle \dot{Q}_{NT} \rangle$', alpha=0.75)
+    #ax[2].plot(R, QNT, marker='', color='grey', ls='-', lw=2,
+    #            label=r'$\langle \dot{Q}_{NT} \rangle$')
+    #ax[2].plot(R, QNTr, marker='', color='grey', ls='-.', lw=2,
+    #            label=r'$\langle \dot{Q}_{NT} \rangle$')
+    #ax[2].plot(R, 2*np.pi*R*QNTr, marker='', color='grey', ls=':', lw=2,
+    #            label=r'$\langle \dot{Q}_{NT} \rangle$')
+
+    ax[0].set_xlim(floorSig(Rmin), ceilSig(Rmax))
+    ax[1].set_xlim(floorSig(Rmin), ceilSig(Rmax))
+    ax[2].set_xlim(floorSig(Rmin), ceilSig(Rmax))
+    ax[0].set_xscale('log')
+    ax[0].set_yscale('log')
+    ax[1].set_xscale('log')
+    ax[1].set_yscale('log')
+    ax[2].set_xscale('log')
+    ax[2].set_yscale('log')
+    ax[2].set_xlabel(r'$r$ ($M$)', fontsize=labelsize)
+    ax[0].set_ylabel(r'$\Delta s$', fontsize=labelsize)
+    ax[1].set_ylabel(r'$\psi_Q$', fontsize=labelsize)
+    ax[2].set_ylabel(r'$\langle \dot{Q} \rangle$', fontsize=labelsize)
+
+    legend = ax[2].legend()
+
+    print("Saving " + name + "...")
+    fig.savefig(name)
+    plt.close(fig)
+
 def dissCorrPlot(data, name):
 #(r, sig, pi, vr, vp, u0, shockDissDat, pars, name):
 
@@ -208,7 +299,10 @@ def dissCorrPlot(data, name):
     pars = {'Metric': 6,
             'GravM': M,
             'GravA': 0.0,
-            'BinW': bw}
+            'BoostType': 1,
+            'BinW': bw,
+            'BinA': data['ba'],
+            'BinM': data['M2']}
 
     phiSa = data['phiSa']
     phiSb = data['phiSb']
@@ -230,8 +324,15 @@ def dissCorrPlot(data, name):
     dpdrb[1:-1] = (phiSb[2:,0]-phiSb[:-2,0]) / (R[2:] - R[:-2])
     
     g00, g0r, g0p, grr, grp, gpp = gr.calc_g(R, pars)
-    u0A = calc_u0(R, vrA, vpA, M, bw)
-    u0B = calc_u0(R, vrB, vpB, M, bw)
+    pars = {'Metric': 6,
+            'GravM': M,
+            'GravA': 0.0,
+            'BoostType': 1,
+            'BinW': bw,
+            'BinA': data['ba'],
+            'BinM': data['M2']}    
+    u0A, urA, upA = gr.calc_u(R, vrA, vpA, pars)
+    u0B, urB, upB = gr.calc_u(R, vrB, vpB, pars)
 
     dgam = grr*gpp-grp*grp
 
@@ -287,13 +388,28 @@ def torque_plot_single(data, name):
     Tcool = data['Tcool']
     Tpsiq = data['Tpsiq']
     qdot = data['dQdra'] + data['dQdrb']
+    l = data['l']
+    Jr = -data['Jr']
+    qdot = data['dQdra'] + data['dQdrb']
+    qdot = data['dQdra'] + data['dQdrb']
     vp = data['vp']
     vr = data['vr']
     M = data['M']
     bw = data['bw']
+
+    pars = {'Metric': 6,
+            'GravM': M,
+            'GravA': 0.0,
+            'BoostType': 1,
+            'BinW': bw,
+            'BinA': data['ba'],
+            'BinM': data['M2']}
     
-    u0 = calc_u0(R, vr, vp, M, bw)
-    up = u0*vp
+    u0, ur, up = gr.calc_u(R, vr, vp, pars)
+
+    Tgrad = np.zeros(R.shape)
+    dJrdR = (Jr[2:] - Jr[:-2]) / (R[2:] - R[:-2])
+    Tgrad[1:-1] = l[1:-1] * dJrdR
 
     fig, ax = plt.subplots(1,1)
     ax.plot(R, Tmdot, color='k', marker='+', mew=2, ms=10, ls='',
@@ -302,6 +418,8 @@ def torque_plot_single(data, name):
             label=r'$-\tau_{Re}$')
     ax.plot(R, -(Tre+Text+Tcool), color=green, marker='+', mew=2, ms=10, ls='',
             label=r'$-\tau_{Re}-\tau_{ext}-\tau_{cool}$')
+    #ax.plot(R, -(Tre+Text+Tcool+Tgrad), color=purple, marker='+', mew=2, ms=10,
+    #        ls='', label=r'$-\tau_{Re}-\tau_{ext}-\tau_{cool} - \tau_{grad}$')
     ylim = ax.get_ylim()
     ax.plot(R, -Tpsiq, color=orange, marker='+', mew=2, ms=10, ls='',
             label=r'$-\tau_{loc}$')
@@ -326,10 +444,73 @@ def torque_plot_single(data, name):
     ax.set_ylim([0,1])
     ax.set_xlim(floorSig(R.min()), ceilSig(R.max()))
     fig.savefig("torqfrac.pdf")
-    
+
+def plot_decomTest(data, name):
+
+    R = data['R']
+    M = data['M']
+    l = data['l']
+    vp = data['vp']
+    sig = data['sig']
+    pi = data['pi']
+
+    vp_kep_newt = np.sqrt(M/(R*R*R))
+    vp_kep_rel = np.sqrt(M/(R*R*R))
+    l_kep_newt = np.sqrt(M*R)
+    l_kep_rel = np.sqrt(M*R) / np.sqrt(1-3*M/R)
+
+    fig, ax = plt.subplots(2,2,sharex=True)
+    ax[0,0].plot(R, vp, ls='', color=blue, marker='+')
+    ax[0,0].plot(R, vp_kep_rel, ls='-', color=orange)
+    ax[0,1].plot(R, (vp-vp_kep_rel) / vp_kep_rel, ls='', color=blue, 
+                        marker='+')
+    ax[0,1].plot(R, (vp_kep_rel-vp_kep_rel) / vp_kep_rel, ls='-', color=orange)
+
+    ax[1,0].plot(R, l, ls='', color=blue, marker='+')
+    ax[1,0].plot(R, l_kep_rel, ls='-', color=orange)
+    ax[1,1].plot(R, (l-l_kep_rel) / l_kep_rel, ls='', color=blue, 
+                        marker='+')
+    ax[1,1].plot(R, (l_kep_rel-l_kep_rel) / l_kep_rel, ls='-', color=orange)
+
+    ax[0,0].set_xscale('log')
+    ax[0,1].set_xscale('log')
+    ax[1,0].set_xscale('log')
+    ax[1,1].set_xscale('log')
+    ax[0,0].set_yscale('log')
+    ax[1,0].set_yscale('log')
+    ax[0,0].set_xlim(floorSig(R.min()), ceilSig(R.max()))
+    ax[0,1].set_xlim(floorSig(R.min()), ceilSig(R.max()))
+    ax[1,0].set_xlim(floorSig(R.min()), ceilSig(R.max()))
+    ax[1,1].set_xlim(floorSig(R.min()), ceilSig(R.max()))
+
+    print("Saving " + name + "...")
+    fig.savefig(name)
+    plt.close(fig)
+
+def plot_mdot_single(data, name):
+
+    R = data['R']
+    Mdot = data['Jr']
+    Mdot0_cgs = data['Mdot'] * eos.M_solar / eos.year
+    Mdot0 = Mdot0_cgs / (eos.rho_scale * eos.rg_solar**2 * eos.c)
+
+    fig, ax = plt.subplots(2,1)
+    ax[0].plot(R, Mdot, '+', color=blue)
+    ax[1].plot(R, Mdot/Mdot0, '+', color=blue)
+
+    ax[0].set_xscale('log')
+    ax[1].set_xscale('log')
+
+    print("Saving " + name + "...")
+    fig.savefig(name)
+    plt.close(fig)
+
+
 def plot_mdot(datas, name):
 
     N = len(datas)
+    if N == 1:
+        return
     data0 = datas[0]
     bw = data0['bw']
     Torb = 2*math.pi / bw
@@ -437,19 +618,23 @@ if __name__ == "__main__":
     doDisp = False
     doDiss = False
     doTorq = False
+    doTest = False
 
     if "mdot" in sys.argv:
         doMdot = True
         sys.argv.remove("mdot")
     if "diss" in sys.argv:
-        doMdot = True
+        doDiss = True
         sys.argv.remove("diss")
     if "disp" in sys.argv:
-        doMdot = True
+        doDisp = True
         sys.argv.remove("disp")
     if "torq" in sys.argv:
-        doMdot = True
+        doTorq = True
         sys.argv.remove("torq")
+    if "test" in sys.argv:
+        doTest = True
+        sys.argv.remove("test")
 
     datas = []
     for filename in sys.argv[1:]:
@@ -462,9 +647,14 @@ if __name__ == "__main__":
 
     if doDiss:
         diss_plot(datas, "diss_plot.pdf")
+        diss_plot_single(datas[0], "diss_plot_single.pdf")
 
     if doTorq:
         torque_plot_single(datas[0], "torque_plot_single.pdf")
 
     if doMdot:
         plot_mdot(datas, "mdot_plot.pdf")
+        plot_mdot_single(datas[0], "mdot_plot_single.pdf")
+
+    if doTest:
+        plot_decomTest(datas[0], "test_plot.pdf")
