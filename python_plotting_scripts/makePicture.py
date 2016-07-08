@@ -60,7 +60,7 @@ class RayData:
         line11 = f.readline()  # azimuth: ?
         f.close()
         self.mode = int(line2.split(':')[1])
-        self.inc = float(line10.split(':')[1])
+        self.inc = (math.pi/180.0) * float(line10.split(':')[1])
 
         dat = np.loadtxt(rayfile, skiprows=12)
         xi = dat[:,2]
@@ -370,32 +370,37 @@ if __name__ == "__main__":
         #gNT = genNTgrid(pars, 8*Mdot, 0.1*alpha, gam) 
         #FnuNT4 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
 
+        Nrot = 8
+
         for i,chkpt in enumerate(chkfiles):
             g.loadCheckpoint(chkpt)
             
-            Fnu = makeSpectrum(g, rays, nus, D=1.0, redshift='yes')
+            for n in xrange(Nrot):
+                Fnu = makeSpectrum(g, rays, nus, D=1.0, redshift='yes')
+                rays.rotate(2*np.pi/Nrot)
 
-            fig, ax = plt.subplots()
-            ax.plot(nus/1000.0, Fnu / (h*nus), 'k+')
-            ax.set_xscale("log")
-            ax.set_yscale("log")
-            ylim = ax.get_ylim()
+                fig, ax = plt.subplots()
+                ax.plot(nus/1000.0, Fnu / (h*nus), 'k+')
+                ax.set_xscale("log")
+                ax.set_yscale("log")
+                ylim = ax.get_ylim()
 
-            if FnuNT1 is not None:
-                ax.plot(nus/1000.0, FnuNT1 / (h*nus), lw=10.0, color=blue,
-                            alpha=0.5)
-                ax.plot(nus/1000.0, FnuNT2 / (h*nus), lw=10.0, color=orange,
-                            alpha=0.5)
-                ax.plot(nus/1000.0, FnuNT3 / (h*nus), lw=10.0, color=green,
-                            alpha=0.5)
-         #       ax.plot(nus/1000.0, FnuNT4 / (h*nus), lw=10.0, color=red,
-         #                   alpha=0.5)
-            ax.set_ylim(ylim)
-            ax.set_xlabel(r"$\nu$ ($keV$)")
-            ax.set_ylabel(r"$F_\nu / h\nu$ ($cts/cm^2 s Hz$)")
-            ax.set_title(chkpt)
-            fig.savefig("{0:s}_spectrum_{1:d}.png".format(prefix, i))
-            plt.close()
+                if FnuNT1 is not None:
+                    ax.plot(nus/1000.0, FnuNT1 / (h*nus), lw=10.0, 
+                            color=blue, alpha=0.5)
+                    ax.plot(nus/1000.0, FnuNT2 / (h*nus), lw=10.0, 
+                            color=orange, alpha=0.5)
+                    ax.plot(nus/1000.0, FnuNT3 / (h*nus), lw=10.0, 
+                            color=green, alpha=0.5)
+             #       ax.plot(nus/1000.0, FnuNT4 / (h*nus), lw=10.0, 
+             #                  color=red, alpha=0.5)
+                ax.set_ylim(ylim)
+                ax.set_xlabel(r"$\nu$ ($keV$)")
+                ax.set_ylabel(r"$F_\nu / h\nu$ ($cts/cm^2 s Hz$)")
+                ax.set_title(chkpt)
+                fig.savefig("{0:s}_spectrum_{1:03d}_{2:03d}.png".format(
+                                prefix,i,n))
+                plt.close()
 
     elif mode == "lightcurve":
         nus = np.logspace(2.0, 4.0, base=10.0, num=3)
