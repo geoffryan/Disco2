@@ -396,6 +396,7 @@ def torque_plot_single(data, name):
     vr = data['vr']
     M = data['M']
     bw = data['bw']
+    D = data['J0']
 
     pars = {'Metric': 6,
             'GravM': M,
@@ -418,8 +419,6 @@ def torque_plot_single(data, name):
             label=r'$-\tau_{Re}$')
     ax.plot(R, -(Tre+Text+Tcool), color=green, marker='+', mew=2, ms=10, ls='',
             label=r'$-\tau_{Re}-\tau_{ext}-\tau_{cool}$')
-    #ax.plot(R, -(Tre+Text+Tcool+Tgrad), color=purple, marker='+', mew=2, ms=10,
-    #        ls='', label=r'$-\tau_{Re}-\tau_{ext}-\tau_{cool} - \tau_{grad}$')
     ylim = ax.get_ylim()
     ax.plot(R, -Tpsiq, color=orange, marker='+', mew=2, ms=10, ls='',
             label=r'$-\tau_{loc}$')
@@ -436,6 +435,31 @@ def torque_plot_single(data, name):
 
     print("Saving " + name + "...")
     fig.savefig(name)
+    plt.close(fig)
+    
+    fig, ax = plt.subplots(1,1)
+    ax.plot(R, Tmdot/D, color='k', marker='+', mew=2, ms=10, ls='',
+            label=r'$\tau_{\dot{M}}$')
+    ax.plot(R, -Tre/D, color=blue, marker='+', mew=2, ms=10, ls='',
+            label=r'$-\tau_{Re}$')
+    ax.plot(R, -(Tre+Text+Tcool)/D, color=green, marker='+', mew=2, ms=10, ls='',
+            label=r'$-\tau_{Re}-\tau_{ext}-\tau_{cool}$')
+    ylim = ax.get_ylim()
+    ax.plot(R, -Tpsiq/D, color=orange, marker='+', mew=2, ms=10, ls='',
+            label=r'$-\tau_{loc}$')
+    ax.plot(R, qdot/vp/D, color=red, marker='+', mew=2, ms=10, ls='',
+            label=r'$-\tau_{glob}$')
+
+    ax.set_xlim(floorSig(R.min()), ceilSig(R.max()))
+    ax.set_ylim(0,ylim[1])
+    ax.set_xscale('log')
+    ax.set_xlabel(r'$r$ $(M)$', fontsize=labelsize)
+    ax.set_ylabel(r'$\tau / D$', fontsize=labelsize)
+
+    legend = ax.legend()
+
+    print("Saving " + "specific_"+name + "...")
+    fig.savefig("specific_"+name)
     plt.close(fig)
 
     fig, ax = plt.subplots(1,1)

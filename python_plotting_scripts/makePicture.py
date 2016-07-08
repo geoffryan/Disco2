@@ -30,20 +30,42 @@ class RayData:
 
     X = None
     U = None
+    xi = None
     ixy = None
     extent = None
     nx = -1
     ny = -1
     M = -1.0
+    mode = 0
+    inc = 0.0
 
     def __init__(self, rayfile, M=1.0):
         self.loadRayfile(rayfile, M)
 
     def loadRayfile(self, rayfile, M):
         print("Loading Rays")
-        dat = np.loadtxt(rayfile)
+
+        f = open(rayfile, "r")
+        line0 = f.readline()  # ### Input Params ###
+        line1 = f.readline()  # Metric: ? 
+        line2 = f.readline()  # Grid: ?
+        line3 = f.readline()  # N1: ?
+        line4 = f.readline()  # N2: ?
+        line5 = f.readline()  # X1a: ?
+        line6 = f.readline()  # X1b: ?
+        line7 = f.readline()  # X2a: ?
+        line8 = f.readline()  # X2b: ?
+        line9 = f.readline()  # distance: ?
+        line10 = f.readline()  # inclination: ?
+        line11 = f.readline()  # azimuth: ?
+        f.close()
+        self.mode = int(line2.split(':')[1])
+        self.inc = float(line10.split(':')[1])
+
+        dat = np.loadtxt(rayfile, skiprows=12)
         xi = dat[:,2]
         yi = dat[:,3]
+        self.xi = dat[:,2:4]
         self.X = dat[:,12:16]
         self.U = dat[:,16:20]
         self.ixy = dat[:,0:2].astype(np.int64)
@@ -60,29 +82,38 @@ class RayData:
         self.nx = self.ixy[:,0].max()+1
         self.ny = self.ixy[:,1].max()+1
 
+    def rotate(self, phi):
+        self.X[:,3] += phi
 
-def getTz(g, rays):
 
-    shape = (rays.nx, rays.ny)
+def getTz(g, rays, massScale=1.0):
+#Returns the effective temperature (in the comoving frame) at the source of 
+# each ray and the redshift between the source (in the comoving frame) and 
+# the end point of the ray.  massScale is the mass of the central BH in solar 
+# masses, it provides a weak scaling on T: Teff ~ M_BH^-1/8. massScale can be
+# different than the DISCO mass, which is assumed to be 1 M_solar.
+
+    shape = (rays.X.shape[0],)
 
     Tmap = np.zeros(shape)
     zmap = np.zeros(shape)
 
-    for ind,ij in enumerate(rays.ixy):
-        i = ij[0]
-        j = ij[1]
+    #for ind,ij in enumerate(rays.ixy):
+    for i in xrange(shape[0]):
+        #i = ij[0]
+        #j = ij[1]
         # if ray hit horizon, T & z are zero.
-        if rays.U[ind,0] == 0:
-            Tmap[i,j] = -1.0
-            zmap[i,j] = -1.0
+        if rays.U[i,0] == 0:
+            Tmap[i] = -1.0
+            zmap[i] = -1.0
             continue
 
-        R = rays.X[ind,1]
-        Phi = rays.X[ind,3]
+        R = rays.X[i,1]
+        Phi = rays.X[i,3]
         ir = np.searchsorted(g.rFaces, R) - 1
         if ir >= g.nr_tot or ir < 0:
-            Tmap[i,j] = -1.0
-            zmap[i,j] = -1.0
+            Tmap[i] = -1.0
+            zmap[i] = -1.0
             continue
         shift = np.argmin(g.pFaces[0][ir])
         piph = np.roll(g.pFaces[0][ir], -shift)
@@ -104,25 +135,23 @@ def getTz(g, rays):
 
         Tc = pi/sig * mp*c*c
         qdot = 4*sb * Tc*Tc*Tc*Tc / (3*ka_bbes*sig * rho_scale*r_scale)
-        Tmap[i,j] = math.pow(qdot/sb, 0.25)
+        Tmap[i] = math.pow(qdot/sb, 0.25)
         
         #print ir, ip
         #print Tc
 
         u0, ur, up = gr.calc_u(R, vr, vp, g._pars)
-        ut = 0.0
-        if g._pars['BoostType'] == 1:
-            bw = g._pars['BinW']
-            up += bw*u0
 
-        #u0 = 1.0/math.sqrt(1.0-2*M/R-4*M/R*vr-(1+2*M/R)*vr*vr-R*R*vp*vp)
-        #ur = u0*vr
-        #ut = 0.0
-        #up = u0*vp
-        U0 = rays.U[ind,0]
-        UR = rays.U[ind,1]
-        UT = rays.U[ind,2]
-        UP = rays.U[ind,3]
+        if g._pars['Metric'] == 6 and g._pars['BoostType'] == 1:
+            binW = g._pars['BinW']
+            up += u0*binW
+
+        ut = 0.0
+
+        U0 = rays.U[i,0]
+        UR = rays.U[i,1]
+        UT = rays.U[i,2]
+        UP = rays.U[i,3]
 
         #u2 = (-1+2*M/R)*u0*u0 + 4*M/R*u0*ur + (1+2*M/R)*ur*ur + R*R*up*up
         #U2 = (-1-2*M/R)*U0*U0 + 4*M/R*U0*UR + (1-2*M/R)*UR*UR \
@@ -130,8 +159,10 @@ def getTz(g, rays):
         #print u2, U2
 
         z1 = -(u0*U0 + ur*UR + ut*UT + up*UP)
-        zmap[i,j] = 1.0/z1
+        zmap[i] = 1.0/z1
         #print z1
+
+    Tmap *= math.pow(massScale, -1.0/8.0)
 
     return Tmap, zmap
 
@@ -139,6 +170,7 @@ def specificIntensity(Tmap, zmap, nu):
     # Calculates specific Intensity given source temperatues and redshifts
     # for each image pixel.  Assumes temperature is in ergs, nu is in eV
     # and returns I_\nu in cgs: erg/cm^2 s Hz ster.
+
 
     #Effective Temp in eV
     T = Tmap * zmap * eV
@@ -151,8 +183,8 @@ def specificIntensity(Tmap, zmap, nu):
     nu = np.atleast_1d(nu)
 
     if len(nu) > 1:
-        Inu = 2*(nu*nu*nu)[:,None,None] / (
-                np.exp(nu[:,None,None]/T[None,:,:])-1.0)
+        Inu = 2*(nu*nu*nu)[:,None] / (
+                np.exp(nu[:,None]/T[None,:])-1.0)
         for i in xrange(len(nu)):
             Inu[i][Tmap==-1.0] = 0.0
     else:
@@ -161,21 +193,21 @@ def specificIntensity(Tmap, zmap, nu):
 
     return Inu/(eV*eV*eV*h*h*c*c)
 
-def makeImage(g, rays, nus, redshift='yes'):
+def makeImage(g, rays, nus, redshift='yes', massScale=1.0):
 
     print("Generating Temperature and redshift maps")
-    Tmap, zmap = getTz(g, rays)
+    Tmap, zmap = getTz(g, rays, massScale=massScale)
 
     if redshift == 'no':
-        zmap[:,:] = 1.0
+        zmap[:] = 1.0
 
     print("Generating intensity map")
     Inus = specificIntensity(Tmap, zmap, nus)
 
     #Transform images into screen coordinates, origin at top left.
-    Inus = np.transpose(Inus, (0,2,1))[:,:,::-1]
+    #Inus = np.transpose(Inus, (0,2,1))[:,:,::-1]
     
-    return Inus
+    return rays.xi, Inus
 
 def makePicture(g, rays, numin, numax, redshift='yes'):
 
@@ -207,10 +239,10 @@ def makePicture(g, rays, numin, numax, redshift='yes'):
     
     return pic
 
-def makeSpectrum(g, rays, nus, D=1.0, redshift='yes'):
+def makeSpectrum(g, rays, nus, D=1.0, redshift='yes', massScale=1.0):
 
     print("Generating Temperature and redshift maps")
-    Tmap, zmap = getTz(g, rays)
+    Tmap, zmap = getTz(g, rays, massScale=massScale)
 
     if redshift == 'no':
         zmap[:,:] = 1.0
@@ -219,13 +251,38 @@ def makeSpectrum(g, rays, nus, D=1.0, redshift='yes'):
 
     print("Generating intensity maps")
 
-    dx = (rays.extent[1]-rays.extent[0]) / (rays.nx-1)
-    dy = (rays.extent[3]-rays.extent[2]) / (rays.ny-1)
-    dA = dx*dy
+    if rays.mode == 0:
+        dx = (rays.extent[1]-rays.extent[0]) / (rays.nx-1)
+        dy = (rays.extent[3]-rays.extent[2]) / (rays.ny-1)
+        dA = dx*dy
 
-    for i,nu in enumerate(nus):
-        Inu = specificIntensity(Tmap, zmap, nu)
-        Fnu[i] = (Inu * dA).sum() / (D*D*kpc*kpc)
+        for i,nu in enumerate(nus):
+            Inu = specificIntensity(Tmap, zmap, nu)
+            Fnu[i] = (Inu * dA).sum() / (D*D*kpc*kpc)
+
+    elif rays.mode == 1:
+        Nr = rays.nx
+        Np = rays.ny
+        ra = rays.xi[0,0]
+        rb = rays.xi[(Nr-1)*Np,0]
+
+        R = ra * np.power(rb/ra, np.arange(Nr) / float(Nr-1))
+
+        print ra, rb
+        
+        Inu = specificIntensity(Tmap, zmap, nus)
+        print Inu.shape
+        Inu.resize((len(nus), Nr, Np))
+        print Inu.shape
+        Inup = Inu.sum(axis=2) * 2.0*np.pi/Np
+        print Inup.shape
+
+        Inurp = 0.5*(R[None,:-1]*Inup[:,:-1]+R[None,1:]*Inup[:,1:])
+        print Inurp.shape
+        dR = R[1:] - R[:-1]
+
+        Fnu = (Inurp[:,:]*dR[None,:]).sum(axis=1) * (
+                math.cos(rays.inc) / (D*D*kpc*kpc))
 
     return Fnu
 
@@ -297,22 +354,21 @@ if __name__ == "__main__":
     rays = RayData(rayfile, g._pars["GravM"])
    
     if mode == "spectrum":
-        nus = np.logspace(2.0, 5.0, base=10.0, num=1000)
-
+        nus = np.logspace(0.0, 5.0, base=10.0, num=100)
 
         FnuNT1 = None
 
-        Mdot = 15.0
+        Mdot = 0.3
         alpha = 0.01
         gam = 5.0/3.0
         gNT = genNTgrid(pars, Mdot, alpha, gam) 
         FnuNT1 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
-        gNT = genNTgrid(pars, 2*Mdot, alpha, gam) 
+        gNT = genNTgrid(pars, 10*Mdot, alpha, gam) 
         FnuNT2 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
-        gNT = genNTgrid(pars, Mdot, 0.1*alpha, gam) 
+        gNT = genNTgrid(pars, 0.1*Mdot, 0.1*alpha, gam) 
         FnuNT3 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
-        gNT = genNTgrid(pars, 2*Mdot, 0.1*alpha, gam) 
-        FnuNT4 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
+        #gNT = genNTgrid(pars, 8*Mdot, 0.1*alpha, gam) 
+        #FnuNT4 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
 
         for i,chkpt in enumerate(chkfiles):
             g.loadCheckpoint(chkpt)
@@ -320,6 +376,11 @@ if __name__ == "__main__":
             Fnu = makeSpectrum(g, rays, nus, D=1.0, redshift='yes')
 
             fig, ax = plt.subplots()
+            ax.plot(nus/1000.0, Fnu / (h*nus), 'k+')
+            ax.set_xscale("log")
+            ax.set_yscale("log")
+            ylim = ax.get_ylim()
+
             if FnuNT1 is not None:
                 ax.plot(nus/1000.0, FnuNT1 / (h*nus), lw=10.0, color=blue,
                             alpha=0.5)
@@ -327,12 +388,9 @@ if __name__ == "__main__":
                             alpha=0.5)
                 ax.plot(nus/1000.0, FnuNT3 / (h*nus), lw=10.0, color=green,
                             alpha=0.5)
-                ax.plot(nus/1000.0, FnuNT4 / (h*nus), lw=10.0, color=red,
-                            alpha=0.5)
-            ax.plot(nus/1000.0, Fnu / (h*nus), 'k+')
-
-            ax.set_xscale("log")
-            ax.set_yscale("log")
+         #       ax.plot(nus/1000.0, FnuNT4 / (h*nus), lw=10.0, color=red,
+         #                   alpha=0.5)
+            ax.set_ylim(ylim)
             ax.set_xlabel(r"$\nu$ ($keV$)")
             ax.set_ylabel(r"$F_\nu / h\nu$ ($cts/cm^2 s Hz$)")
             ax.set_title(chkpt)
@@ -383,17 +441,33 @@ if __name__ == "__main__":
         for i,chkpt in enumerate(chkfiles):
             g.loadCheckpoint(chkpt)
 
-            imgs = makeImage(g, rays, nus, redshift='yes')
+            nrot = 8;
+            for n in xrange(nrot):
 
-            for j,img in enumerate(imgs):
-                fig, ax = plt.subplots()
-                im = ax.imshow(img, cmap=plt.cm.afmhot, extent=rays.extent, 
-                            aspect='equal')
-                ax.set_title(r"$I_\nu$ ($\nu = $ {0:.2f} $keV$)".format(
-                            nus[j]/1000.0))
-                ax.set_xlabel(r"$X$ ($M_\odot$)")
-                ax.set_ylabel(r"$Y$ ($M_\odot$)")
-                plt.colorbar(im)
-                fig.savefig("{0:s}_{1:03d}_{2:03d}.png".format(prefix,i,j))
-                plt.close()
+                xi, Inus = makeImage(g, rays, nus, redshift='yes')
+                rays.rotate(2.0*np.pi/8.0)
+
+                for j,Inu in enumerate(Inus):
+                    fig, ax = plt.subplots()
+                    #im = ax.imshow(img, cmap=plt.cm.afmhot, extent=rays.extent, 
+                    #            aspect='equal')
+                    im = ax.tricontourf(xi[:,0], xi[:,1], Inu, 256,
+                                        antialiased=True, cmap=plt.cm.afmhot, 
+                                        aspect='equal')
+                    for coll in im.collections:
+                        coll.set_edgecolor("face")
+                    ax.set_title(r"$I_\nu$ ($\nu = $ {0:.2f} $keV$)".format(
+                                nus[j]/1000.0))
+                    ax.set_xlabel(r"$X$ ($M_\odot$)")
+                    ax.set_ylabel(r"$Y$ ($M_\odot$)")
+                    ax.set_axis_bgcolor('k')
+                    width = np.fabs(xi).max()
+                    ax.set_xlim(-width, width)
+                    ax.set_ylim(-width, width)
+                    plt.colorbar(im)
+                    ax.set_aspect("equal")
+                    #fig.savefig("{0:s}_{1:03d}_{2:03d}.pdf".format(prefix,i,j))
+                    fig.savefig("{0:s}_{1:03d}_{2:03d}_{3:03d}.png".format(
+                                    prefix,i,n,j), dpi=200)
+                    plt.close()
 
