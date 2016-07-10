@@ -1,11 +1,13 @@
 import sys
 import math
+import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 #import colormath.color_objects as cmco
 #import colormath.color_conversions as cmcc
 import discopy as dp
 import discoGR as gr
+import discoEOS as eos
 import plot_thin as pt
 
 # All constants in c.g.s.
@@ -309,12 +311,32 @@ def genNTgrid(pars, Mdot, alpha, gam):
 
     SSdat, NTdat = pt.calcNT(g, r, rs, Mdot)
 
-    #These are in code units
+    #These are in code units and SCHWARZSCHILD METRIC
     sigNT = NTdat[0]
     piNT = NTdat[1]
     vrNT = NTdat[2]
     vpNT = NTdat[3]
-    
+
+    vrNT2 = vrNT.copy()
+    vpNT2 = vpNT.copy()
+
+    if pars['Metric'] == 2 or pars['Metric'] == 6:
+        u0NT = 1.0/np.sqrt(1.0-2*M/r - vrNT*vrNT/(1-2*M/r) - r*r*vpNT*vpNT)
+        urNT = u0NT * vrNT
+        upNT = u0NT * vpNT
+
+        u0ks = u0NT + urNT / (r/(2*M)-1.0)
+        urks = urNT
+        upks = upNT
+
+        if pars['Metric'] == 6:
+            print "shifting..."
+            bw = pars['BinW']
+            upks -= bw * u0ks
+
+        vrNT = urks / u0ks
+        vpNT = upks / u0ks
+
     g.prim = []
 
     for k in xrange(g.nz_tot):
@@ -359,6 +381,8 @@ if __name__ == "__main__":
         FnuNT1 = None
 
         Mdot = 0.3
+        Mdot0_cgs = pars['BoundPar2'] * eos.M_solar / eos.year
+        Mdot0_code = Mdot0_cgs / (eos.rho_scale * eos.rg_solar**2 * eos.c)
         alpha = 0.01
         gam = 5.0/3.0
         gNT = genNTgrid(pars, Mdot, alpha, gam) 
@@ -367,8 +391,8 @@ if __name__ == "__main__":
         FnuNT2 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
         gNT = genNTgrid(pars, 0.1*Mdot, 0.1*alpha, gam) 
         FnuNT3 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
-        #gNT = genNTgrid(pars, 8*Mdot, 0.1*alpha, gam) 
-        #FnuNT4 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
+        gNT = genNTgrid(pars, Mdot0_code, 0.1*alpha, gam) 
+        FnuNT4 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
 
         Nrot = 8
 
@@ -392,8 +416,8 @@ if __name__ == "__main__":
                             color=orange, alpha=0.5)
                     ax.plot(nus/1000.0, FnuNT3 / (h*nus), lw=10.0, 
                             color=green, alpha=0.5)
-             #       ax.plot(nus/1000.0, FnuNT4 / (h*nus), lw=10.0, 
-             #                  color=red, alpha=0.5)
+                    ax.plot(nus/1000.0, FnuNT4 / (h*nus), lw=10.0, 
+                               color=red, alpha=0.5)
                 ax.set_ylim(ylim)
                 ax.set_xlabel(r"$\nu$ ($keV$)")
                 ax.set_ylabel(r"$F_\nu / h\nu$ ($cts/cm^2 s Hz$)")
@@ -401,6 +425,21 @@ if __name__ == "__main__":
                 fig.savefig("{0:s}_spectrum_{1:03d}_{2:03d}.png".format(
                                 prefix,i,n))
                 plt.close()
+
+                savedat = {"nu": nus,
+                            "Fnu": Fnu,
+                            "FnuNT1": FnuNT1,
+                            "FnuNT2": FnuNT2,
+                            "FnuNT3": FnuNT3,
+                            "FnuNT4": FnuNT4,
+                            "Mdot1": Mdot,
+                            "Mdot2": 10.0*Mdot,
+                            "Mdot3": 0.1*Mdot,
+                            "Mdot4": Mdot0_code}
+                f = open("{0:s}_spectrum_{1:03d}_{2:03d}.dat".format(
+                                prefix,i,n), "w")
+                pickle.dump(savedat, f, protocol=-1)
+                f.close()
 
     elif mode == "lightcurve":
         nus = np.logspace(2.0, 4.0, base=10.0, num=3)
