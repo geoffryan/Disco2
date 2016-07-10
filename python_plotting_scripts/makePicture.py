@@ -268,7 +268,7 @@ def makeSpectrum(g, rays, nus, D=1.0, redshift='yes', massScale=1.0):
         ra = rays.xi[0,0]
         rb = rays.xi[(Nr-1)*Np,0]
 
-        R = ra * np.power(rb/ra, np.arange(Nr) / float(Nr-1))
+        R = ra * np.power(rb/ra, np.arange(Nr) / float(Nr-1)) * r_scale
 
         print ra, rb
         
@@ -284,7 +284,7 @@ def makeSpectrum(g, rays, nus, D=1.0, redshift='yes', massScale=1.0):
         dR = R[1:] - R[:-1]
 
         Fnu = (Inurp[:,:]*dR[None,:]).sum(axis=1) * (
-                math.cos(rays.inc) / (D*D*kpc*kpc))
+                math.cos(rays.inc) / (D*D*r_scale*r_scale*kpc*kpc))
 
     return Fnu
 
@@ -380,7 +380,7 @@ if __name__ == "__main__":
 
         FnuNT1 = None
 
-        Mdot = 0.3
+        Mdot = 1.0
         Mdot0_cgs = pars['BoundPar2'] * eos.M_solar / eos.year
         Mdot0_code = Mdot0_cgs / (eos.rho_scale * eos.rg_solar**2 * eos.c)
         alpha = 0.01
@@ -394,7 +394,7 @@ if __name__ == "__main__":
         gNT = genNTgrid(pars, Mdot0_code, 0.1*alpha, gam) 
         FnuNT4 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
 
-        Nrot = 8
+        Nrot = 1
 
         for i,chkpt in enumerate(chkfiles):
             g.loadCheckpoint(chkpt)
@@ -404,20 +404,31 @@ if __name__ == "__main__":
                 rays.rotate(2*np.pi/Nrot)
 
                 fig, ax = plt.subplots()
-                ax.plot(nus/1000.0, Fnu / (h*nus), 'k+')
+                # keV / (cm^2 s) 
+                ax.plot(nus/1000.0, 1.0e3*eV * (nus/(h*eV)) * Fnu, 'k+')
+                # cnts / (cm^2 s Hz) 
+                #ax.plot(nus/1000.0, Fnu / (nus/eV), 'k+')
                 ax.set_xscale("log")
                 ax.set_yscale("log")
                 ylim = ax.get_ylim()
 
                 if FnuNT1 is not None:
-                    ax.plot(nus/1000.0, FnuNT1 / (h*nus), lw=10.0, 
-                            color=blue, alpha=0.5)
-                    ax.plot(nus/1000.0, FnuNT2 / (h*nus), lw=10.0, 
-                            color=orange, alpha=0.5)
-                    ax.plot(nus/1000.0, FnuNT3 / (h*nus), lw=10.0, 
-                            color=green, alpha=0.5)
-                    ax.plot(nus/1000.0, FnuNT4 / (h*nus), lw=10.0, 
-                               color=red, alpha=0.5)
+                    ax.plot(nus/1000.0, 1.0e3*eV * (nus/(h*eV)) * FnuNT1, 
+                            lw=10.0, color=blue, alpha=0.5)
+                    #ax.plot(nus/1000.0, FnuNT1 / (nus/eV), lw=10.0, 
+                    #        color=blue, alpha=0.5)
+                    ax.plot(nus/1000.0, 1.0e3*eV * (nus/(h*eV)) * FnuNT2, 
+                            lw=10.0, color=orange, alpha=0.5)
+                    #ax.plot(nus/1000.0, FnuNT2 / (nus/eV), lw=10.0, 
+                    #        color=orange, alpha=0.5)
+                    ax.plot(nus/1000.0, 1.0e3*eV * (nus/(h*eV)) * FnuNT3, 
+                            lw=10.0, color=green, alpha=0.5)
+                    #ax.plot(nus/1000.0, FnuNT3 / (nus/eV), lw=10.0, 
+                    #        color=green, alpha=0.5)
+                    ax.plot(nus/1000.0, 1.0e3*eV * (nus/(h*eV)) * FnuNT4, 
+                            lw=10.0, color=red, alpha=0.5)
+                    #ax.plot(nus/1000.0, FnuNT4 / (nus/eV), lw=10.0, 
+                    #           color=red, alpha=0.5)
                 ax.set_ylim(ylim)
                 ax.set_xlabel(r"$\nu$ ($keV$)")
                 ax.set_ylabel(r"$F_\nu / h\nu$ ($cts/cm^2 s Hz$)")
