@@ -164,7 +164,7 @@ def getTz(g, rays, massScale=1.0):
         zmap[i] = 1.0/z1
         #print z1
 
-    Tmap *= math.pow(massScale, -1.0/8.0)
+    Tmap[Tmap>0.0] *= math.pow(massScale, -0.125)
 
     return Tmap, zmap
 
@@ -241,7 +241,8 @@ def makePicture(g, rays, numin, numax, redshift='yes'):
     
     return pic
 
-def makeSpectrum(g, rays, nus, D=1.0, redshift='yes', massScale=1.0):
+def makeSpectrum(g, rays, nus, ri=0.0, ro=np.inf, D=1.0, redshift='yes', 
+                    massScale=1.0):
 
     print("Generating Temperature and redshift maps")
     Tmap, zmap = getTz(g, rays, massScale=massScale)
@@ -251,16 +252,18 @@ def makeSpectrum(g, rays, nus, D=1.0, redshift='yes', massScale=1.0):
 
     Fnu = np.zeros(nus.shape)
 
+    valid = (rays.X[:,1] > ri) * (rays.X[:,1] < ro)
+
     print("Generating intensity maps")
 
     if rays.mode == 0:
         dx = (rays.extent[1]-rays.extent[0]) / (rays.nx-1)
         dy = (rays.extent[3]-rays.extent[2]) / (rays.ny-1)
-        dA = dx*dy
+        dA = dx*dy * r_scale*r_scale*massScale*massScale
 
         for i,nu in enumerate(nus):
             Inu = specificIntensity(Tmap, zmap, nu)
-            Fnu[i] = (Inu * dA).sum() / (D*D*kpc*kpc)
+            Fnu[i] = (Inu[valid] * dA).sum() / (D*D*kpc*kpc)
 
     elif rays.mode == 1:
         Nr = rays.nx
@@ -268,11 +271,12 @@ def makeSpectrum(g, rays, nus, D=1.0, redshift='yes', massScale=1.0):
         ra = rays.xi[0,0]
         rb = rays.xi[(Nr-1)*Np,0]
 
-        R = ra * np.power(rb/ra, np.arange(Nr) / float(Nr-1)) * r_scale
+        R = ra * np.power(rb/ra, np.arange(Nr)/float(Nr-1)) * r_scale*massScale
 
         print ra, rb
         
         Inu = specificIntensity(Tmap, zmap, nus)
+        Inu[:,-valid] = 0.0
         print Inu.shape
         Inu.resize((len(nus), Nr, Np))
         print Inu.shape
@@ -284,7 +288,73 @@ def makeSpectrum(g, rays, nus, D=1.0, redshift='yes', massScale=1.0):
         dR = R[1:] - R[:-1]
 
         Fnu = (Inurp[:,:]*dR[None,:]).sum(axis=1) * (
-                math.cos(rays.inc) / (D*D*r_scale*r_scale*kpc*kpc))
+                math.cos(rays.inc) / (D*D*kpc*kpc))
+
+    return Fnu
+
+def makeSpectrumSimple(g, ri, ro, nus, D=1.0, massScale=1.0):
+
+    R, prim = pt.gToArr(g)
+
+    sig = prim[:,0]
+    pi = prim[:,1]
+    vr = prim[:,2]
+    vp = prim[:,3]
+
+    T = pi/sig * mp*c*c #(erg)
+    Qdot = 8.0/3.0 * sb*T*T*T*T / (ka_bbes * sig * rho_scale*r_scale) # erg / cm^2 s
+    Teff = np.power(0.5 * Qdot / sb, 0.25) #(erg)
+
+    nu = nus / (h * eV) # (Hz)
+
+    Inu = (2*h/(c*c)) * (nu*nu*nu)[:,None] / (
+            np.exp(h*nu[:,None] / Teff[None,:]) - 1.0) # erg/cm^s s Hz ster
+    
+    Fnu = np.zeros(nus.shape)
+
+    dr = (g.rFaces[1:] - g.rFaces[:-1]) * r_scale
+
+    for i,r in enumerate(np.unique(R)):
+        if r < ri or r > ro:
+            continue
+        ind = r==R
+        numphi = R[ind].shape[0]
+        Fnu[:] += (Inu[:,ind] * 2*np.pi/numphi * (r*r_scale) * dr[i]).sum(axis=1)
+
+    Fnu /= D*D*kpc*kpc
+
+    return Fnu
+
+def makeSpectrumSimpleNT(M, xi, xo, Mdot, nus, D=1.0):
+    #M in M_solar, xi,xo in M, Mdot in M_solar/yr, nus in eV, D in kpc
+
+    rg = M * rg_solar #(cm)
+    rs = 6*M * rg_solar #(cm)
+    Rf = rg * np.logspace(math.log10(xi), math.log10(xo), base=10.0, 
+                            num=10001) #(cm)
+    Mdot_cgs = Mdot * eos.M_solar / eos.year #(g/s)
+    nu = nus / (h*eV) #(Hz)
+
+    R = 0.5*(Rf[1:]+Rf[:-1]) #(cm)
+    dR = Rf[1:]-Rf[:-1] #(cm)
+
+    omK = np.sqrt(rg / (R*R*R)) * c #(s^-1)
+
+    Pfunc = 1 - np.sqrt(rs/R) + np.sqrt(3*rg/R)*(
+            np.arctanh(np.sqrt(3*rg/R)) - np.arctanh(np.sqrt(3*rg/rs)))
+    Qdot = 3*Mdot_cgs / (4*np.pi) * omK*omK / (1-3*rg/R) * Pfunc # erg/cm^2 s
+
+    Teff = np.power(0.5 * Qdot / sb, 0.25) #(erg)
+
+    nu = nus / (h * eV) # (Hz)
+
+    Inu = (2*h/(c*c)) * (nu*nu*nu)[:,None] / (
+            np.exp(h*nu[:,None] / Teff[None,:]) - 1.0) # erg/cm^s s Hz ster
+    
+    Fnu = np.zeros(nus.shape)
+
+    Fnu = (2*np.pi*R[None,:]*Inu[:,:]*dR[None,:]).sum(axis=1) / (
+            D*D*kpc*kpc)
 
     return Fnu
 
@@ -376,62 +446,90 @@ if __name__ == "__main__":
     rays = RayData(rayfile, g._pars["GravM"])
    
     if mode == "spectrum":
-        nus = np.logspace(0.0, 5.0, base=10.0, num=100)
+        nus = np.logspace(2.0, 4.0, base=10.0, num=100)
 
         FnuNT1 = None
 
+        yaxis = 0
+
+        M = 10.0
+        Medd = 4*np.pi*M*rg_solar * c/ ka_bbes * eos.year/eos.M_solar
         Mdot = 1.0
-        Mdot0_cgs = pars['BoundPar2'] * eos.M_solar / eos.year
+        Mdot0 = 0.75*pars['BoundPar2']
+        #Mdot0 = 0.3*Medd
+        Mdot0_cgs = Mdot0 * eos.M_solar / eos.year
         Mdot0_code = Mdot0_cgs / (eos.rho_scale * eos.rg_solar**2 * eos.c)
+
+        print "Mdot: {0}".format(Mdot0_code)
+        
         alpha = 0.01
         gam = 5.0/3.0
         gNT = genNTgrid(pars, Mdot, alpha, gam) 
-        FnuNT1 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
+        FnuNT1 = makeSpectrum(gNT, rays, nus, ri=6, ro=100, D=1.0, 
+                                redshift='yes')
         gNT = genNTgrid(pars, 10*Mdot, alpha, gam) 
-        FnuNT2 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
+        FnuNT2 = makeSpectrum(gNT, rays, nus, ri=6, ro=100, D=1.0, 
+                                redshift='yes')
         gNT = genNTgrid(pars, 0.1*Mdot, 0.1*alpha, gam) 
-        FnuNT3 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
+        FnuNT3 = makeSpectrum(gNT, rays, nus, ri=6, ro=100, D=1.0, 
+                                redshift='yes')
         gNT = genNTgrid(pars, Mdot0_code, 0.1*alpha, gam) 
-        FnuNT4 = makeSpectrum(gNT, rays, nus, D=1.0, redshift='yes')
+        FnuNT4 = makeSpectrum(gNT, rays, nus, ri=6, ro=100, D=50.0, 
+                               redshift='yes', massScale=1.0)
+        
+        #FnuNT1 = makeSpectrumSimpleNT(1.0, 6.0, 200.0, Mdot0, nus, D=1.0)
+        #FnuNT2 = 0.0*makeSpectrumSimpleNT(1.0, 6.0, 120.0, Mdot0, nus, D=1.0)
+        #FnuNT3 = 0.0*makeSpectrumSimpleNT(1.0, 6.0, 200.0, Mdot0, nus, D=1.0)
+        #FnuNT4 = makeSpectrumSimpleNT(M, 6.0, 1.0e3, Mdot0, nus, D=48.0)
 
         Nrot = 1
 
+        if yaxis == 0:
+            Fscale = 1.0
+            ylabel = r"$F_\nu$ ($erg/cm^2 s Hz$)"
+        elif yaxis == 1:
+            Fscale = 1.0 / (1.0e3 * h*nus)
+            ylabel = r"$F_\nu / h \nu$ ($cnts/cm^2 s\ keV$)"
+        elif yaxis == 2:
+            Fscale = 1.0e3*nus/h
+            ylabel = r"$h\nu F_\nu$ ($keV/cm^2 s$)"
+        elif yaxis == 3:
+            Fscale = (nus/eV)/h
+            ylabel = r"$h\nu F_\nu$ ($erg/cm^2 s$)"
+        else:
+            Fscale = 1.0
+            ylabel = r"$F_\nu$ ($erg/cm^2 s Hz$)"
+
+
         for i,chkpt in enumerate(chkfiles):
             g.loadCheckpoint(chkpt)
+            #Fnu2 = makeSpectrumSimple(g, 0.0, 200.0, nus, D=1.0)
             
             for n in xrange(Nrot):
-                Fnu = makeSpectrum(g, rays, nus, D=1.0, redshift='yes')
+                Fnu = makeSpectrum(g, rays, nus, ri=0.0, ro=100, D=1.0,
+                                    redshift='yes')
                 rays.rotate(2*np.pi/Nrot)
 
                 fig, ax = plt.subplots()
-                # keV / (cm^2 s) 
-                ax.plot(nus/1000.0, 1.0e3*eV * (nus/(h*eV)) * Fnu, 'k+')
-                # cnts / (cm^2 s Hz) 
-                #ax.plot(nus/1000.0, Fnu / (nus/eV), 'k+')
+                ax.plot(nus/1000.0, Fscale*Fnu, 'k+')
+                #ax.plot(nus/1000.0, Fscale*Fnu2, marker='+',
+                #        ls='', ms=10, mew=2, color=purple)
                 ax.set_xscale("log")
                 ax.set_yscale("log")
                 ylim = ax.get_ylim()
 
-                if FnuNT1 is not None:
-                    ax.plot(nus/1000.0, 1.0e3*eV * (nus/(h*eV)) * FnuNT1, 
-                            lw=10.0, color=blue, alpha=0.5)
-                    #ax.plot(nus/1000.0, FnuNT1 / (nus/eV), lw=10.0, 
-                    #        color=blue, alpha=0.5)
-                    ax.plot(nus/1000.0, 1.0e3*eV * (nus/(h*eV)) * FnuNT2, 
-                            lw=10.0, color=orange, alpha=0.5)
-                    #ax.plot(nus/1000.0, FnuNT2 / (nus/eV), lw=10.0, 
-                    #        color=orange, alpha=0.5)
-                    ax.plot(nus/1000.0, 1.0e3*eV * (nus/(h*eV)) * FnuNT3, 
-                            lw=10.0, color=green, alpha=0.5)
-                    #ax.plot(nus/1000.0, FnuNT3 / (nus/eV), lw=10.0, 
-                    #        color=green, alpha=0.5)
-                    ax.plot(nus/1000.0, 1.0e3*eV * (nus/(h*eV)) * FnuNT4, 
-                            lw=10.0, color=red, alpha=0.5)
-                    #ax.plot(nus/1000.0, FnuNT4 / (nus/eV), lw=10.0, 
-                    #           color=red, alpha=0.5)
+                if FnuNT4 is not None:
+                    ax.plot(nus/1000.0, Fscale*FnuNT1, lw=10.0, 
+                            color=blue, alpha=0.5)
+                    ax.plot(nus/1000.0, Fscale*FnuNT2, lw=10.0, 
+                            color=orange, alpha=0.5)
+                    ax.plot(nus/1000.0, Fscale*FnuNT3, lw=10.0, 
+                            color=green, alpha=0.5)
+                    ax.plot(nus/1000.0, Fscale*FnuNT4, lw=10.0, 
+                               color=red, alpha=0.5)
                 ax.set_ylim(ylim)
                 ax.set_xlabel(r"$\nu$ ($keV$)")
-                ax.set_ylabel(r"$F_\nu / h\nu$ ($cts/cm^2 s Hz$)")
+                ax.set_ylabel(ylabel)
                 ax.set_title(chkpt)
                 fig.savefig("{0:s}_spectrum_{1:03d}_{2:03d}.png".format(
                                 prefix,i,n))
