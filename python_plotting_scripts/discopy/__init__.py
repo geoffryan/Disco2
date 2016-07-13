@@ -7,5 +7,6 @@ from .discoGrid import *
 from .remapArchive import *
 from .plotGrid import *
 from .viridis import *
+from .viridis import _viridis_data
 
 

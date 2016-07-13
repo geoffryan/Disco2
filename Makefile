@@ -62,7 +62,7 @@ endif
 	@echo "Installing into $(INSDIR)..."
 	@echo "   Installing pyscripts/"
 	@mkdir -p $(INSDIR)/$(VISDIR)
-	@cp -r $(VISDIR)/* $(INSDIR)/$(VISDIR)/
+	@cp -r $(VISDIR)/*.py $(INSDIR)/$(VISDIR)/
 
 $(BINDIR)/$(APP): buildrepo $(OBJS)
 	@mkdir -p `dirname $@`

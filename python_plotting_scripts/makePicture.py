@@ -21,6 +21,10 @@ r_scale = rg_solar
 rho_scale = 1.0
 eV = 6.24150934e11
 kpc = 3.08567758149e21
+l_ref0 = rg_solar
+t_ref0 = rg_solar / c
+m_ref0 = math.sqrt(sb * mp**4 * c**8 * rg_solar**5 / (ka_bbes * c**3))
+
 
 blue = (31.0/255, 119.0/255, 180.0/255)
 orange = (255.0/255, 127.0/255, 14.0/255)
@@ -325,7 +329,7 @@ def makeSpectrumSimple(g, ri, ro, nus, D=1.0, massScale=1.0):
 
     return Fnu
 
-def makeSpectrumSimpleNT(M, xi, xo, Mdot, nus, D=1.0):
+def makeSpectrumSimpleNT(M, xi, xo, Mdot, nus, D=1.0, inc=0.0):
     #M in M_solar, xi,xo in M, Mdot in M_solar/yr, nus in eV, D in kpc
 
     rg = M * rg_solar #(cm)
@@ -351,8 +355,9 @@ def makeSpectrumSimpleNT(M, xi, xo, Mdot, nus, D=1.0):
     Inu = (2*h/(c*c)) * (nu*nu*nu)[:,None] / (
             np.exp(h*nu[:,None] / Teff[None,:]) - 1.0) # erg/cm^s s Hz ster
     
-    Fnu = np.zeros(nus.shape)
+    cosi = math.cos(inc*math.pi/180.0)
 
+    Fnu = np.zeros(nus.shape)
     Fnu = (2*np.pi*R[None,:]*Inu[:,:]*dR[None,:]).sum(axis=1) / (
             D*D*kpc*kpc)
 
@@ -446,21 +451,28 @@ if __name__ == "__main__":
     rays = RayData(rayfile, g._pars["GravM"])
    
     if mode == "spectrum":
-        nus = np.logspace(2.0, 4.0, base=10.0, num=100)
+        nus = np.logspace(2.0, 5.0, base=10.0, num=100)
 
         FnuNT1 = None
 
-        yaxis = 0
+        yaxis = 2
 
-        M = 10.0
+        M = 1.0
+        M = pars['GravM']
+        inc = 67
         Medd = 4*np.pi*M*rg_solar * c/ ka_bbes * eos.year/eos.M_solar
         Mdot = 1.0
-        Mdot0 = 0.75*pars['BoundPar2']
-        #Mdot0 = 0.3*Medd
+        Mdot0 = pars['BoundPar2']
+        #Mdot0 = 1.0*Medd
+        #Mdot0 = 1.0e-8
         Mdot0_cgs = Mdot0 * eos.M_solar / eos.year
         Mdot0_code = Mdot0_cgs / (eos.rho_scale * eos.rg_solar**2 * eos.c)
+        Mdot0_ref = Mdot0_cgs * t_ref0 / m_ref0 * math.pow(M, -1.5)
 
-        print "Mdot: {0}".format(Mdot0_code)
+        print "Mdot: {0:.6g} M_solar/year".format(Mdot0)
+        print "    = {0:.6g} g/s".format(Mdot0_cgs)
+        print "    = {0:.6g} m_code/t_code".format(Mdot0_code)
+        print "    = {0:.6g} m_ref/t_ref".format(Mdot0_ref)
         
         alpha = 0.01
         gam = 5.0/3.0
@@ -477,10 +489,14 @@ if __name__ == "__main__":
         FnuNT4 = makeSpectrum(gNT, rays, nus, ri=6, ro=100, D=50.0, 
                                redshift='yes', massScale=1.0)
         
-        #FnuNT1 = makeSpectrumSimpleNT(1.0, 6.0, 200.0, Mdot0, nus, D=1.0)
-        #FnuNT2 = 0.0*makeSpectrumSimpleNT(1.0, 6.0, 120.0, Mdot0, nus, D=1.0)
-        #FnuNT3 = 0.0*makeSpectrumSimpleNT(1.0, 6.0, 200.0, Mdot0, nus, D=1.0)
-        #FnuNT4 = makeSpectrumSimpleNT(M, 6.0, 1.0e3, Mdot0, nus, D=48.0)
+        #FnuNT1 = makeSpectrumSimpleNT(M, 6.0, 3.0e1, Mdot0, nus, D=52.0,
+        #                                inc=inc)
+        #FnuNT2 = makeSpectrumSimpleNT(M, 6.0, 3.0e1, 1.0e1*Mdot0, nus, D=52.0,
+        #                                inc=inc)
+        #FnuNT3 = makeSpectrumSimpleNT(M, 6.0, 3.0e1, 1.0e2*Mdot0, nus, D=52.0,
+        #                                inc=inc)
+        #FnuNT4 = makeSpectrumSimpleNT(M, 6.0, 3.0e1, 1.0e3*Mdot0, nus, D=52.0,
+        #                                inc=inc)
 
         Nrot = 1
 
@@ -488,10 +504,10 @@ if __name__ == "__main__":
             Fscale = 1.0
             ylabel = r"$F_\nu$ ($erg/cm^2 s Hz$)"
         elif yaxis == 1:
-            Fscale = 1.0 / (1.0e3 * h*nus)
+            Fscale = 1.0 / (1.0e-3*nus * h)
             ylabel = r"$F_\nu / h \nu$ ($cnts/cm^2 s\ keV$)"
         elif yaxis == 2:
-            Fscale = 1.0e3*nus/h
+            Fscale = 1.0e-3*nus/h
             ylabel = r"$h\nu F_\nu$ ($keV/cm^2 s$)"
         elif yaxis == 3:
             Fscale = (nus/eV)/h
@@ -514,7 +530,6 @@ if __name__ == "__main__":
                 ax.plot(nus/1000.0, Fscale*Fnu, 'k+')
                 #ax.plot(nus/1000.0, Fscale*Fnu2, marker='+',
                 #        ls='', ms=10, mew=2, color=purple)
-                ax.set_xscale("log")
                 ax.set_yscale("log")
                 ylim = ax.get_ylim()
 
@@ -528,6 +543,9 @@ if __name__ == "__main__":
                     ax.plot(nus/1000.0, Fscale*FnuNT4, lw=10.0, 
                                color=red, alpha=0.5)
                 ax.set_ylim(ylim)
+                ax.set_ylim(1.0e-4, 1.0)
+                ax.set_xscale("log")
+                ax.set_yscale("log")
                 ax.set_xlabel(r"$\nu$ ($keV$)")
                 ax.set_ylabel(ylabel)
                 ax.set_title(chkpt)

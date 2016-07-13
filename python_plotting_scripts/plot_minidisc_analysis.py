@@ -912,7 +912,7 @@ def find_shocks_d2s(r, phi, S):
 
     return iSa, iSb, phiSa, phiSb
 
-def find_shocks_d2sDet(r, phi, dphi, S, dV12):
+def find_shocks_d2sDet(r, phi, dphi, S, dV12, plots=True):
 
 #Find shocks by looking at derivatives of S AND the Rezzolla&Zanotti quantity.
 
@@ -925,101 +925,102 @@ def find_shocks_d2sDet(r, phi, dphi, S, dV12):
     iSa = np.zeros((N,2),dtype=np.int)
     iSb = np.zeros((N,2),dtype=np.int)
 
-    RsI = [Rs[0], Rs[N/5], Rs[(2*N)/5], Rs[(3*N)/5], Rs[(4*N)/5], Rs[-20]]
-    fig, ax = plt.subplots(2, 3, figsize=(24,9))
+    if plots:
+        RsI = [Rs[0], Rs[N/5], Rs[(2*N)/5], Rs[(3*N)/5], Rs[(4*N)/5], Rs[-20]]
+        fig, ax = plt.subplots(2, 3, figsize=(24,9))
 
-    for i, ax in enumerate(ax.flat):
-        R = RsI[i]
-        ind = r==R
+        for i, ax in enumerate(ax.flat):
+            R = RsI[i]
+            ind = r==R
 
-        phiC = phi[ind]
-        phiR = np.roll(phiC, -1)
-        phiL = np.roll(phiC, 1)
-        phiR[phiR<phiC] += 2*np.pi
-        phiL[phiL>phiC] -= 2*np.pi
-        dphiAve = (phiR-phiC).mean()
+            phiC = phi[ind]
+            phiR = np.roll(phiC, -1)
+            phiL = np.roll(phiC, 1)
+            phiR[phiR<phiC] += 2*np.pi
+            phiL[phiL>phiC] -= 2*np.pi
+            dphiAve = (phiR-phiC).mean()
 
-        s = S[ind]
-        sl = np.roll(s,1)
-        sll = np.roll(s,2)
-        sr = np.roll(s,-1)
-        srr = np.roll(s,-2)
-        d2s = (-srr + 16*sr - 30*s + 16*sl - sll) / (dphiAve*dphiAve)
-        d1s = (sr - sl) / (phiR - phiL)
+            s = S[ind]
+            sl = np.roll(s,1)
+            sll = np.roll(s,2)
+            sr = np.roll(s,-1)
+            srr = np.roll(s,-2)
+            d2s = (-srr + 16*sr - 30*s + 16*sl - sll) / (dphiAve*dphiAve)
+            d1s = (sr - sl) / (phiR - phiL)
 
-        dv12 = dV12[ind]
+            dv12 = dV12[ind]
 
-        maxinds = signal.argrelmax(dv12, order=5, mode='wrap')[0]
-        print maxinds
-        if maxinds.shape[0] > 0:
-            maxinds = maxinds[np.argsort(dv12[maxinds])[::-1]]
-        print maxinds
-        ax2 = ax.twinx()
-        ax3 = ax.twinx()
-        ax4 = ax.twinx()
-        ax.plot(phiC, s, 'k+')
-        ax2.plot(phiC, d1s, 'b+')
-        ax3.plot(phiC, d2s, 'g+')
-        ax4.plot(0.5*(phiR+phiC), dv12, 'r+')
-        if maxinds.shape[0] >= 1:
-            ax.axvline(phiC[maxinds[0]], color='k')
-        if maxinds.shape[0] >= 2:
-            ax.axvline(phiC[maxinds[1]], color='b')
-        if maxinds.shape[0] >= 3:
-            ax.axvline(phiC[maxinds[2]], color='g')
-        if maxinds.shape[0] >= 4:
-            ax.axvline(phiC[maxinds[3]], color='r')
-        ax.set_title(r"$R = {0:f}$".format(R))
-    plt.tight_layout()
-    fig.savefig("shock_comp.png")
-    plt.close()
+            maxinds = signal.argrelmax(dv12, order=5, mode='wrap')[0]
+            print maxinds
+            if maxinds.shape[0] > 0:
+                maxinds = maxinds[np.argsort(dv12[maxinds])[::-1]]
+            print maxinds
+            ax2 = ax.twinx()
+            ax3 = ax.twinx()
+            ax4 = ax.twinx()
+            ax.plot(phiC, s, 'k+')
+            ax2.plot(phiC, d1s, 'b+')
+            ax3.plot(phiC, d2s, 'g+')
+            ax4.plot(0.5*(phiR+phiC), dv12, 'r+')
+            if maxinds.shape[0] >= 1:
+                ax.axvline(phiC[maxinds[0]], color='k')
+            if maxinds.shape[0] >= 2:
+                ax.axvline(phiC[maxinds[1]], color='b')
+            if maxinds.shape[0] >= 3:
+                ax.axvline(phiC[maxinds[2]], color='g')
+            if maxinds.shape[0] >= 4:
+                ax.axvline(phiC[maxinds[3]], color='r')
+            ax.set_title(r"$R = {0:f}$".format(R))
+        plt.tight_layout()
+        fig.savefig("shock_comp.png")
+        plt.close()
 
-    fig, ax = plt.subplots(1, 1)
-    for i,R in enumerate(Rs):
-        ind = r==R
-        numphi = r[ind].shape[0]
+        fig, ax = plt.subplots(1, 1)
+        for i,R in enumerate(Rs):
+            ind = r==R
+            numphi = r[ind].shape[0]
 
-        if i>0:
-            rm = 0.5*(R+Rs[i-1])
-        else:
-            rm = R - 0.5*(Rs[1]-R)
-        if i<N-1:
-            rp = 0.5*(R+Rs[i+1])
-        else:
-            rp = R + 0.5*(R-Rs[i-1])
+            if i>0:
+                rm = 0.5*(R+Rs[i-1])
+            else:
+                rm = R - 0.5*(Rs[1]-R)
+            if i<N-1:
+                rp = 0.5*(R+Rs[i+1])
+            else:
+                rp = R + 0.5*(R-Rs[i-1])
 
-        X = np.zeros((2, numphi+1))
-        Y = np.zeros((2, numphi+1))
-        X[:,1:] = (phi[ind] + 0.5*dphi[ind])[None,:]
-        X[:,0] = phi[ind][0] - 0.5*dphi[ind][0]
-        Y[0,:] = rm
-        Y[1,:] = rp
+            X = np.zeros((2, numphi+1))
+            Y = np.zeros((2, numphi+1))
+            X[:,1:] = (phi[ind] + 0.5*dphi[ind])[None,:]
+            X[:,0] = phi[ind][0] - 0.5*dphi[ind][0]
+            Y[0,:] = rm
+            Y[1,:] = rp
 
-        dat = np.zeros(r[ind].shape)
-        phiC = phi[ind]
-        phiR = np.roll(phiC, -1)
-        phiR[phiR<phiC] += 2*np.pi
+            dat = np.zeros(r[ind].shape)
+            phiC = phi[ind]
+            phiR = np.roll(phiC, -1)
+            phiR[phiR<phiC] += 2*np.pi
 
-        s = S[ind]
-        sr = np.roll(s,-1)
-        ds = (sr-s) / (phiR - phiC)
-        
-        dv12 = dV12[ind]
-        maxinds = signal.argrelmax(dv12, order=5, mode='wrap')[0]
-        if maxinds.shape[0] > 0:
-            maxinds = maxinds[np.argsort(dv12[maxinds])[::-1]]
-        if maxinds.shape[0] > 2:
-            thresh = dv12[maxinds[2]]
-            indsss = (dv12 > thresh)*(ds > 0)
-            dat[indsss] = 1.0
+            s = S[ind]
+            sr = np.roll(s,-1)
+            ds = (sr-s) / (phiR - phiC)
+            
+            dv12 = dV12[ind]
+            maxinds = signal.argrelmax(dv12, order=5, mode='wrap')[0]
+            if maxinds.shape[0] > 0:
+                maxinds = maxinds[np.argsort(dv12[maxinds])[::-1]]
+            if maxinds.shape[0] > 2:
+                thresh = dv12[maxinds[2]]
+                indsss = (dv12 > thresh)*(ds > 0)
+                dat[indsss] = 1.0
 
-        C = ax.pcolormesh(X, Y, np.atleast_2d(dat), 
-                        edgecolors='none', vmin=0.0, vmax=1.0,
-                        cmap=dp.viridis)
-    ax.set_yscale('log')
-    plt.tight_layout()
-    fig.savefig("shock_det.png")
-    plt.close()
+            C = ax.pcolormesh(X, Y, np.atleast_2d(dat), 
+                            edgecolors='none', vmin=0.0, vmax=1.0,
+                            cmap=dp.viridis)
+        ax.set_yscale('log')
+        plt.tight_layout()
+        fig.savefig("shock_det.png")
+        plt.close()
 
     for i,R in enumerate(Rs):
         ind = r==R
