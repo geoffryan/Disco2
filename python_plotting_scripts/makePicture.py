@@ -428,6 +428,26 @@ def genNTgrid(pars, Mdot, alpha, gam):
 
     return g
 
+def mdotLocal(pars, tmin=20,tmax=29):
+    
+    if pars['BoundTypeSource'] != 6:
+        return None
+
+    try:
+        f = open("mdot.dat", "r")
+        dat = pickle.load(f)
+        f.close()
+    except IOError:
+        return None
+
+    Mdot = dat['Mdot'] # Fraction of Nozzle
+    R = dat['R'] # Code Units
+    T = dat['T'] # Orbits
+
+    Mdot0 = Mdot[:,(T>=20)*(T<=29)].mean() * pars['BoundPar2']
+
+    return Mdot0
+
 
 if __name__ == "__main__":
 
@@ -462,9 +482,13 @@ if __name__ == "__main__":
         inc = 67
         Medd = 4*np.pi*M*rg_solar * c/ ka_bbes * eos.year/eos.M_solar
         Mdot = 1.0
-        Mdot0 = pars['BoundPar2']
-        #Mdot0 = 1.0*Medd
-        #Mdot0 = 1.0e-8
+
+        Mdot0 = mdotLocal(pars, tmin=20, tmax=29)
+        if Mdot0 == None:
+            Mdot0 = pars['BoundPar2']
+            #Mdot0 = 1.0*Medd
+            #Mdot0 = 1.0e-8
+
         Mdot0_cgs = Mdot0 * eos.M_solar / eos.year
         Mdot0_code = Mdot0_cgs / (eos.rho_scale * eos.rg_solar**2 * eos.c)
         Mdot0_ref = Mdot0_cgs * t_ref0 / m_ref0 * math.pow(M, -1.5)
