@@ -17,7 +17,7 @@ import binary_orbit as bo
 import ode
 
 #poscmap = plt.cm.afmhot
-poscmap = dp.viridis
+poscmap = dp.inferno
 divcmap = plt.cm.RdBu
 
 def plot_equat_single(fig, ax, mesh, dat, pars, gridbounds=None,
@@ -124,8 +124,8 @@ def calcRoche(pars, xlim, ylim, N=256):
     phi = phiRoche(X, Y, M1, M2, a, w)
 
     L1x = opt.newton(fxRoche, -0.5*a, args=(M1, M2, a, w))
-    L2x = opt.newton(fxRoche, -2*a, args=(M1, M2, a, w))
-    L3x = opt.newton(fxRoche, q*a, args=(M1, M2, a, w))
+    L2x = opt.newton(fxRoche, q*a, args=(M1, M2, a, w))
+    L3x = opt.newton(fxRoche, -2*a, args=(M1, M2, a, w))
 
     L1phi = phiRoche(L1x, 0.0, M1, M2, a, w)
     L2phi = phiRoche(L2x, 0.0, M1, M2, a, w)
@@ -143,7 +143,7 @@ def plot_roche(ax, rocheData):
     phi = rocheData[2]
     lvls = rocheData[3]
 
-    ax.contour(x, y, phi, levels=lvls, colors='m', ls='--')
+    ax.contour(x, y, phi, levels=lvls, colors='w', ls='--', linewidths=2)
 
 def calcQuiver(r, phi, vr, vp, gridbounds, N=20):
 
