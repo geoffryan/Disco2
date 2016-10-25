@@ -92,7 +92,7 @@ class RayData:
         self.X[:,3] += phi
 
 
-def getTz(g, rays, massScale=1.0):
+def getTz(g, rays, mask=None, massScale=1.0):
 #Returns the effective temperature (in the comoving frame) at the source of 
 # each ray and the redshift between the source (in the comoving frame) and 
 # the end point of the ray.  massScale is the mass of the central BH in solar 
@@ -109,6 +109,11 @@ def getTz(g, rays, massScale=1.0):
         #i = ij[0]
         #j = ij[1]
         # if ray hit horizon, T & z are zero.
+        if mask is not None and not mask[i]:
+            Tmap[i] = -1.0
+            zmap[i] = -1.0
+            continue
+
         if rays.U[i,0] == 0:
             Tmap[i] = -1.0
             zmap[i] = -1.0
@@ -221,7 +226,7 @@ def makePicture(g, rays, numin, numax, redshift='yes'):
     Tmap, zmap = getTz(g, rays)
 
     if redshift == 'no':
-        zmap[:,:] = 1.0
+        zmap[:] = 1.0
 
     optical_lambda = np.linspace(340.0, 830.0, num=50) * 1.0e-7 # in cm
     optical_nu = c/optical_lambda * h * eV # in eV
@@ -249,14 +254,16 @@ def makeSpectrum(g, rays, nus, ri=0.0, ro=np.inf, D=1.0, redshift='yes',
                     massScale=1.0):
 
     print("Generating Temperature and redshift maps")
-    Tmap, zmap = getTz(g, rays, massScale=massScale)
+
+    valid = (rays.X[:,1] > ri) * (rays.X[:,1] < ro)
+
+    Tmap, zmap = getTz(g, rays, mask=valid, massScale=massScale)
 
     if redshift == 'no':
-        zmap[:,:] = 1.0
+        zmap[:] = 1.0
 
     Fnu = np.zeros(nus.shape)
 
-    valid = (rays.X[:,1] > ri) * (rays.X[:,1] < ro)
 
     print("Generating intensity maps")
 
@@ -440,11 +447,13 @@ def mdotLocal(pars, tmin=20,tmax=29):
     except IOError:
         return None
 
+    print("Getting local mdot!")
+
     Mdot = dat['Mdot'] # Fraction of Nozzle
     R = dat['R'] # Code Units
     T = dat['T'] # Orbits
 
-    Mdot0 = Mdot[:,(T>=20)*(T<=29)].mean() * pars['BoundPar2']
+    Mdot0 = Mdot[(T>=20)*(T<=29),0].mean() * pars['BoundPar2']
 
     return Mdot0
 
@@ -475,7 +484,7 @@ if __name__ == "__main__":
 
         FnuNT1 = None
 
-        yaxis = 2
+        yaxis = 0
 
         M = 1.0
         M = pars['GravM']
@@ -483,11 +492,16 @@ if __name__ == "__main__":
         Medd = 4*np.pi*M*rg_solar * c/ ka_bbes * eos.year/eos.M_solar
         Mdot = 1.0
 
+        massScale = 1.0e8
+        Rout = 40.0
+
         Mdot0 = mdotLocal(pars, tmin=20, tmax=29)
         if Mdot0 == None:
             Mdot0 = pars['BoundPar2']
             #Mdot0 = 1.0*Medd
             #Mdot0 = 1.0e-8
+
+        Mdot0 *= 1.0
 
         Mdot0_cgs = Mdot0 * eos.M_solar / eos.year
         Mdot0_code = Mdot0_cgs / (eos.rho_scale * eos.rg_solar**2 * eos.c)
@@ -500,18 +514,18 @@ if __name__ == "__main__":
         
         alpha = 0.01
         gam = 5.0/3.0
-        gNT = genNTgrid(pars, Mdot, alpha, gam) 
-        FnuNT1 = makeSpectrum(gNT, rays, nus, ri=6, ro=100, D=1.0, 
-                                redshift='yes')
-        gNT = genNTgrid(pars, 10*Mdot, alpha, gam) 
-        FnuNT2 = makeSpectrum(gNT, rays, nus, ri=6, ro=100, D=1.0, 
-                                redshift='yes')
-        gNT = genNTgrid(pars, 0.1*Mdot, 0.1*alpha, gam) 
-        FnuNT3 = makeSpectrum(gNT, rays, nus, ri=6, ro=100, D=1.0, 
-                                redshift='yes')
-        gNT = genNTgrid(pars, Mdot0_code, 0.1*alpha, gam) 
-        FnuNT4 = makeSpectrum(gNT, rays, nus, ri=6, ro=100, D=50.0, 
-                               redshift='yes', massScale=1.0)
+        gNT = genNTgrid(pars, Mdot0_code, alpha, gam) 
+        FnuNT1 = makeSpectrum(gNT, rays, nus, ri=6, ro=Rout, D=1.0, 
+                                redshift='yes', massScale=massScale)
+        #gNT = genNTgrid(pars, 10*Mdot0_code, alpha, gam) 
+        #FnuNT2 = makeSpectrum(gNT, rays, nus, ri=6, ro=100, D=1.0, 
+        #                        redshift='yes', massScale=massScale)
+        #gNT = genNTgrid(pars, 0.1*Mdot0_code, 0.1*alpha, gam) 
+        #FnuNT3 = makeSpectrum(gNT, rays, nus, ri=6, ro=100, D=1.0, 
+        #                        redshift='yes', massScale=massScale)
+        #gNT = genNTgrid(pars, Mdot0_code, 0.1*alpha, gam) 
+        #FnuNT4 = makeSpectrum(gNT, rays, nus, ri=6, ro=100, D=50.0, 
+        #                       redshift='yes', massScale=massScale)
         
         #FnuNT1 = makeSpectrumSimpleNT(M, 6.0, 3.0e1, Mdot0, nus, D=52.0,
         #                                inc=inc)
@@ -522,7 +536,7 @@ if __name__ == "__main__":
         #FnuNT4 = makeSpectrumSimpleNT(M, 6.0, 3.0e1, 1.0e3*Mdot0, nus, D=52.0,
         #                                inc=inc)
 
-        Nrot = 1
+        Nrot = 16
 
         if yaxis == 0:
             Fscale = 1.0
@@ -546,8 +560,8 @@ if __name__ == "__main__":
             #Fnu2 = makeSpectrumSimple(g, 0.0, 200.0, nus, D=1.0)
             
             for n in xrange(Nrot):
-                Fnu = makeSpectrum(g, rays, nus, ri=0.0, ro=100, D=1.0,
-                                    redshift='yes')
+                Fnu = makeSpectrum(g, rays, nus, ri=0.0, ro=Rout, D=1.0,
+                                    redshift='yes', massScale=massScale)
                 rays.rotate(2*np.pi/Nrot)
 
                 fig, ax = plt.subplots()
@@ -557,17 +571,18 @@ if __name__ == "__main__":
                 ax.set_yscale("log")
                 ylim = ax.get_ylim()
 
-                if FnuNT4 is not None:
+                if FnuNT1 is not None:
                     ax.plot(nus/1000.0, Fscale*FnuNT1, lw=10.0, 
                             color=blue, alpha=0.5)
-                    ax.plot(nus/1000.0, Fscale*FnuNT2, lw=10.0, 
-                            color=orange, alpha=0.5)
-                    ax.plot(nus/1000.0, Fscale*FnuNT3, lw=10.0, 
-                            color=green, alpha=0.5)
-                    ax.plot(nus/1000.0, Fscale*FnuNT4, lw=10.0, 
-                               color=red, alpha=0.5)
-                ax.set_ylim(ylim)
-                ax.set_ylim(1.0e-4, 1.0)
+                    #ax.plot(nus/1000.0, Fscale*FnuNT2, lw=10.0, 
+                    #        color=orange, alpha=0.5)
+                    #ax.plot(nus/1000.0, Fscale*FnuNT3, lw=10.0, 
+                    #        color=green, alpha=0.5)
+                    #ax.plot(nus/1000.0, Fscale*FnuNT4, lw=10.0, 
+                    #           color=red, alpha=0.5)
+                #ax.set_ylim(ylim)
+                ax.set_ylim(1.0e-5*ylim[1], ylim[1])
+                #ax.set_ylim(1.0e-4, 1.0)
                 ax.set_xscale("log")
                 ax.set_yscale("log")
                 ax.set_xlabel(r"$\nu$ ($keV$)")
@@ -580,9 +595,9 @@ if __name__ == "__main__":
                 savedat = {"nu": nus,
                             "Fnu": Fnu,
                             "FnuNT1": FnuNT1,
-                            "FnuNT2": FnuNT2,
-                            "FnuNT3": FnuNT3,
-                            "FnuNT4": FnuNT4,
+               #             "FnuNT2": FnuNT2,
+               #             "FnuNT3": FnuNT3,
+               #             "FnuNT4": FnuNT4,
                             "Mdot1": Mdot,
                             "Mdot2": 10.0*Mdot,
                             "Mdot3": 0.1*Mdot,
@@ -636,7 +651,7 @@ if __name__ == "__main__":
         for i,chkpt in enumerate(chkfiles):
             g.loadCheckpoint(chkpt)
 
-            nrot = 8;
+            nrot = 8
             for n in xrange(nrot):
 
                 xi, Inus = makeImage(g, rays, nus, redshift='yes')
