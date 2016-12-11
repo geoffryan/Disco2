@@ -65,23 +65,26 @@ def comparisonPlot(names):
     #shapes = ['+', 'o', '^', 'x', 'v', '.']
     shapes = ['', '', '', '', '', '']
     #ls = ['', '', '', '', '', '']
-    ls = ['-', (0,(16,8)), (0,(4,4))]
+    ls = ['-', (0,(8,4)), (0,(2,2))]
     #lw = [0,0,0,0,0,0]
-    lw = [6,4,4,4,4,4]
+    lw = [4,2,2,2,2,2]
     ms = [10,5,5,5,5,5]
     mew = [1,0,0,0,0,0]
     alpha = [1, 1, 1, 1, 1, 1]
+    label= ['Model 2', 'Model 2-bc', 'Model 2-hr']
 
-    fig, ax = plt.subplots(2,1)
+    fig, ax = plt.subplots(2,1, figsize=(4,4), sharex=True)
     for i,pair in enumerate(names):
         R, sig, vr, mach, machR = getCompData(*pair)
         inds = R<100
         ax[0].plot(R[inds], sig[inds], color=colors[i], marker=shapes[i], 
                                         ls=ls[i], ms=ms[i], mew=mew[i],
-                                        alpha=alpha[i], lw=lw[i])
+                                        alpha=alpha[i], lw=lw[i], 
+                                        label=label[i])
         ax[1].plot(R[inds], -vr[inds], color=colors[i], marker=shapes[i],
                                         ls=ls[i], ms=ms[i], mew=mew[i],
-                                        alpha=alpha[i], lw=lw[i])
+                                        alpha=alpha[i], lw=lw[i],
+                                        label=label[i])
         #ax[2].plot(R[inds], mach[inds], color=colors[i], marker=shapes[i],
         #                                ls=ls[i], ms=ms[i], mew=mew[i],
         #                                alpha=alpha[i], lw=lw[i])
@@ -90,11 +93,11 @@ def comparisonPlot(names):
         #                                alpha=alpha[i], lw=lw[i])
 
     #ax[0].set_xlabel(r'$R$')
-    ax[0].set_ylabel(r'$\Sigma$')
+    ax[0].set_ylabel(r'$\Sigma$', fontsize=16)
     ax[0].set_xscale('log')
     ax[0].set_yscale('log')
-    ax[1].set_xlabel(r'$R$')
-    ax[1].set_ylabel(r'$-v^r$')
+    ax[1].set_xlabel(r'$R$', fontsize=16)
+    ax[1].set_ylabel(r'$-v^r$', fontsize=16)
     ax[1].set_xscale('log')
     ax[1].set_yscale('log')
     #ax[2].set_xlabel(r'$R$')
@@ -105,8 +108,13 @@ def comparisonPlot(names):
     #ax[3].set_ylabel(r'$\mathcal{M}_R$')
     #ax[3].set_xscale('log')
     #ax[3].set_yscale('log')
+    
+    ax[0].legend(loc='lower right', fontsize=10)
+    ax[0].tick_params(labelsize=10)
+    ax[1].tick_params(labelsize=10)
+    fig.subplots_adjust(left=0.17, bottom=0.12, top=0.95, right=0.95, 
+                        hspace=0.07)
 
-    fig.tight_layout()
     fig.savefig("plot_minidisc_comp.pdf")
 
 if __name__ == "__main__":

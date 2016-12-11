@@ -2266,20 +2266,23 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
         plt.close(figNice)
 
 
-    figNice, axNice = plt.subplots(1,1,figsize=(12,9))
-    axNice.plot(Rs, alpha, '+', ms=10, mew=2, color=blue, label=r"$\dot{M}$")
-    axNice.plot(Rs, psiQ[:,2]/(1.5*np.pi), '+', ms=10, mew=2, color=orange, 
-                    label=r"\delta s")
-    axNice.set_xlabel(r"$r$", fontsize=24)
-    axNice.set_ylabel(r"$\alpha$", fontsize=24)
+    figNice, axNice = plt.subplots(1,1,figsize=(4,3))
+    axNice.plot(Rs, alpha, '-', lw=3, ms=10, mew=2, color=blue, 
+                label=r"$\alpha_\dot{M}$")
+    axNice.plot(Rs, psiQ[:,2]/(1.5*np.pi), '--', lw=3, ms=10, mew=2, 
+                color=blue, label=r"$\alpha_\dot{Q}$")
+    axNice.set_xlabel(r"$r$", fontsize=16)
+    axNice.set_ylabel(r"$\alpha$", fontsize=16)
     axNice.set_xscale('log')
     axNice.set_yscale('log')
     axNice.set_xlim(RMIN, RMAX)
-    axNice.tick_params(labelsize=18)
-    axNice.set_title(r"$\alpha$ Parameter", fontsize=36)
+    axNice.tick_params(labelsize=10)
+    axNice.legend(fontsize=10)
+    #axNice.set_title(r"$\alpha$ Parameter", fontsize=36)
     outname = "plot_minidisc_alpha_r_{0}.pdf".format(
                 "_".join(chckname.split(".")[0].split("_")[1:]))
     print("Saving {0:s}...".format(outname))
+    figNice.subplots_adjust(left=0.15, bottom=0.15, right=0.95, top=0.95)
     figNice.savefig(outname)
     plt.close(figNice)
 

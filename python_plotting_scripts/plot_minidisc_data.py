@@ -6,7 +6,9 @@ import matplotlib.pyplot as plt
 import discoGR as gr
 import discoEOS as eos
 
-labelsize = 24
+labelsize = 14
+ticklabelsize = 10
+legendsize = 8
 
 blue = (31.0/255, 119.0/255, 180.0/255)
 orange = (255.0/255, 127.0/255, 14.0/255)
@@ -35,6 +37,8 @@ lightcolors = [lightblue, lightorange, lightgreen, lightred, lightpurple,
                     lightbrown, lightpink, lightgrey, lightyellow, lightteal]
 markers = ['o', '+', '^', 'x', 'v']
 linestyles = ['-', '--', ':', '-.']
+labels3 = ["Model 1", "Model 2", "Model 3"]
+labels5 = ["Model 1", "Model 1.5", "Model 2", "Model 2.5", "Model 3"]
 
 
 def get_data(filename):
@@ -45,7 +49,8 @@ def get_data(filename):
 
     return data
 
-def add_disp_plot(ax, data, marker, mc, ls, lc, mode='ABC'):
+def add_disp_plot(ax, data, marker, mc, ls, lc, mode='ABC', label=None, 
+                    zorder=2):
     
     R = data['R']
     sig = data['sig']
@@ -105,32 +110,43 @@ def add_disp_plot(ax, data, marker, mc, ls, lc, mode='ABC'):
     
     if 'A' in mode:
         ax.plot((relMach[indA])[1:-1], tpA, marker=marker, color=mc, ls='', 
-                ms=10, mew=mew, mec=mc, alpha=0.5)
+                ms=8, mew=mew, mec=mc, alpha=0.5, label=label, zorder=zorder)
     if 'B' in mode:
         ax.plot((relMach[indB])[1:-1], tpB, marker=marker, color=mc, ls='', 
-                ms=10, mew=mew, mec=mc, alpha=0.5)
+                ms=8, mew=mew, mec=mc, alpha=0.5, label=None, zorder=zorder)
     if 'C' in mode:
-        ax.plot(relMach, tpWKBrel, ls=ls, color=lc, lw=3, alpha=1.0)
+        ax.plot(relMach, tpWKBrel, ls=ls, color=lc, lw=2.5, alpha=1.0,
+                label=None, zorder=zorder)
 
 def disp_plot(datas, name, mode='ABC'):
 
-    fig, ax = plt.subplots(1,1)
+    fig, ax = plt.subplots(1,1, figsize=(4,3.5))
+
+    if len(datas) == 3:
+        labels = labels3
+    elif len(datas) == 5:
+        labels = labels5
+    else:
+        labels = [None for i in range(len(data))]
 
     for i,data in enumerate(datas):
         add_disp_plot(ax, data, markers[i], colors[i], '', 
-                        'k', mode)
+                        'k', mode, labels[i], zorder=9-i)
 
     if 'C' in mode:
         for i,data in enumerate(datas):
             add_disp_plot(ax, data, markers[i], colors[i], linestyles[i], 
-                            'k', 'C')
+                            'k', 'C', zorder=10)
 
     ax.set_xlabel(r'$\mathcal{M}$', fontsize=labelsize)
-    ax.set_ylabel(r'$\tan \theta_S$', fontsize=labelsize)
+    ax.set_ylabel(r'$\tan\ \theta_S$', fontsize=labelsize)
     ax.set_xscale('linear')
     ax.set_yscale('linear')
+    ax.tick_params(labelsize=ticklabelsize)
     ylim = ax.get_ylim()
     ax.set_ylim(0,0.5)
+    ax.legend(loc="upper right", fontsize=ticklabelsize)
+    fig.tight_layout()
     
     print("Saving " + name + "...")
     fig.savefig(name)
@@ -202,7 +218,7 @@ def diss_plot(datas, name):
 
 def diss_plot_single(data, name):
 
-    fig, ax = plt.subplots(3,1, sharex=True, figsize=(9,9))
+    fig, ax = plt.subplots(3,1, sharex=True, figsize=(4,5))
 
     R = data['R']
     Rmin = R.min()
@@ -246,20 +262,34 @@ def diss_plot_single(data, name):
     marker = '+'
     mew = 2
 
-    ax[0].plot(R, dsa, marker=marker, color=blue, mew=mew, ls='')
-    ax[0].plot(R, dsb, marker=marker, color=orange, mew=mew, ls='')
-    ax[1].plot(R, psiqa, marker=marker, color=blue, mew=mew, ls='')
-    ax[1].plot(R, psiqb, marker=marker, color=orange, mew=mew, ls='')
-    ax[2].plot(R, dQdra, marker=marker, color=blue, mew=mew, ls='', 
+    #ax[0].plot(R, dsa, marker=marker, color=blue, mew=mew, ls='')
+    #ax[0].plot(R, dsb, marker=marker, color=orange, mew=mew, ls='')
+    #ax[1].plot(R, psiqa, marker=marker, color=blue, mew=mew, ls='')
+    #ax[1].plot(R, psiqb, marker=marker, color=orange, mew=mew, ls='')
+    #ax[2].plot(R, dQdra, marker=marker, color=blue, mew=mew, ls='', 
+    #            label=r'$\dot{Q}_{irr,A}$')
+    #ax[2].plot(R, dQdrb, marker=marker, color=orange, mew=mew, ls='',
+    #            label=r'$\dot{Q}_{irr,B}$')
+    #ax[2].plot(R, dqdr, marker=marker, color='k', mew=mew, ls='',
+    #            label=r'$\langle \dot{Q}_{irr} \rangle$')
+    #ax[2].plot(R, dCool, marker=marker, color=green, mew=mew, ls='',
+    #            label=r'$\langle \dot{Q}_{cool} \rangle$')
+    #ax[2].plot(R, 2*np.pi*R*QNT, marker='', color='grey', ls='-', lw=4,
+    #            label=r'$\langle \dot{Q}_{NT} \rangle$', alpha=0.75)
+    ax[0].plot(R, dsa, marker='', color=blue, mew=mew, ls=(0,(9,6)), lw=3)
+    ax[0].plot(R, dsb, marker='', color=orange, mew=mew, ls=(0,(9,6)), lw=3)
+    ax[1].plot(R, psiqa, marker='', color=blue, mew=mew, ls=(0,(9,6)), lw=3)
+    ax[1].plot(R, psiqb, marker='', color=orange, mew=mew, ls=(0,(9,6)), lw=3)
+    ax[2].plot(R, dQdra, marker='', color=blue, mew=mew, ls=(0,(9,6)), lw=3,
                 label=r'$\dot{Q}_{irr,A}$')
-    ax[2].plot(R, dQdrb, marker=marker, color=orange, mew=mew, ls='',
+    ax[2].plot(R, dQdrb, marker='', color=orange, mew=mew, ls=(0,(9,6)), lw=3,
                 label=r'$\dot{Q}_{irr,B}$')
-    ax[2].plot(R, dqdr, marker=marker, color='k', mew=mew, ls='',
+    ax[2].plot(R, dqdr, marker='', color='green', mew=mew, ls='-', lw=3,
                 label=r'$\langle \dot{Q}_{irr} \rangle$')
-    ax[2].plot(R, dCool, marker=marker, color=green, mew=mew, ls='',
+    ax[2].plot(R, dCool, marker='', color='k', mew=mew, ls=(0,(3,3)), lw=3,
                 label=r'$\langle \dot{Q}_{cool} \rangle$')
-    ax[2].plot(R, 2*np.pi*R*QNT, marker='', color='grey', ls='-', lw=4,
-                label=r'$\langle \dot{Q}_{NT} \rangle$', alpha=0.75)
+    ax[2].plot(R, 2*np.pi*R*QNT, marker='', color='grey', ls='-', lw=6,
+                label=r'$\langle \dot{Q}_{NT} \rangle$', alpha=1.0, zorder=1)
     #ax[2].plot(R, 2*np.pi*R*QNTc, marker='', color='grey', ls='--', lw=4,
     #            label=r'$\langle \dot{Q}_{NT} \rangle$', alpha=0.75)
     #ax[2].plot(R, QNT, marker='', color='grey', ls='-', lw=2,
@@ -282,8 +312,16 @@ def diss_plot_single(data, name):
     ax[0].set_ylabel(r'$\Delta s$', fontsize=labelsize)
     ax[1].set_ylabel(r'$\psi_Q$', fontsize=labelsize)
     ax[2].set_ylabel(r'$\langle \dot{Q} \rangle$', fontsize=labelsize)
+    ax[0].tick_params(labelsize=ticklabelsize)
+    ax[1].tick_params(labelsize=ticklabelsize)
+    ax[2].tick_params(labelsize=ticklabelsize)
 
-    legend = ax[2].legend()
+    legend = ax[2].legend(fontsize=legendsize, bbox_to_anchor=(0.97,0.67),
+                            bbox_transform=fig.transFigure)
+
+    #fig.tight_layout()
+    fig.subplots_adjust(hspace=0.1, top=0.95, left=0.2, right=0.95)
+
 
     print("Saving " + name + "...")
     fig.savefig(name)
@@ -412,26 +450,29 @@ def torque_plot_single(data, name):
     dJrdR = (Jr[2:] - Jr[:-2]) / (R[2:] - R[:-2])
     Tgrad[1:-1] = l[1:-1] * dJrdR
 
-    fig, ax = plt.subplots(1,1)
-    ax.plot(R, Tmdot, color='k', marker='+', mew=2, ms=10, ls='',
+    fig, ax = plt.subplots(1,1, figsize=(4,3.5))
+    ax.plot(R, Tmdot, color='k', marker='', mew=2, ms=10, ls='-', lw=3,
             label=r'$\tau_{\dot{M}}$')
-    ax.plot(R, -Tre, color=blue, marker='+', mew=2, ms=10, ls='',
+    ax.plot(R, -Tre, color=blue, marker='', mew=2, ms=10, ls=(0,(9,6)), lw=3,
             label=r'$-\tau_{Re}$')
-    ax.plot(R, -(Tre+Text+Tcool), color=green, marker='+', mew=2, ms=10, ls='',
-            label=r'$-\tau_{Re}-\tau_{ext}-\tau_{cool}$')
+    #ax.plot(R, -(Tre+Text+Tcool), color=red, marker='', mew=2, ms=10, ls='-', 
+    #        lw=3, label=r'$-\tau_{Re}-\tau_{ext}-\tau_{cool}$')
+    ax.plot(R, -(Text+Tcool), color=green, marker='', mew=2, ms=10, 
+            ls=(0,(3,3)), lw=3, label=r'$-\tau_{ext}-\tau_{cool}$')
     ylim = ax.get_ylim()
-    ax.plot(R, -Tpsiq, color=orange, marker='+', mew=2, ms=10, ls='',
-            label=r'$-\tau_{loc}$')
-    ax.plot(R, qdot/vp, color=red, marker='+', mew=2, ms=10, ls='',
-            label=r'$-\tau_{glob}$')
+    #ax.plot(R, -Tpsiq, color=orange, marker='', mew=2, ms=10, ls='-', lw=3,
+    #        label=r'$-\tau_{loc}$')
+    ax.plot(R, qdot/vp, color=orange, marker='', mew=2, ms=10, ls='-', lw=3,
+            label=r'$-\tau_{shock}$')
 
     ax.set_xlim(floorSig(R.min()), ceilSig(R.max()))
-    ax.set_ylim(0,ylim[1])
+    #ax.set_ylim(0,ylim[1])
     ax.set_xscale('log')
     ax.set_xlabel(r'$r$ $(M)$', fontsize=labelsize)
     ax.set_ylabel(r'$\tau$', fontsize=labelsize)
 
-    legend = ax.legend()
+    legend = ax.legend(fontsize=legendsize, loc='lower left')
+    fig.subplots_adjust(left=0.2, bottom=0.2, right=0.95, top=0.95)
 
     print("Saving " + name + "...")
     fig.savefig(name)
