@@ -357,8 +357,9 @@ void cell_init_kick_isothermal(struct Cell *c, double r, double phi, double z,
         printf("(%.6lg %.6lg %.6lg %.6lg) -->", u0[0], u0[1], u0[2], u0[3]);
         printf(" (%.6lg %.6lg %.6lg %.6lg)\n", u[0], u[1], u[2], u[3]);
     }
-
-    double rho = rho0 * pow(X0[1]/r0, -1.5);
+    
+    double rhopow = 0.0;
+    double rho = rho0 * pow(X0[1]/r0, rhopow);
     double P = T * rho;
     double vr = u[1] / u[0];
     double vp = u[2] / u[0];
@@ -375,6 +376,124 @@ void cell_init_kick_isothermal(struct Cell *c, double r, double phi, double z,
         c->prim[i] = q;
 }
 
+void cell_init_kick_constmach(struct Cell *c, double r, double phi, double z,
+                                struct Sim *theSim)
+{
+    int i;
+    double M = sim_GravM(theSim);
+    double a = sim_GravA(theSim);
+    double al = sim_AlphaVisc(theSim);
+    double GAM = sim_GAMMALAW(theSim);
+    double VMAX = 0.5;
+
+
+    double r0 = sim_InitPar1(theSim);
+    double rho0 = sim_InitPar2(theSim);
+    double mach = sim_InitPar3(theSim);
+    double kickV = sim_InitPar4(theSim);
+    double massFac = sim_InitPar5(theSim);
+    double a0 = sim_InitPar6(theSim);
+
+    double X[4] = {time_global, r, phi, z};
+    double X0[4], u[4], u0[4];
+
+    double M0 = M / massFac;
+
+    calc_pos_orig(X, X0, M0, a0, M, a, kickV);
+    calc_u_geo(X0, u0, M0, a0);
+    calc_vel_kick(X0, u0, X, u, M0, a0, M, a, kickV);
+
+    double U2 = M0 / X0[1];
+
+    double rho = rho0;
+    double P = rho * (M0/X0[1]) / (mach*mach);
+    double vr = u[1] / u[0];
+    double vp = u[2] / u[0];
+    double vz = u[3] / u[0];
+    double q = r>r0 ? 0.0 : 1.0;
+
+    c->prim[RHO] = rho;
+    c->prim[PPP] = P;
+    c->prim[URR] = vr;
+    c->prim[UPP] = vp;
+    c->prim[UZZ] = 0.0;
+
+    for(i=sim_NUM_C(theSim); i<sim_NUM_Q(theSim); i++)
+        c->prim[i] = q;
+}
+
+void cell_init_kick_novikov(struct Cell *c, double r, double phi, double z,
+                                struct Sim *theSim)
+{
+    // Novikov-Thorne profile with gas pressure and Thompson opacity
+
+    int i;
+    double M = sim_GravM(theSim);
+    double a = sim_GravA(theSim);
+    double al = sim_AlphaVisc(theSim);
+    double GAM = sim_GAMMALAW(theSim);
+
+    double r0 = sim_InitPar1(theSim);
+    double Mdot = sim_InitPar2(theSim);
+    double C = sim_InitPar3(theSim);
+    double kickV = sim_InitPar4(theSim);
+    double massFac = sim_InitPar5(theSim);
+    double a0 = sim_InitPar6(theSim);
+
+    double X[4] = {time_global, r, phi, z};
+    double X0[4], u[4], u0[4];
+
+    double M0 = M / massFac;
+
+    calc_pos_orig(X, X0, M0, a0, M, a, kickV);
+    calc_u_geo(X0, u0, M0, a0);
+    calc_vel_kick(X0, u0, X, u, M0, a0, M, a, kickV);
+
+    r = X0[1];
+    double A0 = a0 * M0;
+    double OMK = sqrt(M0 / (r*r*r));
+    double rs = ;
+    double B = 1 + A0*M0;
+    double C = 1 - 3*M0/r + 2*A0*OMK;
+    double D = 1 - 2*M0/r + A0*A0 / (r*r);
+
+    double th = acos(a0)/3.0;
+    double cth = cos(th);
+    double sth = sin(th);
+    double x1 = cth - sqrt(3.0)*sth;
+    double x2 = cth + sqrt(3.0)*sth;
+    double x3 = -2*cth;
+    double c0 = -a0*a0/(x1*x2*x3);
+    double c1 = (x1-a0)*(x1-a0) / (x1*(x2-x1)*(x3-x1));
+    double c2 = (x2-a0)*(x2-a0) / (x2*(x1-x2)*(x3-x2));
+    double c3 = (x3-a0)*(x3-a0) / (x3*(x1-x3)*(x2-x3));
+    double x = sqrt(r0/M0);
+    double xs = sqrt(rs/M0);
+
+    double p = 1.0 - xs/x - 3/x * (c0*log(x/xs) + c1*log((x-x1)/(xs-x1))
+                            + c2*log((x-x2)/(xs-x2)) + c3*log((x-x3)/(xs-x3)));
+
+    //UNITS UNITS UNITS
+    double Pnt = Mdot / (3*M_PI*al) * OMK * sqrt(C) * p / (D*D);
+    double Qdotnt = 3*Mdot/(4*M_PI) * OMK * OMK * Pnt / C;
+    double Signt = pow(8*EOS_SB/(3*KA_ES*Qdotnt) * Pnt*Pnt*Pnt*Pnt, 0.2)
+    
+    double rho = Signt;
+    double P = Pnt;
+    double vr = u[1] / u[0];
+    double vp = u[2] / u[0];
+    double vz = u[3] / u[0];
+    double q = r>r0 ? 0.0 : 1.0;
+
+    c->prim[RHO] = rho;
+    c->prim[PPP] = P;
+    c->prim[URR] = vr;
+    c->prim[UPP] = vp;
+    c->prim[UZZ] = 0.0;
+
+    for(i=sim_NUM_C(theSim); i<sim_NUM_Q(theSim); i++)
+        c->prim[i] = q;
+}
 void cell_init_kick_calc(struct Cell *c, double r, double phi, double z,
                             struct Sim *theSim)
 {
@@ -382,6 +501,10 @@ void cell_init_kick_calc(struct Cell *c, double r, double phi, double z,
 
     if(opt == 0)
         cell_init_kick_isothermal(c, r, phi, z, theSim);
+    else if(opt == 1)
+        cell_init_kick_constmach(c, r, phi, z, theSim);
+    else if(opt == 2)
+        cell_init_kick_novikov(c, r, phi, z, theSim);
     else
         printf("ERROR: cell_init_kick given bad option.\n");
 }
