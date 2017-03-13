@@ -17,7 +17,10 @@ void cell_src_boost(double t, double r, double phi, double z, double *cons,
 void cell_cool_integrateT_gr_num(double *prim, double *dcons, double dt, 
                                 double u0, double GAM, double pos[], double M,
                                 struct Sim *theSim);
-void cell_cool_integrateT_gr_exact(double *prim, double *dcons, double dt, 
+void cell_cool_integrateT_gr_gas_exact(double *prim, double *dcons, double dt, 
+                                double u0, double GAM, double pos[], double M,
+                                struct Sim *theSim);
+void cell_cool_integrateT_gr_rad_exact(double *prim, double *dcons, double dt, 
                                 double u0, double GAM, double pos[], double M,
                                 struct Sim *theSim);
 
@@ -242,7 +245,10 @@ void cell_add_src_gr( struct Cell *** theCells ,struct Sim * theSim, struct Grav
                 int coolType = sim_CoolingType(theSim);
 
                 if(coolType == COOL_ISOTHERM || coolType == COOL_BB_ES)
-                    cell_cool_integrateT_gr_exact(c->prim, dcons_cool, dt, 
+                    cell_cool_integrateT_gr_gas_exact(c->prim, dcons_cool, dt, 
+                                            u[0], GAMMALAW, pos, M, theSim);
+                else if(coolType == COOL_BB_RAD)
+                    cell_cool_integrateT_gr_rad_exact(c->prim, dcons_cool, dt, 
                                             u[0], GAMMALAW, pos, M, theSim);
                 else
                     cell_cool_integrateT_gr_num(c->prim, dcons_cool, dt, u[0], 
@@ -407,7 +413,7 @@ void cell_cool_integrateT_gr_num(double *prim, double *dcons, double dt,
     free(cons1);
 }
 
-void cell_cool_integrateT_gr_exact(double *prim, double *dcons, double dt, 
+void cell_cool_integrateT_gr_gas_exact(double *prim, double *dcons, double dt, 
                                 double u0, double GAM, double pos[], double M,
                                 struct Sim *theSim)
 {
@@ -440,6 +446,118 @@ void cell_cool_integrateT_gr_exact(double *prim, double *dcons, double dt,
     double p[NUMQ];
     p[RHO] = prim[RHO];
     p[PPP] = prim[RHO] * T1;
+    p[URR] = prim[URR];
+    p[UPP] = prim[UPP];
+    p[UZZ] = prim[UZZ];
+    for(i=5; i<NUMQ; i++)
+        p[i] = 0.0;
+
+    double *cons0 = (double *)malloc(NUMQ * sizeof(double));
+    double *cons1 = (double *)malloc(NUMQ * sizeof(double));
+    cell_prim2cons(prim, cons0, pos, 1.0, theSim);
+    cell_prim2cons(p,    cons1, pos, 1.0, theSim);
+
+    dcons[RHO] = 0.0;
+    dcons[SRR] = cons1[SRR]-cons0[SRR];
+    dcons[LLL] = cons1[LLL]-cons0[LLL];
+    dcons[SZZ] = cons1[SZZ]-cons0[SZZ];
+    dcons[TAU] = cons1[TAU]-cons0[TAU];
+    for(i=5; i<NUMQ; i++)
+        dcons[i] = 0.0;
+    free(cons0);
+    free(cons1);
+}
+
+void cell_cool_integrateT_gr_rad_exact(double *prim, double *dcons, double dt, 
+                                double u0, double GAM, double pos[], double M,
+                                struct Sim *theSim)
+{
+    //Assuming here that we're cooling a radiation pressure dominated, 
+    //vertically integrated disk.
+    //
+    //As such we ignore GAM, and assume the adiabatic index is 4/3.
+
+    int i;
+    double ka = 0.4; // electron scattering opacity in cm^2/g
+
+    double sig = prim[RHO]; //Vertically integrated density
+    double pi = prim[PPP];  //Vertically integrated pressure
+
+    double eps0 = 3.0 * pi/sig;
+
+    //Need to calculate om_*, s.t. H = sqrt(P/rhoh) / om_*
+    //Use Abramowicz et al 1997, but with Keplerian 4-velocity.
+    
+    double oms;
+    if(sim_Metric(theSim) == SCHWARZSCHILD_SC
+            || sim_Metric(theSim) == SCHWARZSCHILD_KS
+            || sim_Metric(theSim) == SCHWARZSCHILD_KS_ADM)
+    {
+        double M = sim_GravM(theSim);
+        double Risco = 6.0*M;
+        double r = pos[R_DIR];
+        if(r > Risco)
+            oms = sqrt(M/(r*r*r-3*M*r*r));
+        else
+            oms = 2.0*sqrt(3.0)*M/(r*r);
+    }
+    else if(sim_Metric(theSim) == KERR_KS)
+    {
+        double M = sim_GravM(theSim);
+        double a = sim_GravA(theSim);
+
+        double Z1 = 1. + pow((1-a*a)*(1+a), 1./3) + pow((1-a*a)*(1-a), 1./3);
+        double Z2 = sqrt(3.*a*a + Z1*Z1);
+        double r = pos[R_DIR];
+        double Risco;
+        if(a >= 0)
+            Risco = M*(3 + Z2 - sqrt((3-Z1)*(3+Z1+2*Z2)));
+        else
+            Risco = M*(3 + Z2 + sqrt((3-Z1)*(3+Z1+2*Z2)));
+
+        if(r > Risco)
+        {
+            double U0 = (r+a*M*sqrt(M/r)) / sqrt(r*r-3*M*r+2*a*M*sqrt(M*r));
+            double omk = sqrt(M/(r*r*r));
+            double om = omk / (1+a*M*omk);
+            double l = U0*(-2*M*M*a/r + (r*r+a*a*M*M+2*M*M*M*a*a/r)*om);
+            double e = U0*(-1 + 2*M/r - 2*M*M*a*om/r);
+            double ls = sqrt(l*l - a*a*M*M*(e*e-1));
+            oms = ls/(r*r);
+        }
+        else
+        {
+            double omk = sqrt(M/(Risco*Risco*Risco));
+            double om = omk / (1+a*M*omk);
+            double U0 = (1+a*M*om) / sqrt(1 - 3*M/r + 2*a*M*om);
+            double UP = U0*om;
+            double l = -2*M*M*a/Risco * U0 + (r*r+a*a*M*M+2*M*a*a/r)*UP;
+            double e = -(1-2*M/Risco) * U0 - 2*M*M*a/Risco * UP;
+            double ls = sqrt(l*l - a*a*M*M*(e*e-1));
+            oms = ls / r*r;
+        }
+    }
+    else
+        oms = 0.0;
+
+    //cooling timescale
+    double tc = sig*(ka*eos_rho_scale*eos_r_scale)*u0 / (3.0 * oms);
+
+    // Here we solve the equation d/dt (eps) = - 8 * sb * T^4 / 3*tau
+    // exactly.  The strange variables make it easier to express
+    // the solution.
+    double x0 = sqrt(4*eps0/3.);
+    double cht = cosh(dt/tc);
+    double sht = sinh(dt/tc);
+    double deh = x0 * cht - sqrt(1+x0*x0) * sht;
+    double eps = 0.75 * deh*deh;
+
+    //Now that wasn't so bad was it?
+
+    int NUMQ = sim_NUM_Q(theSim);
+    double p[NUMQ];
+    p[RHO] = prim[RHO];
+    p[PPP] = prim[RHO] * eps / 3.0;
     p[URR] = prim[URR];
     p[UPP] = prim[UPP];
     p[UZZ] = prim[UZZ];
