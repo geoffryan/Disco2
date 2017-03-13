@@ -1,4 +1,5 @@
 #define CELL_PRIVATE_DEFS
+#define EOS_PRIVATE_DEFS
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
@@ -422,7 +423,7 @@ void cell_init_kick_constmach(struct Cell *c, double r, double phi, double z,
         c->prim[i] = q;
 }
 
-void cell_init_kick_novikov(struct Cell *c, double r, double phi, double z,
+void cell_init_kick_novikov_gas(struct Cell *c, double r, double phi, double z,
                                 struct Sim *theSim)
 {
     // Novikov-Thorne profile with gas pressure and Thompson opacity
@@ -432,10 +433,11 @@ void cell_init_kick_novikov(struct Cell *c, double r, double phi, double z,
     double a = sim_GravA(theSim);
     double al = sim_AlphaVisc(theSim);
     double GAM = sim_GAMMALAW(theSim);
+    double ka_es = 0.4;
 
     double r0 = sim_InitPar1(theSim);
-    double Mdot = sim_InitPar2(theSim);
-    double C = sim_InitPar3(theSim);
+    double Mdot_sy = sim_InitPar2(theSim);
+    double CCC = sim_InitPar3(theSim);
     double kickV = sim_InitPar4(theSim);
     double massFac = sim_InitPar5(theSim);
     double a0 = sim_InitPar6(theSim);
@@ -452,7 +454,86 @@ void cell_init_kick_novikov(struct Cell *c, double r, double phi, double z,
     r = X0[1];
     double A0 = a0 * M0;
     double OMK = sqrt(M0 / (r*r*r));
-    double rs = ;
+    double rs = r0;
+    double B = 1 + A0*M0;
+    double C = 1 - 3*M0/r + 2*A0*OMK;
+    double D = 1 - 2*M0/r + A0*A0 / (r*r);
+
+    double th = acos(a0)/3.0;
+    double cth = cos(th);
+    double sth = sin(th);
+    double x1 = cth - sqrt(3.0)*sth;
+    double x2 = cth + sqrt(3.0)*sth;
+    double x3 = -2*cth;
+    double c0 = -a0*a0/(x1*x2*x3);
+    double c1 = (x1-a0)*(x1-a0) / (x1*(x2-x1)*(x3-x1));
+    double c2 = (x2-a0)*(x2-a0) / (x2*(x1-x2)*(x3-x2));
+    double c3 = (x3-a0)*(x3-a0) / (x3*(x1-x3)*(x2-x3));
+    double x = sqrt(r0/M0);
+    double xs = sqrt(rs/M0);
+
+    double p = 1.0 - xs/x - 3/x * (c0*log(x/xs) + c1*log((x-x1)/(xs-x1))
+                            + c2*log((x-x2)/(xs-x2)) + c3*log((x-x3)/(xs-x3)));
+
+    double Mdot_cgs = Mdot_sy * eos_Msolar / eos_year;
+    double Mdot = Mdot_cgs / (eos_rho_scale*eos_r_scale*eos_r_scale*eos_c);
+
+    double Pnt = Mdot / (3*M_PI*al) * OMK * sqrt(C) * p / (D*D);
+    double Qdotnt = 3*Mdot/(4*M_PI) * OMK * OMK * p / C;
+    double Pi_cgs = Pnt * eos_rho_scale*eos_r_scale*eos_c*eos_c;
+    double Qdot_cgs = Qdotnt * eos_rho_scale*eos_c*eos_c*eos_c;
+    double Sig_cgs = pow(8*eos_sb/(3*ka_es*Qdot_cgs)
+                        * Pi_cgs*Pi_cgs*Pi_cgs*Pi_cgs, 0.2);
+    double Signt = Sig_cgs / (eos_rho_scale * eos_r_scale);
+    
+    double rho = Signt;
+    double P = Pnt;
+    double vr = u[1] / u[0];
+    double vp = u[2] / u[0];
+    double vz = u[3] / u[0];
+    double q = r>r0 ? 0.0 : 1.0;
+
+    c->prim[RHO] = rho;
+    c->prim[PPP] = P;
+    c->prim[URR] = vr;
+    c->prim[UPP] = vp;
+    c->prim[UZZ] = 0.0;
+
+    for(i=sim_NUM_C(theSim); i<sim_NUM_Q(theSim); i++)
+        c->prim[i] = q;
+}
+
+void cell_init_kick_novikov_rad(struct Cell *c, double r, double phi, double z,
+                                struct Sim *theSim)
+{
+    // Novikov-Thorne profile with radiation pressure and Thompson opacity
+
+    int i;
+    double M = sim_GravM(theSim);
+    double a = sim_GravA(theSim);
+    double al = sim_AlphaVisc(theSim);
+    double GAM = sim_GAMMALAW(theSim);
+
+    double r0 = sim_InitPar1(theSim);
+    double Mdot = sim_InitPar2(theSim);
+    double CCC = sim_InitPar3(theSim);
+    double kickV = sim_InitPar4(theSim);
+    double massFac = sim_InitPar5(theSim);
+    double a0 = sim_InitPar6(theSim);
+
+    double X[4] = {time_global, r, phi, z};
+    double X0[4], u[4], u0[4];
+
+    double M0 = M / massFac;
+
+    calc_pos_orig(X, X0, M0, a0, M, a, kickV);
+    calc_u_geo(X0, u0, M0, a0);
+    calc_vel_kick(X0, u0, X, u, M0, a0, M, a, kickV);
+
+    r = X0[1];
+    double A0 = a0 * M0;
+    double OMK = sqrt(M0 / (r*r*r));
+    double rs = r0;
     double B = 1 + A0*M0;
     double C = 1 - 3*M0/r + 2*A0*OMK;
     double D = 1 - 2*M0/r + A0*A0 / (r*r);
@@ -474,9 +555,10 @@ void cell_init_kick_novikov(struct Cell *c, double r, double phi, double z,
                             + c2*log((x-x2)/(xs-x2)) + c3*log((x-x3)/(xs-x3)));
 
     //UNITS UNITS UNITS
+    double ka_es = 0.4;
     double Pnt = Mdot / (3*M_PI*al) * OMK * sqrt(C) * p / (D*D);
     double Qdotnt = 3*Mdot/(4*M_PI) * OMK * OMK * Pnt / C;
-    double Signt = pow(8*EOS_SB/(3*KA_ES*Qdotnt) * Pnt*Pnt*Pnt*Pnt, 0.2)
+    double Signt = pow(8*eos_sb/(3*ka_es*Qdotnt) * Pnt*Pnt*Pnt*Pnt, 0.2);
     
     double rho = Signt;
     double P = Pnt;
@@ -494,6 +576,7 @@ void cell_init_kick_novikov(struct Cell *c, double r, double phi, double z,
     for(i=sim_NUM_C(theSim); i<sim_NUM_Q(theSim); i++)
         c->prim[i] = q;
 }
+
 void cell_init_kick_calc(struct Cell *c, double r, double phi, double z,
                             struct Sim *theSim)
 {
@@ -504,7 +587,9 @@ void cell_init_kick_calc(struct Cell *c, double r, double phi, double z,
     else if(opt == 1)
         cell_init_kick_constmach(c, r, phi, z, theSim);
     else if(opt == 2)
-        cell_init_kick_novikov(c, r, phi, z, theSim);
+        cell_init_kick_novikov_gas(c, r, phi, z, theSim);
+    else if(opt == 3)
+        cell_init_kick_novikov_rad(c, r, phi, z, theSim);
     else
         printf("ERROR: cell_init_kick given bad option.\n");
 }
