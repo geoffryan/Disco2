@@ -553,6 +553,23 @@ void cell_cool_integrateT_gr_rad_exact(double *prim, double *dcons, double dt,
     double eps = 0.75 * deh*deh;
 
     //Now that wasn't so bad was it?
+    //
+    //Now double check we haven't over-cooled.
+    //  If tc >~ dt then we've just cooled past eps=0. If tc >> dt then
+    //  its possible the eps we just calculated is > eps0. Big mistake!
+    //
+    //  Solution 1: if eps < Floor value (or if tc >~dt) just set to floor
+    //      value. Aesthetically this perhaps should be handled by the
+    //      cons2prim? Might introduce heat in unwanted areas?
+    //
+    //  Solution 2: if tc >~ dt just set eps here to 0. The prim2cons will be
+    //      fine, and the cons2prim will (hopefully) end up using the floor.
+    //
+    //  In practice, the CS_FLOOR will be set so low these will be almost
+    //      identical.  Let's use (2), the easier one, for now.
+    
+    if(x0 < sht)
+        eps = 0.0;
 
     int NUMQ = sim_NUM_Q(theSim);
     double p[NUMQ];
