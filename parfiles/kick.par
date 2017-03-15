@@ -78,14 +78,14 @@ EOSPar4            0.0      // Burning
 //Cooling
 CoolingType         0       //0 None, 1 Isothermal, 2 Blackbody-Thompson,
                             //3 Blackbody-freefree, 4 Neutrino-Approx,
-                            //5 Neutrino-Itoh
+                            //5 Neutrino-Itoh, 6 Disk-Rad
 CoolPar1            1.0e-3     // Target Temperature
 CoolPar2            1.0     // Timescale
 CoolPar3            0.0
 CoolPar4            0.0
 
 //Initial Condition Parameters
-InitPar0        0           // 0 Isothermal
+InitPar0        0           // 0 Isothermal, 1 ConstMach, 2 NT-gas, 3 NT-rad
 InitPar1        1.0e2       // r0
 InitPar2        1.0         // rho0
 InitPar3        1.0e-3      // T

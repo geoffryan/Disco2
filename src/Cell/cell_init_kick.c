@@ -482,7 +482,9 @@ void cell_init_kick_novikov_gas(struct Cell *c, double r, double phi, double z,
     double Qdotnt = 3*Mdot/(4*M_PI) * OMK * OMK * p / C;
     double Pi_cgs = Pnt * eos_rho_scale*eos_r_scale*eos_c*eos_c;
     double Qdot_cgs = Qdotnt * eos_rho_scale*eos_c*eos_c*eos_c;
+
     double Sig_cgs = pow(8*eos_sb/(3*ka_es*Qdot_cgs)
+                        * eos_mp*eos_mp*eos_mp*eos_mp
                         * Pi_cgs*Pi_cgs*Pi_cgs*Pi_cgs, 0.2);
     double Signt = Sig_cgs / (eos_rho_scale * eos_r_scale);
     
@@ -513,9 +515,10 @@ void cell_init_kick_novikov_rad(struct Cell *c, double r, double phi, double z,
     double a = sim_GravA(theSim);
     double al = sim_AlphaVisc(theSim);
     double GAM = sim_GAMMALAW(theSim);
+    double ka_es = 0.4;
 
     double r0 = sim_InitPar1(theSim);
-    double Mdot = sim_InitPar2(theSim);
+    double Mdot_sy = sim_InitPar2(theSim);
     double CCC = sim_InitPar3(theSim);
     double kickV = sim_InitPar4(theSim);
     double massFac = sim_InitPar5(theSim);
@@ -530,10 +533,19 @@ void cell_init_kick_novikov_rad(struct Cell *c, double r, double phi, double z,
     calc_u_geo(X0, u0, M0, a0);
     calc_vel_kick(X0, u0, X, u, M0, a0, M, a, kickV);
 
+    double rs = r0;
+    
     r = X0[1];
+    double R = r;
+
+    if(r < 1.1*rs)
+    {
+        r = 1.1*rs;
+    }
+
+
     double A0 = a0 * M0;
     double OMK = sqrt(M0 / (r*r*r));
-    double rs = r0;
     double B = 1 + A0*M0;
     double C = 1 - 3*M0/r + 2*A0*OMK;
     double D = 1 - 2*M0/r + A0*A0 / (r*r);
@@ -554,14 +566,52 @@ void cell_init_kick_novikov_rad(struct Cell *c, double r, double phi, double z,
     double p = 1.0 - xs/x - 3/x * (c0*log(x/xs) + c1*log((x-x1)/(xs-x1))
                             + c2*log((x-x2)/(xs-x2)) + c3*log((x-x3)/(xs-x3)));
 
-    //UNITS UNITS UNITS
-    double ka_es = 0.4;
+    double Mdot_cgs = Mdot_sy * eos_Msolar / eos_year;
+    double Mdot = Mdot_cgs / (eos_rho_scale*eos_r_scale*eos_r_scale*eos_c);
+
     double Pnt = Mdot / (3*M_PI*al) * OMK * sqrt(C) * p / (D*D);
-    double Qdotnt = 3*Mdot/(4*M_PI) * OMK * OMK * Pnt / C;
-    double Signt = pow(8*eos_sb/(3*ka_es*Qdotnt) * Pnt*Pnt*Pnt*Pnt, 0.2);
-    
+    double Qdotnt = 3*Mdot/(4*M_PI) * OMK * OMK * p / C;
+    double Pi_cgs = Pnt * eos_rho_scale*eos_r_scale*eos_c*eos_c;
+    double Qdot_cgs = Qdotnt * eos_rho_scale*eos_c*eos_c*eos_c;
+
+    // Find the effective omega for Abramowicz height formula
+    double om = OMK / (1+A0*OMK);
+    double ut = (1+A0*OMK) / sqrt(C);
+    double up = om*ut;
+    double l = -2*M0*A0/r * ut + (r*r + A0*A0 + 2*M0*A0*A0/r) * up;
+    double e = -(1-2*M0/r) * ut + -2*M0*A0/r * up;
+    double ls = sqrt(l*l - A0*A0*(e*e-1.));
+    double oms = ls/(r*r);
+
+    // Get specific internal energy
+    double xx = ka_es * Qdot_cgs / (oms * eos_c*eos_c);
+    double eps = 0.375 * xx*xx / (sqrt(1+xx*xx)+1);
+
+    double Signt = 3*Pnt / eps;
+
     double rho = Signt;
     double P = Pnt;
+
+    if(R != r)
+    {
+        double width = 2 * M0;
+        double sig0 = 1.0e-6 * Signt;
+        double P0 = 1.0e-6 * Pnt;
+
+        if(R > r-width)
+        {
+            double y = 0.5*M_PI * (R - (r-width))/r;
+            double siny = sin(y);
+            rho = sig0 + (Signt-sig0) * siny * siny;
+            P = P0 + (Pnt-P0) * siny * siny;
+        }
+        else
+        {
+            rho = sig0;
+            P = P0;
+        }
+    }
+    
     double vr = u[1] / u[0];
     double vp = u[2] / u[0];
     double vz = u[3] / u[0];
