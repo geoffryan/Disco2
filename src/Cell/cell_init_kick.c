@@ -452,9 +452,16 @@ void cell_init_kick_novikov_gas(struct Cell *c, double r, double phi, double z,
     calc_vel_kick(X0, u0, X, u, M0, a0, M, a, kickV);
 
     r = X0[1];
+    double rs = r0;
+    double R = r;
+
+    if(r < 1.1*rs)
+    {
+        r = 1.1*rs;
+    }
+
     double A0 = a0 * M0;
     double OMK = sqrt(M0 / (r*r*r));
-    double rs = r0;
     double B = 1 + A0*M0;
     double C = 1 - 3*M0/r + 2*A0*OMK;
     double D = 1 - 2*M0/r + A0*A0 / (r*r);
@@ -469,7 +476,7 @@ void cell_init_kick_novikov_gas(struct Cell *c, double r, double phi, double z,
     double c1 = (x1-a0)*(x1-a0) / (x1*(x2-x1)*(x3-x1));
     double c2 = (x2-a0)*(x2-a0) / (x2*(x1-x2)*(x3-x2));
     double c3 = (x3-a0)*(x3-a0) / (x3*(x1-x3)*(x2-x3));
-    double x = sqrt(r0/M0);
+    double x = sqrt(r/M0);
     double xs = sqrt(rs/M0);
 
     double p = 1.0 - xs/x - 3/x * (c0*log(x/xs) + c1*log((x-x1)/(xs-x1))
@@ -490,6 +497,27 @@ void cell_init_kick_novikov_gas(struct Cell *c, double r, double phi, double z,
     
     double rho = Signt;
     double P = Pnt;
+
+    if(R != r)
+    {
+        double width = 3 * M0;
+        double sig0 = 1.0e-6 * Signt;
+        double P0 = 1.0e-6 * Pnt;
+
+        if(R > r-width)
+        {
+            double y = 0.5*M_PI * (R - (r-width))/r;
+            double siny = sin(y);
+            rho = sig0 + (Signt-sig0) * siny * siny;
+            P = P0 + (Pnt-P0) * siny * siny;
+        }
+        else
+        {
+            rho = sig0;
+            P = P0;
+        }
+    }
+
     double vr = u[1] / u[0];
     double vp = u[2] / u[0];
     double vz = u[3] / u[0];
@@ -543,7 +571,6 @@ void cell_init_kick_novikov_rad(struct Cell *c, double r, double phi, double z,
         r = 1.1*rs;
     }
 
-
     double A0 = a0 * M0;
     double OMK = sqrt(M0 / (r*r*r));
     double B = 1 + A0*M0;
@@ -560,7 +587,7 @@ void cell_init_kick_novikov_rad(struct Cell *c, double r, double phi, double z,
     double c1 = (x1-a0)*(x1-a0) / (x1*(x2-x1)*(x3-x1));
     double c2 = (x2-a0)*(x2-a0) / (x2*(x1-x2)*(x3-x2));
     double c3 = (x3-a0)*(x3-a0) / (x3*(x1-x3)*(x2-x3));
-    double x = sqrt(r0/M0);
+    double x = sqrt(r/M0);
     double xs = sqrt(rs/M0);
 
     double p = 1.0 - xs/x - 3/x * (c0*log(x/xs) + c1*log((x-x1)/(xs-x1))
@@ -584,7 +611,7 @@ void cell_init_kick_novikov_rad(struct Cell *c, double r, double phi, double z,
     double oms = ls/(r*r);
 
     // Get specific internal energy
-    double xx = ka_es * Qdot_cgs / (oms * eos_c*eos_c);
+    double xx = 4 * ka_es * Qdot_cgs / (oms*eos_c/eos_r_scale * eos_c*eos_c);
     double eps = 0.375 * xx*xx / (sqrt(1+xx*xx)+1);
 
     double Signt = 3*Pnt / eps;
@@ -595,8 +622,8 @@ void cell_init_kick_novikov_rad(struct Cell *c, double r, double phi, double z,
     if(R != r)
     {
         double width = 2 * M0;
-        double sig0 = 1.0e-6 * Signt;
-        double P0 = 1.0e-6 * Pnt;
+        double sig0 = 1.0e0 * Signt;
+        double P0 = 1.0e0 * Pnt;
 
         if(R > r-width)
         {

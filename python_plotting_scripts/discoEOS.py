@@ -10,6 +10,7 @@ rg_solar = 1.4766250385e5
 M_solar = 1.9884e33
 year = 3.15569252e7
 rho_scale = 1.0
+r_scale = rg_solar
 
 def P_gas(rho, T, pars):
     eos_x1 = pars['EOSPar1']

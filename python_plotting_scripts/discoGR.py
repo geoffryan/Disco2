@@ -1,4 +1,5 @@
 import numpy as np
+import math
 
 # 0: Flat, cyl coords
 # 1: Schwarzschild, schwarzschild coords
@@ -206,3 +207,96 @@ def lapse(r, pars):
         al = 1.0 / np.sqrt(1.0+2.0*M/r)
 
     return al
+
+def isco(pars):
+    
+    M = pars['GravM']
+    a = pars['GravA']
+    A = M*a
+
+    if pars['Metric'] == 0:
+        Risco = None
+
+    elif pars['Metric'] == 1:
+        Risco = 6*M
+    
+    elif pars['Metric'] == 2:
+        Risco = 6*M
+
+    elif pars['Metric'] == 3:
+        Risco = None
+
+    elif pars['Metric'] == 4:
+        Z1 = 1. + math.pow((1-a*a)*(1+a),1./3) + math.pow((1-a*a)*(1-a),1./3)
+        Z2 = math.sqrt(3*a*a + Z1*Z1)
+        if a > 0.0:
+            Risco = M*(3.0 + Z2 - math.sqrt((3.0-Z1)*(3.0+Z1+2*Z2)))
+        else:
+            Risco = M*(3.0 + Z2 + math.sqrt((3.0-Z1)*(3.0+Z1+2*Z2)))
+
+    elif pars['Metric'] == 5:
+        Risco = None
+
+    elif pars['Metric'] == 6:
+        Risco = 6*M
+
+    return Risco
+
+def ergo(pars):
+    
+    M = pars['GravM']
+    a = pars['GravA']
+    A = M*a
+
+    if pars['Metric'] == 0:
+        Rergo = None
+
+    elif pars['Metric'] == 1:
+        Rergo = None
+    
+    elif pars['Metric'] == 2:
+        Rergo = None
+
+    elif pars['Metric'] == 3:
+        Rergo = None
+
+    elif pars['Metric'] == 4:
+        Rergo = 2*M
+
+    elif pars['Metric'] == 5:
+        Rergo = None
+
+    elif pars['Metric'] == 6:
+        Rergo = None
+
+    return Rergo
+
+def horizon(pars):
+    
+    M = pars['GravM']
+    a = pars['GravA']
+    A = M*a
+
+    if pars['Metric'] == 0:
+        R = None
+
+    elif pars['Metric'] == 1:
+        Reh = 2*M
+    
+    elif pars['Metric'] == 2:
+        Reh = 2*M
+
+    elif pars['Metric'] == 3:
+        Reh = None
+
+    elif pars['Metric'] == 4:
+        Reh = M*(1+math.sqrt((1-a)*(1+a)))
+
+    elif pars['Metric'] == 5:
+        Reh = None
+
+    elif pars['Metric'] == 6:
+        Reh = 2*M
+
+    return Reh
+
