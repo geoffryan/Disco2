@@ -501,12 +501,12 @@ void cell_init_kick_novikov_gas(struct Cell *c, double r, double phi, double z,
     if(R != r)
     {
         double width = 3 * M0;
-        double sig0 = 1.0e-6 * Signt;
-        double P0 = 1.0e-6 * Pnt;
+        double sig0 = 1.0e-1 * Signt;
+        double P0 = 1.0e-1 * Pnt;
 
         if(R > r-width)
         {
-            double y = 0.5*M_PI * (R - (r-width))/r;
+            double y = 0.5*M_PI * (R - (r-width))/width;
             double siny = sin(y);
             rho = sig0 + (Signt-sig0) * siny * siny;
             P = P0 + (Pnt-P0) * siny * siny;
@@ -621,13 +621,13 @@ void cell_init_kick_novikov_rad(struct Cell *c, double r, double phi, double z,
 
     if(R != r)
     {
-        double width = 2 * M0;
-        double sig0 = 1.0e0 * Signt;
-        double P0 = 1.0e0 * Pnt;
+        double width = 3 * M0;
+        double sig0 = 1.0e-1 * Signt;
+        double P0 = 1.0e-1 * Pnt;
 
         if(R > r-width)
         {
-            double y = 0.5*M_PI * (R - (r-width))/r;
+            double y = 0.5*M_PI * (R - (r-width))/width;
             double siny = sin(y);
             rho = sig0 + (Signt-sig0) * siny * siny;
             P = P0 + (Pnt-P0) * siny * siny;
