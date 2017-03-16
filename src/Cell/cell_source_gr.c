@@ -505,6 +505,7 @@ void cell_cool_integrateT_gr_rad_exact(double *prim, double *dcons, double dt,
     {
         double M = sim_GravM(theSim);
         double a = sim_GravA(theSim);
+        double A = M*a;
 
         double Z1 = 1. + pow((1-a*a)*(1+a), 1./3) + pow((1-a*a)*(1-a), 1./3);
         double Z2 = sqrt(3.*a*a + Z1*Z1);
@@ -517,24 +518,25 @@ void cell_cool_integrateT_gr_rad_exact(double *prim, double *dcons, double dt,
 
         if(r > Risco)
         {
-            double U0 = (r+a*M*sqrt(M/r)) / sqrt(r*r-3*M*r+2*a*M*sqrt(M*r));
+            double U0 = (r+A*sqrt(M/r)) / sqrt(r*r-3*M*r+2*A*sqrt(M*r));
             double omk = sqrt(M/(r*r*r));
-            double om = omk / (1+a*M*omk);
-            double l = U0*(-2*M*M*a/r + (r*r+a*a*M*M+2*M*M*M*a*a/r)*om);
-            double e = U0*(-1 + 2*M/r - 2*M*M*a*om/r);
-            double ls = sqrt(l*l - a*a*M*M*(e*e-1));
+            double om = omk / (1+A*omk);
+            double l = U0*(-2*M*A/r + (r*r+A*A+2*M*A*A/r)*om);
+            double e = U0*(-1 + 2*M/r - 2*M*A*om/r);
+            double ls = sqrt(l*l - A*A*(e*e-1));
             oms = ls/(r*r);
         }
         else
         {
             double omk = sqrt(M/(Risco*Risco*Risco));
-            double om = omk / (1+a*M*omk);
-            double U0 = (1+a*M*om) / sqrt(1 - 3*M/r + 2*a*M*om);
+            double om = omk / (1+A*omk);
+            double U0 = (1+A*omk) / sqrt(1 - 3*M/Risco + 2*A*omk);
             double UP = U0*om;
-            double l = -2*M*M*a/Risco * U0 + (r*r+a*a*M*M+2*M*a*a/r)*UP;
-            double e = -(1-2*M/Risco) * U0 - 2*M*M*a/Risco * UP;
-            double ls = sqrt(l*l - a*a*M*M*(e*e-1));
-            oms = ls / r*r;
+            double l = -2*M*A/Risco * U0
+                        + (Risco*Risco+A*A+2*M*A*A/Risco) * UP;
+            double e = -(1-2*M/Risco) * U0 - 2*M*A/Risco * UP;
+            double ls = sqrt(l*l - A*A*(e*e-1));
+            oms = ls / (r*r);
         }
     }
     else
@@ -569,7 +571,16 @@ void cell_cool_integrateT_gr_rad_exact(double *prim, double *dcons, double dt,
     //      identical.  Let's use (2), the easier one, for now.
     
     if(x0 < sht)
+    {
+        printf("Overcooled: r=%.6lg eps0=%.6lg tc=%.6lg dt=%.6lg\n",
+                    pos[R_DIR], eps0, tc, dt); 
+        printf("            sig=%.6lg, u0=%.6lg, oms=%.6lg, vp=%.6lg\n", 
+                    sig, u0, oms, prim[UPP]);
+        printf("            sig=%.6lg, u0=%.6lg, oms=%.6lg, vp=%.6lg\n", 
+                    sig*eos_rho_scale*eos_r_scale, u0, oms*eos_c/eos_r_scale,
+                    prim[UPP]*eos_c/eos_r_scale);
         eps = 0.0;
+    }
 
     int NUMQ = sim_NUM_Q(theSim);
     double p[NUMQ];
