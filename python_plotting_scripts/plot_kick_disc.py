@@ -10,6 +10,63 @@ import discoGR as gr
 RMAX = np.inf
 scale = 'log'
 
+def calc_spectrum(filename, nu, pars):
+
+    dat = dp.readCheckpoint(filename)
+    t = dat[0]
+    r = dat[1]
+    sig = dat[4]
+    pi  = dat[5]
+    vr = dat[6]
+    vp = dat[7]
+    dA = dat[9]
+    qs = np.array(dat[10])
+
+    M = pars['GravM']
+    a = pars['GravA']
+    A = a*M
+
+    u0, ur, up = gr.calc_u(r, vr, vp, pars)
+    g00, g0r, g0p, grr, grp, gpp = gr.calc_g(r, pars)
+    l0 = g00*u0 + g0r*ur + g0p*up
+    lr = g0r*u0 + grr*ur + grp*up
+    lp = g0p*u0 + grp*ur + gpp*up
+
+    gam = pars['Adiabatic_Index']
+
+    eps = pi/((gam-1)*sig)
+    oms = np.sqrt(lp*lp - A*A*(l0*l0-1)) / r*r
+    sigh = sig + gam/(gam-1)*pi
+    H = np.sqrt(pi/sigh)/oms
+    P = pi / (2*H)
+    rho = sig / (2*H)
+    rho_cgs = rho * eos.rho_scale
+    P_cgs = P * eos.rho_scale*eos.c*eos.c
+    H_cgs = H * eos.r_scale
+    sig_cgs = sig * eos.rho_scale * eos.r_scale
+    pi_cgs = pi * eos.rho_scale * eos.r_scale * eos.c*eos.c
+
+    t_cgs = t * eos.r_scale / eos.c
+
+    if pars['CoolingType'] == 6:
+        T_erg = np.power(0.25*eos.c/eos.sb * P_cgs, 0.25)
+    else:
+        T_erg = eos.mp*pi_cgs/sig_cgs
+    T_K = T_erg / eos.kb
+
+    tau = eos.ka_es * sig_cgs
+
+    F = 4*eos.sb/(3*tau) * T_erg*T_erg*T_erg*T_erg
+
+    T_eff = np.power(F/eos.sb, 0.25)
+
+    Inu = 2*eos.h*(nu*nu*nu)[:,None] / (eos.c*eos.c*
+            (np.exp(eos.h * nu[:,None]/T_erg[None,:])-1.0))
+
+    Fnu = (Inu[:,:] * dA[None,:]).sum(axis=1)
+
+    return t_cgs, Inu, Fnu
+
 def plot_r_profile_single(ax, r, f, sca, ylabel, pars):
 
     ax.plot(r, f, 'k+')
@@ -109,7 +166,27 @@ if __name__ == "__main__":
     
     parname = sys.argv[1]
     pars = dp.readParfile(parname)
-    for filename in sys.argv[2:]:
+
+    nu_min = 3.0e11  # 300GHz, far IR
+    nu_max = 3.0e21  # 3000 PHz, gamma-ray
+    Nnu = 300
+    nu = np.logspace(math.log10(nu_min), math.log10(nu_max), 
+                        num=Nnu, base=10.0)
+
+    Fnus = np.empty((len(sys.argv[2:]), Nnu), dtype=np.float)
+    ts = np.empty(len(sys.argv[2:]), dtype=np.float)
+
+    for i, filename in enumerate(sys.argv[2:]):
         fig = plot_r_profile(filename, pars, sca=scale)
         plt.close(fig)
+        t, Inu, Fnu = calc_spectrum(filename, nu, pars)
+        Fnus[i,:] = Fnu[:]
+        ts[i] = t
 
+    f = open("emission.txt", "w")
+    line = " ".join([str(x) for x in nu])
+    f.write(line + "\n")
+    for i in range(ts.shape[0]):
+        line = str(ts[i]) + " " + " ".join([str(fnu) for fnu in Fnus[i,:]])
+        f.write(line + "\n")
+    f.close()

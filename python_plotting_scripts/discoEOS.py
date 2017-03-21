@@ -9,6 +9,8 @@ mp = 1.672621777e-24
 rg_solar = 1.4766250385e5
 M_solar = 1.9884e33
 year = 3.15569252e7
+eV = 1.60217662e-12
+ka_es = 0.4
 rho_scale = 1.0
 r_scale = rg_solar
 
