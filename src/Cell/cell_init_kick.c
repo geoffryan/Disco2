@@ -19,6 +19,7 @@ void calc_pos_orig(double *X, double *X0, double M0, double a0,
                     double M1, double a1, double V);
 void calc_vel_kick(double *X0, double *U0, double *X, double *U,
                     double M0, double a0, double M1, double a1, double V);
+double calc_isco(double M, double a);
 
 void calc_pos_orig(double *X, double *X0, double M0, double a0, 
                     double M1, double a1, double V)
@@ -264,12 +265,8 @@ void calc_vel_kick(double *X0, double *U0, double *X, double *U,
     }
 }
 
-void calc_u_geo(double *x, double *u, double M, double a)
+double calc_isco(double M, double a)
 {
-    double r = x[1];
-    double phi = x[2];
-    double z = 0.0;
-    
     double Z1 = 1.0 + pow((1.0-a*a)*(1.0+a), 1.0/3.0)
                      + pow((1.0-a*a)*(1.0-a), 1.0/3.0);
     double Z2 = sqrt(3.0*a*a + Z1*Z1);
@@ -278,6 +275,17 @@ void calc_u_geo(double *x, double *u, double M, double a)
         Risco = M*(3.0 + Z2 - sqrt((3.0-Z1)*(3.0+Z1+2.0*Z2)));
     else
         Risco = M*(3.0 + Z2 + sqrt((3.0-Z1)*(3.0+Z1+2.0*Z2)));
+
+    return Risco;
+}
+
+void calc_u_geo(double *x, double *u, double M, double a)
+{
+    double r = x[1];
+    double phi = x[2];
+    double z = 0.0;
+    
+    double Risco = calc_isco(M, a);
 
     if(r > Risco)
     {
@@ -437,7 +445,7 @@ void cell_init_kick_novikov_gas(struct Cell *c, double r, double phi, double z,
 
     double r0 = sim_InitPar1(theSim);
     double Mdot_sy = sim_InitPar2(theSim);
-    double CCC = sim_InitPar3(theSim);
+    double cavFac = sim_InitPar3(theSim);
     double kickV = sim_InitPar4(theSim);
     double massFac = sim_InitPar5(theSim);
     double a0 = sim_InitPar6(theSim);
@@ -452,13 +460,13 @@ void cell_init_kick_novikov_gas(struct Cell *c, double r, double phi, double z,
     calc_vel_kick(X0, u0, X, u, M0, a0, M, a, kickV);
 
     r = X0[1];
-    double rs = r0;
+    double rs = calc_isco(M0, a0);
     double R = r;
 
+    if(r < r0)
+        r = r0;
     if(r < 1.1*rs)
-    {
         r = 1.1*rs;
-    }
 
     double A0 = a0 * M0;
     double OMK = sqrt(M0 / (r*r*r));
@@ -498,11 +506,11 @@ void cell_init_kick_novikov_gas(struct Cell *c, double r, double phi, double z,
     double rho = Signt;
     double P = Pnt;
 
-    if(R != r)
+    if(r != R)
     {
         double width = 3 * M0;
-        double sig0 = 1.0e-3 * Signt;
-        double P0 = 1.0e-3 * Pnt;
+        double sig0 = cavFac * Signt;
+        double P0 = cavFac * Pnt;
 
         if(R > r-width)
         {
@@ -547,7 +555,7 @@ void cell_init_kick_novikov_rad(struct Cell *c, double r, double phi, double z,
 
     double r0 = sim_InitPar1(theSim);
     double Mdot_sy = sim_InitPar2(theSim);
-    double CCC = sim_InitPar3(theSim);
+    double cavFac = sim_InitPar3(theSim);
     double kickV = sim_InitPar4(theSim);
     double massFac = sim_InitPar5(theSim);
     double a0 = sim_InitPar6(theSim);
@@ -561,15 +569,15 @@ void cell_init_kick_novikov_rad(struct Cell *c, double r, double phi, double z,
     calc_u_geo(X0, u0, M0, a0);
     calc_vel_kick(X0, u0, X, u, M0, a0, M, a, kickV);
 
-    double rs = r0;
+    double rs = calc_isco(M0, a0);
     
     r = X0[1];
     double R = r;
 
+    if(r < r0)
+        r = r0;
     if(r < 1.1*rs)
-    {
         r = 1.1*rs;
-    }
 
     double A0 = a0 * M0;
     double OMK = sqrt(M0 / (r*r*r));

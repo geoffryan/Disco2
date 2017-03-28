@@ -543,7 +543,8 @@ void cell_cool_integrateT_gr_rad_exact(double *prim, double *dcons, double dt,
         oms = 0.0;
 
     //cooling timescale
-    double tc = sig*(ka*eos_rho_scale*eos_r_scale)*u0 / (3.0 * oms);
+    double tau = (sig*eos_rho_scale*eos_r_scale)*ka;
+    double tc = (tau+1.0/tau)*u0 / (3.0 * oms);
 
     // Here we solve the equation d/dt (eps) = - 8 * sb * T^4 / 3*tau
     // exactly.  The strange variables make it easier to express
