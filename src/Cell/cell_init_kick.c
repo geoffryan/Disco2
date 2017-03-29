@@ -630,8 +630,8 @@ void cell_init_kick_novikov_rad(struct Cell *c, double r, double phi, double z,
     if(R != r)
     {
         double width = 3 * M0;
-        double sig0 = 1.0e-3 * Signt;
-        double P0 = 1.0e-3 * Pnt;
+        double sig0 = cavFac * Signt;
+        double P0 = cavFac * Pnt;
 
         if(R > r-width)
         {

@@ -35,7 +35,7 @@ def calc_spectrum(filename, nu, pars):
     gam = pars['Adiabatic_Index']
 
     eps = pi/((gam-1)*sig)
-    oms = np.sqrt(lp*lp - A*A*(l0*l0-1)) / r*r
+    oms = np.sqrt(lp*lp - A*A*(l0*l0-1)) / (r*r)
     sigh = sig + gam/(gam-1)*pi
     H = np.sqrt(pi/sigh)/oms
     P = pi / (2*H)
@@ -114,6 +114,9 @@ def plot_r_profile(filename, pars, sca='linear'):
     qs = qs[:,real]
 
     GAM = pars['Adiabatic_Index']
+    M = pars['GravM']
+    a = pars['GravA']
+    A = M*a
 
     R = np.linspace(r.min(), r.max(), 500)
     
@@ -122,7 +125,18 @@ def plot_r_profile(filename, pars, sca='linear'):
     cs = np.sqrt(GAM * pi / sigh)
     eps =  pi / ((GAM-1.0)*sig)
 
+    lapse = gr.lapse(r, pars)
     u0, ur, up = gr.calc_u(r, vr, vp, pars)
+    g00, g0r, g0p, grr, grp, gpp = gr.calc_g(r, pars)
+    l0 = g00*u0 + g0r*ur + g0p*up
+    lr = g0r*u0 + grr*ur + grp*up
+    lp = g0p*u0 + grp*ur + gpp*up
+    w = lapse*u0
+    u2 = w*w-1.0
+    mach = np.sqrt(u2*(1-cs*cs)/(cs*cs))
+    
+    oms = np.sqrt(lp*lp - A*A*(l0*l0-1)) / (r*r)
+    H = np.sqrt(pi/sigh)/oms
 
     Mdot = -2*math.pi* r * sig * ur
 
@@ -130,6 +144,19 @@ def plot_r_profile(filename, pars, sca='linear'):
     pi_cgs = pi * eos.rho_scale*eos.r_scale*eos.c*eos.c
     vr_cgs = vr * eos.c
     vp_cgs = vp * eos.c/eos.r_scale
+    oms_cgs = oms * eos.c/eos.r_scale
+    H_cgs = H * eos.r_scale
+    t_cgs = t * eos.r_scale/eos.c
+    
+    tau = eos.ka_es * sig_cgs
+
+    if pars['CoolingType'] == 6:
+        tcool = (tau+1.0/tau)*u0 / (3.0*oms_cgs) * np.sqrt(np.fmin(eps,1))
+    elif pars['CoolingType'] == 2:
+        tcool = 0.375 * tau * sig_cgs * u0 / (eos.sb*(eos.mp**4)*(gam-1)**4)\
+                    * np.power(eps*eos.c*eos.c, -3)
+    else:
+        tcool = np.inf * np.ones(tau.shape)
 
     print("Plotting t = {0:g}".format(t))
 
@@ -145,6 +172,16 @@ def plot_r_profile(filename, pars, sca='linear'):
     plot_r_profile_single(ax[1,0], r, vr_cgs,  "linear",  r"$v^r$ (cm/s)",
                             pars)
     plot_r_profile_single(ax[1,1], r, vp_cgs,  "linear",  r"$v^\phi$ (s$^{-1})$",
+                            pars)
+    if pars['CoolingType'] != 0:
+        ax[2,0].axhline(t_cgs, lw=2, color='grey', alpha=0.5)
+        ax[2,0].plot(R, 2*np.pi*R*np.sqrt(R/M)*eos.r_scale/eos.c, 
+                        lw=2, ls='--', color='grey', alpha=0.5)
+        plot_r_profile_single(ax[2,0], r, tcool,  sca,  r"$t_{cool}$ (s)",
+                                pars)
+    plot_r_profile_single(ax[2,1], r, tau,  sca,  r"$\tau$",
+                            pars)
+    plot_r_profile_single(ax[2,2], r, mach,  sca,  r"$\mathcal{M}$",
                             pars)
 
     plt.suptitle(r"$T = {0:.3g}$".format(t))
