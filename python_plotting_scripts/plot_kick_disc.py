@@ -153,7 +153,7 @@ def plot_r_profile(filename, pars, sca='linear'):
     if pars['CoolingType'] == 6:
         tcool = (tau+1.0/tau)*u0 / (3.0*oms_cgs) * np.sqrt(np.fmin(eps,1))
     elif pars['CoolingType'] == 2:
-        tcool = 0.375 * tau * sig_cgs * u0 / (eos.sb*(eos.mp**4)*(gam-1)**4)\
+        tcool = 0.375 * tau * sig_cgs * u0 / (eos.sb*(eos.mp**4)*(GAM-1)**4)\
                     * np.power(eps*eos.c*eos.c, -3)
     else:
         tcool = np.inf * np.ones(tau.shape)

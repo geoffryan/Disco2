@@ -64,6 +64,23 @@ class Grid:
         else:
             print("Given checkpoint has different grid structure, can not load.")
 
+    def cells(self):
+        for k in xrange(self.nz_tot):
+            zp = self.zFaces[k+1]
+            zm = self.zFaces[k]
+            for j in xrange(self.nr_tot):
+                rp = self.rFaces[j+1]
+                rm = self.rFaces[j]
+                for i in xrange(self.np[k][j]):
+                    pp = self.pFaces[k][j][i]
+                    pm = self.pFaces[k][j][i-1]
+                    if pm > pp:
+                        pm -= 2*np.pi
+                    xa = np.array([rm, pm, zm]) 
+                    xb = np.array([rp, pp, zp])
+                    prim = self.prim[k][j][i]
+                    yield (xa, xb, prim)
+
     def saveCheckpoint(self, filename, numProc=1, loadBalance="default"):
         # Saves grid to checkpoint file, emulating Disco's behaviour for
         # distribution amongst several processes.  loadBalance should be
