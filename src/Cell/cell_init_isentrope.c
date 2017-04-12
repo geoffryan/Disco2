@@ -9,13 +9,13 @@
 #include "../Headers/header.h"
 
 void cell_single_init_isentrope(struct Cell *theCell, struct Sim *theSim,int i,int j,int k){
-    double rho_ref  = 1.0;
-    double P_ref  = 100.0;
-    double v_ref = 0.0;
-    double GAMMALAW = sim_GAMMALAW(theSim);
-    double L = 0.3;
-    double a = 1.0;
-    double x0 = 0.5;
+    double rho_ref = sim_InitPar1(theSim); // 1.0 for RAM
+    double P_ref = sim_InitPar2(theSim);   // 100 for RAM
+    double v_ref = sim_InitPar3(theSim);   // 0   for RAM
+    double GAMMALAW = sim_GAMMALAW(theSim);// 5/3 for RAM
+    double L = sim_InitPar4(theSim);       // 0.3 for RAM
+    double a = sim_InitPar5(theSim);       // 1.0 for RAM
+    double x0 = sim_InitPar6(theSim);      // Away from axis
     double rho, P, v;
 
     double rm = sim_FacePos(theSim,i-1,R_DIR);
@@ -63,13 +63,13 @@ void cell_single_init_isentrope(struct Cell *theCell, struct Sim *theSim,int i,i
 
 void cell_init_isentrope(struct Cell ***theCells,struct Sim *theSim,struct MPIsetup * theMPIsetup)
 {
-    double rho_ref  = 1.0;
-    double P_ref  = 100.0;
-    double v_ref  = 0.0;
-    double GAMMALAW = sim_GAMMALAW(theSim);
-    double L = 0.3;
-    double a = 1.0;
-    double x0 = 0.5;
+    double rho_ref = sim_InitPar1(theSim); // 1.0 for RAM
+    double P_ref = sim_InitPar2(theSim);   // 100 for RAM
+    double v_ref = sim_InitPar3(theSim);   // 0   for RAM
+    double GAMMALAW = sim_GAMMALAW(theSim);// 5/3 for RAM
+    double L = sim_InitPar4(theSim);       // 0.3 for RAM
+    double a = sim_InitPar5(theSim);       // 1.0 for RAM
+    double x0 = sim_InitPar6(theSim);      // Away from axis
     double K = P_ref / pow(rho_ref, GAMMALAW);
     double rho, P, v;
 
