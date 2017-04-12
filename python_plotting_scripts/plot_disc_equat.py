@@ -1,6 +1,8 @@
 import math
 import pickle
 import h5py as h5
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.tri as tri
 import matplotlib.collections as coll
