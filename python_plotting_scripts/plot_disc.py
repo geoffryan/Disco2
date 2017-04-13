@@ -19,6 +19,7 @@ def allTheThings(filename, pars):
     vr = dat[6]
     vp = dat[7]
     q = dat[10]
+    piph = dat[11]
     u0, ur, up = gr.calc_u(r, vr, vp, pars)
     M = pars['GravM']
 
@@ -42,7 +43,7 @@ def allTheThings(filename, pars):
         P = pi/H
         T = pi/sig
 
-    return t, r, phi, rho, sig, T, P, pi, H, vr, vp, u0, q
+    return t, r, phi, rho, sig, T, P, pi, H, vr, vp, u0, q, piph
 
 
 def plot_data(ax, x, f, color='k', marker='+'):

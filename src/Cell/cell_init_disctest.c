@@ -252,8 +252,41 @@ void cell_init_disctest_geodesic(struct Cell *c, double r, double phi, double z,
 
     if(sim_NUM_C(theSim)<sim_NUM_Q(theSim)) 
     {
+        int q = sim_NUM_C(theSim);
+        if(q < sim_NUM_Q(theSim))
+        {
+            if(r*cos(phi) < 0.0)
+                c->prim[q] = 0.0;
+            else
+                c->prim[q] = 1.0;
+        }
+        q++;
+        if(q < sim_NUM_Q(theSim))
+        {
+            if(r < 10.0)
+                c->prim[q] = 0.0;
+            else
+                c->prim[q] = 1.0;
+        }
+        q++;
+        if(q < sim_NUM_Q(theSim))
+        {
+            double x0 = 10.0;
+            double y0 = 0.0;
+            double R0 = 1.0;
+            double dx = r*cos(phi) - x0;
+            double dy = r*sin(phi) - y0;
+            double R = sqrt(dx*dx + dy*dy);
+
+            if(R < R0)
+                c->prim[q] = 1.0;
+            else
+                c->prim[q] = 0.0;
+        }
+        q++;
+
         int i;
-        for(i=sim_NUM_C(theSim); i<sim_NUM_Q(theSim); i++)
+        for(i=q; i<sim_NUM_Q(theSim); i++)
         {
             if(r*cos(phi) < 0)
                 c->prim[i] = 0.0;

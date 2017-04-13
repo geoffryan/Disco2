@@ -273,8 +273,8 @@ def plot_all(filename, pars, rmax=-1.0, plot=True, bounds=None,
 
     print("Reading {0:s}".format(filename))
 
-    t, r, phi, rho, sig, T, P, pi, H, vr, vp, u0, Q = pd.allTheThings(filename,
-                                                                        pars)
+    t, r, phi, rho, sig, T, P, pi, H, vr, vp, u0, Q, piph = pd.allTheThings(
+                                                            filename, pars)
 
     gam = pars['Adiabatic_Index']
     S = np.log(pi * np.power(sig, -gam))/(gam-1.0)
@@ -334,6 +334,7 @@ def plot_all(filename, pars, rmax=-1.0, plot=True, bounds=None,
                     "_".join(chckname.split(".")[0].split("_")[1:]), "vp")
         Sname = "plot_disc_equat_{0}_{1}.png".format(
                     "_".join(chckname.split(".")[0].split("_")[1:]), "s")
+        
         #Plot.
 
         localOrbit=None
@@ -384,7 +385,8 @@ def plot_all(filename, pars, rmax=-1.0, plot=True, bounds=None,
                 datbounds=bounds[4],  rocheData=rocheData,
                 quiverData=quiverData, Vmax=Vmax, orbitData=localOrbit, 
                 label=r'$S$', title=title, filename=Sname, cmap=poscmap)
-        
+       
+        """
         #q
         for i,q in enumerate(Q):
             qname = "plot_disc_equat_{0}_{1}{2:01d}.png".format(
@@ -395,7 +397,6 @@ def plot_all(filename, pars, rmax=-1.0, plot=True, bounds=None,
                         quiverData=quiverData, Vmax=Vmax, 
                         orbitData=localOrbit, label=r'$q_{0:d}$'.format(i), 
                         title=title, filename=qname, cmap=poscmap)
-        """
 
     return bounds, Vmax
 
