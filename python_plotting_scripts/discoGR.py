@@ -300,3 +300,81 @@ def horizon(pars):
 
     return Reh
 
+def calc_geo_U(r, pars):
+    
+    M = pars['GravM']
+    a = pars['GravA']
+    A = M*a
+
+    u0 = np.empty(r.shape)
+    ur = np.empty(r.shape)
+    up = np.empty(r.shape)
+
+    Risco = isco(pars)
+    inns = r < Risco
+    outs = r > Risco
+    ri = r[inns]
+    ro = r[outs]
+
+    if pars['Metric'] == 0:
+        u0[:] = 1.0
+        ur[:] = 0.0
+        up[:] = 0.0
+    elif pars['Metric'] == 3:
+        u0[:] = 1.0
+        ur[:] = 0.0
+        up[:] = 0.0
+    elif pars['Metric'] == 1:
+        u0o = 1.0/np.sqrt(1-3*M/ro)
+        uro = np.zeros(ro.shape)
+        upo = u0o * np.sqrt(M/(ro*ro*ro))
+        u0i = 2*math.sqrt(2.)/3. / (1 - 2*M/ri)
+        x = Risco/ri - 1.0
+        uri = -np.sqrt(x*x*x)/3.0
+        upi = 2.*math.sqrt(3.0)*M / (ri*ri)
+        u0[inns] = u0i
+        ur[inns] = uri
+        up[inns] = upi
+        u0[outs] = u0o
+        ur[outs] = uro
+        up[outs] = upo
+    elif pars['Metric'] == 2:
+        u0o = 1.0/np.sqrt(1-3*M/ro)
+        uro = np.zeros(ro.shape)
+        upo = u0o * np.sqrt(M/(ro*ro*ro))
+        x = Risco/ri - 1.0
+        u0i = 2.*(math.sqrt(2.)*ri - M*np.sqrt(x*x*x)) / (3.*(ri - 2*M))
+        uri = -np.sqrt(x*x*x)/3.0
+        upi = 2.*math.sqrt(3.0)*M / (ri*ri)
+        u0[inns] = u0i
+        ur[inns] = uri
+        up[inns] = upi
+        u0[outs] = u0o
+        ur[outs] = uro
+        up[outs] = upo
+    elif pars['Metric'] == 4:
+        u0o = (ro + A*np.sqrt(M/ro)) / np.sqrt(ro*ro - 3*M*ro
+                                                + 2*A*np.sqrt(M*ro))
+        uro = np.zeros(ro.shape)
+        omk = np.sqrt(M/(ro*ro*ro))
+        upo = u0o * omk / (1+A*omk)
+
+        OMK = math.sqrt(M/(Risco*Risco*Risco))
+        U0 = (1. + A*OMK) / math.sqrt(1. - 3*M/Risco + 2*A*OMK)
+        UP = U0 * OMK / (1. + A*OMK)
+        eps = (-1. + 2*M/Risco) * U0 + (-2*M*A/Risco) * UP
+        lll = (-2*M*A/Risco) * U0 + (Risco*Risco + A*A + 2*M*A*A/Risco) * UP
+
+        x = Risco/ri - 1.0
+        u0i = 2.*(math.sqrt(2.)*ri - M*np.sqrt(x*x*x)) / (3.*(ri - 2*M))
+        uri = -np.sqrt(x*x*x)/3.0
+        upi = 2.*math.sqrt(3.0)*M / (ri*ri)
+        u0[inns] = u0i
+        ur[inns] = uri
+        up[inns] = upi
+        u0[outs] = u0o
+        ur[outs] = uro
+        up[outs] = upo
+
+    return u0, ur, up
+

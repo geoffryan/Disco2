@@ -10,6 +10,12 @@ import discoGR as gr
 
 scale = 'linear'
 
+blue = (31.0/255, 119.0/255, 180.0/255)
+orange = (255.0/255, 127.0/255, 14.0/255)
+green = (44.0/255, 160.0/255, 44.0/255)
+red = (214.0/255, 39.0/255, 40.0/255)
+purple = (148.0/255, 103.0/255, 189.0/255)
+
 def allTheThings(filename, pars):
 
     dat = dp.readCheckpoint(filename)
@@ -26,11 +32,11 @@ def allTheThings(filename, pars):
 
     return t, r, phi, rho, P, vr, vp, u0, dV
 
-def plot_data(ax, x, f, color='k', marker='+'):
-    ax.plot(x, f, marker=marker, ls='', color=color)
+def plot_data(ax, x, f, color='k', marker='+', **kwargs):
+    ax.plot(x, f, marker=marker, ls='', color=color, **kwargs)
 
-def plot_line(ax, x, f, color='k', ls='-', lw=2.0, alpha=0.5):
-    ax.plot(x, f, color=color, ls=ls, lw=lw, alpha=alpha)
+def plot_line(ax, x, f, color='k', ls='-', lw=2.0, alpha=0.5, **kwargs):
+    ax.plot(x, f, color=color, ls=ls, lw=lw, alpha=alpha, **kwargs)
 
 def floor_sig(x, sig):
     if x == 0.0:
@@ -52,13 +58,15 @@ def pretty_axis(ax, pars, xscale="linear", yscale="linear",
     ax.set_yscale(yscale)
     ax.set_ylim(ylim)
     if ylabel != None:
-        ax.set_ylabel(ylabel)
+        ax.set_ylabel(ylabel, fontsize=30)
 
     ax.set_xscale(xscale)
     ax.set_xlim(xlim)
 
     if xlabel != None:
-        ax.set_xlabel(xlabel)
+        ax.set_xlabel(xlabel, fontsize=30)
+
+    ax.tick_params(labelsize=18)
 
 def plot_x_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
@@ -126,7 +134,6 @@ def plot_x_profile(filename, pars, sca='linear', plot=True, bounds=None):
 
     if plot:
 
-
         #print("Plotting t = {0:g}".format(t))
 
         #Plot.
@@ -134,36 +141,45 @@ def plot_x_profile(filename, pars, sca='linear', plot=True, bounds=None):
         chckname = filename.split("/")[-1]
 
         # Density
-        fig, ax = plt.subplots(1,1,figsize=(12,9))
-        plot_data(ax, x, rho)
-        plot_line(ax, X, RHO)
+        fig, ax = plt.subplots(1,1,figsize=(8,6))
+        plot_line(ax, X0, RHO, label=r'Initial', color='k', lw=8)
+        plot_line(ax, X, RHO, label=r'Final', color='grey', lw=8)
+        plot_data(ax, x, rho, marker='.', mew=0, ms=5, color=blue, label=r'$\mathtt{Disco}$')
         pretty_axis(ax, pars, xscale=scale, yscale=scale, 
                     ylabel=r"$\rho$", xlabel=r"$x$", ylim=rhoB, xlim=bounds[0])
+        ax.legend(loc='upper left', fontsize=18)
+        fig.tight_layout()
         outname = "plot_cart_rho_{0}.png".format("_".join(chckname.split(".")[0].split("_")[1:]))
         #print("Saving {0:s}...".format(outname))
-        plt.savefig(outname)
+        plt.savefig(outname, dpi=300)
         plt.close(fig)
        
         # Pressure
-        fig, ax = plt.subplots(1,1,figsize=(12,9))
-        plot_data(ax, x, P)
-        plot_line(ax, X, PPP)
+        fig, ax = plt.subplots(1,1,figsize=(8,6))
+        plot_line(ax, X0, PPP, label=r'Initial', color='k', lw=8)
+        plot_line(ax, X, PPP, label=r'Final', color='grey', lw=8)
+        plot_data(ax, x, P, marker='.', mew=0, ms=5, color=blue, label=r'$\mathtt{Disco}$')
         pretty_axis(ax, pars, xscale=scale, yscale=scale, 
                     ylabel=r"$P$", xlabel=r"$x$", ylim=PB, xlim=bounds[0])
+        ax.legend(loc='upper left', fontsize=18)
+        fig.tight_layout()
         outname = "plot_cart_P_{0}.png".format("_".join(chckname.split(".")[0].split("_")[1:]))
         #print("Saving {0:s}...".format(outname))
-        plt.savefig(outname)
+        plt.savefig(outname, dpi=300)
         plt.close(fig)
         
         # Velocity
-        fig, ax = plt.subplots(1,1,figsize=(12,9))
-        plot_data(ax, x, vx)
-        plot_line(ax, X, VVV)
+        fig, ax = plt.subplots(1,1,figsize=(8,6))
+        plot_line(ax, X0, VVV, label=r'Initial', color='k', lw=8)
+        plot_line(ax, X, VVV, label=r'Final', color='grey', lw=8)
+        plot_data(ax, x, vx, marker='.', mew=0, ms=5, color=blue, label=r'$\mathtt{Disco}$')
         pretty_axis(ax, pars, xscale=scale, yscale=scale, 
                     ylabel=r"$v^x$", xlabel=r"$x$", ylim=[0,1], xlim=bounds[0])
+        ax.legend(loc='upper left', fontsize=18)
+        fig.tight_layout()
         outname = "plot_cart_v_{0}.png".format("_".join(chckname.split(".")[0].split("_")[1:]))
         #print("Saving {0:s}...".format(outname))
-        plt.savefig(outname)
+        plt.savefig(outname, dpi=300)
         plt.close(fig)
 
     else:

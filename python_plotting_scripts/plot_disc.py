@@ -138,7 +138,7 @@ def plot_r_profile(filename, pars, sca='linear', plot=True, bounds=None):
     a = pars['GravA']
     A = a*M
 
-    t, r, phi, rho, sig, T, P, pi, H, vr, vp, u0, q = allTheThings(filename, pars)
+    t, r, phi, rho, sig, T, P, pi, H, vr, vp, u0, q, piph = allTheThings(filename, pars)
     
     inds = np.argsort(r)
     r = r[inds]
